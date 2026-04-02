@@ -1,0 +1,25 @@
+<Solution>
+  <Folder Name="/apps/" />
+  <Folder Name="/apps/api/">
+    <Project Path="apps/api/iBalance.Api/iBalance.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/" />
+  <Folder Name="/src/BuildingBlocks/">
+    <Project Path="src/BuildingBlocks/iBalance.BuildingBlocks.Application/iBalance.BuildingBlocks.Application.csproj" />
+    <Project Path="src/BuildingBlocks/iBalance.BuildingBlocks.Domain/iBalance.BuildingBlocks.Domain.csproj" />
+    <Project Path="src/BuildingBlocks/iBalance.BuildingBlocks.Infrastructure/iBalance.BuildingBlocks.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/Finance/">
+    <Project Path="src/Modules/Finance/iBalance.Modules.Finance/iBalance.Modules.Finance.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/OilAndGas/">
+    <Project Path="src/Modules/OilAndGas/iBalance.Modules.OilAndGas/iBalance.Modules.OilAndGas.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Platform/">
+    <Project Path="src/Modules/Platform/iBalance.Modules.Platform/iBalance.Modules.Platform.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Universities/">
+    <Project Path="src/Modules/Universities/iBalance.Modules.Universities/iBalance.Modules.Universities.csproj" />
+  </Folder>
+</Solution>

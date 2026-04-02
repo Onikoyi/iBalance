@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.5" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.5">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\BuildingBlocks\iBalance.BuildingBlocks.Domain\iBalance.BuildingBlocks.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\BuildingBlocks\iBalance.BuildingBlocks.Application\iBalance.BuildingBlocks.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\BuildingBlocks\iBalance.BuildingBlocks.Infrastructure\iBalance.BuildingBlocks.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Platform\iBalance.Modules.Platform\iBalance.Modules.Platform.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Finance\iBalance.Modules.Finance\iBalance.Modules.Finance.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Universities\iBalance.Modules.Universities\iBalance.Modules.Universities.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\OilAndGas\iBalance.Modules.OilAndGas\iBalance.Modules.OilAndGas.csproj" />
+  </ItemGroup>
+
+</Project>

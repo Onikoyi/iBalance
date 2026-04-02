@@ -1,0 +1,6 @@
+@iBalance.Api_HostAddress = http://localhost:5071
+
+GET {{iBalance.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

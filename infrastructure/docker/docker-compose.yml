@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+  ibalance-postgres:
+    image: postgres:16
+    container_name: ibalance-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ibalance
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - ibalance-postgres-data:/var/lib/postgresql/data
+
+  ibalance-redis:
+    image: redis:7
+    container_name: ibalance-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+volumes:
+  ibalance-postgres-data:
