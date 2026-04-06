@@ -17,4 +17,14 @@ public abstract class TenantOwnedEntity : AuditableEntity
     protected TenantOwnedEntity()
     {
     }
+
+    public void AssignTenant(Guid tenantId)
+    {
+        if (tenantId == Guid.Empty)
+        {
+            throw new ArgumentException("TenantId cannot be empty.", nameof(tenantId));
+        }
+
+        TenantId = tenantId;
+    }
 }

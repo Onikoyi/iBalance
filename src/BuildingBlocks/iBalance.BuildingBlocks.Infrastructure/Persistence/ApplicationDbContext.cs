@@ -1,6 +1,8 @@
 using iBalance.BuildingBlocks.Application.Security;
 using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Domain.Common;
+using iBalance.Modules.Finance.Domain.Entities;
+using iBalance.Modules.Finance.Persistence;
 using iBalance.Modules.Platform.Domain.Entities;
 using iBalance.Modules.Platform.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -11,6 +13,11 @@ public class ApplicationDbContext : DbContext
 {
     private readonly ITenantContextAccessor _tenantContextAccessor;
     private readonly ICurrentUserService _currentUserService;
+
+    private Guid? CurrentTenantId =>
+        _tenantContextAccessor.Current.IsAvailable
+            ? _tenantContextAccessor.Current.TenantId
+            : null;
 
     public ApplicationDbContext(
         DbContextOptions<ApplicationDbContext> options,
@@ -24,13 +31,22 @@ public class ApplicationDbContext : DbContext
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<UserAccount> UserAccounts => Set<UserAccount>();
+    public DbSet<LedgerAccount> LedgerAccounts => Set<LedgerAccount>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
         modelBuilder.HasDefaultSchema("public");
+
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(PlatformPersistenceMarker).Assembly);
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(FinancePersistenceMarker).Assembly);
+
+        modelBuilder.Entity<UserAccount>()
+            .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+
+        modelBuilder.Entity<LedgerAccount>()
+            .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
@@ -73,7 +89,7 @@ public class ApplicationDbContext : DbContext
     {
         var entries = ChangeTracker
             .Entries<TenantOwnedEntity>()
-            .Where(entry => entry.State == EntityState.Added);
+            .Where(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted);
 
         foreach (var entry in entries)
         {
@@ -82,9 +98,18 @@ public class ApplicationDbContext : DbContext
                 throw new InvalidOperationException("Tenant context is required for tenant-owned entities.");
             }
 
-            typeof(TenantOwnedEntity)
-                .GetProperty(nameof(TenantOwnedEntity.TenantId))!
-                .SetValue(entry.Entity, _tenantContextAccessor.Current.TenantId);
+            var currentTenantId = _tenantContextAccessor.Current.TenantId;
+
+            if (entry.State == EntityState.Added)
+            {
+                entry.Entity.AssignTenant(currentTenantId);
+                continue;
+            }
+
+            if (entry.Entity.TenantId != currentTenantId)
+            {
+                throw new InvalidOperationException("Cross-tenant data access is not allowed.");
+            }
         }
     }
 }

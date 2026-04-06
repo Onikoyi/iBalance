@@ -4,6 +4,7 @@
     <ProjectReference Include="..\iBalance.BuildingBlocks.Application\iBalance.BuildingBlocks.Application.csproj" />
     <ProjectReference Include="..\iBalance.BuildingBlocks.Domain\iBalance.BuildingBlocks.Domain.csproj" />
     <ProjectReference Include="..\..\Modules\Platform\iBalance.Modules.Platform\iBalance.Modules.Platform.csproj" />
+    <ProjectReference Include="..\..\Modules\Finance\iBalance.Modules.Finance\iBalance.Modules.Finance.csproj" />
   </ItemGroup>
 
   <ItemGroup>

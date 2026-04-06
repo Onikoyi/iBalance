@@ -1,6 +1,7 @@
 using iBalance.Api.Extensions;
 using iBalance.Api.Health;
 using iBalance.Api.Middleware;
+using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Infrastructure.Platform.Seeding;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -43,5 +44,20 @@ app.MapGet("/", (HttpContext httpContext) => Results.Ok(new
     TimestampUtc = DateTime.UtcNow,
     CorrelationId = httpContext.Items[CorrelationIdMiddleware.HeaderName]?.ToString()
 }));
+
+app.MapGet("/diagnostics/tenant", (ITenantContextAccessor tenantContextAccessor) =>
+{
+    var tenantContext = tenantContextAccessor.Current;
+    var isResolved =
+        tenantContext.TenantId != Guid.Empty &&
+        !string.IsNullOrWhiteSpace(tenantContext.TenantKey);
+
+    return Results.Ok(new
+    {
+        Resolved = isResolved,
+        TenantId = isResolved ? tenantContext.TenantId : (Guid?)null,
+        TenantKey = isResolved ? tenantContext.TenantKey : null
+    });
+});
 
 app.Run();

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using iBalance.BuildingBlocks.Infrastructure.Persistence;
 namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260406201706_AddFinanceLedgerAccounts")]
+    partial class AddFinanceLedgerAccounts
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -45,9 +48,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
-                    b.Property<bool>("IsHeader")
-                        .HasColumnType("boolean");
-
                     b.Property<bool>("IsPostingAllowed")
                         .HasColumnType("boolean");
 
@@ -65,15 +65,10 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.Property<int>("NormalBalance")
                         .HasColumnType("integer");
 
-                    b.Property<Guid?>("ParentLedgerAccountId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("ParentLedgerAccountId");
 
                     b.HasIndex("TenantId");
 
@@ -171,21 +166,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("UserAccounts", "platform");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.LedgerAccount", b =>
-                {
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.LedgerAccount", "ParentLedgerAccount")
-                        .WithMany("Children")
-                        .HasForeignKey("ParentLedgerAccountId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("ParentLedgerAccount");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.LedgerAccount", b =>
-                {
-                    b.Navigation("Children");
                 });
 #pragma warning restore 612, 618
         }
