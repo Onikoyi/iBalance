@@ -24,11 +24,9 @@ export const api = axios.create({
 
 api.interceptors.request.use((config) => {
   const tenantKey = getTenantKey();
-
   if (tenantKey) {
     config.headers['X-Tenant-Key'] = tenantKey;
   }
-
   return config;
 });
 
@@ -68,8 +66,8 @@ export type LedgerAccountDto = {
   tenantId: string;
   code: string;
   name: string;
-  category: number;
-  normalBalance: number;
+  category: number; // 1..5
+  normalBalance: number; // 1=Debit, 2=Credit
   isHeader: boolean;
   isPostingAllowed: boolean;
   isActive: boolean;
@@ -84,8 +82,8 @@ export type JournalEntryDto = {
   entryDateUtc: string;
   reference: string;
   description: string;
-  status: number;
-  type: number;
+  status: number; // 1 Draft, 2 Posted, 3 Voided, 4 Reversed
+  type: number; // 1 Normal, 2 OpeningBalance
   postedAtUtc: string | null;
   reversedAtUtc: string | null;
   reversalJournalEntryId: string | null;
@@ -106,9 +104,9 @@ export type FiscalPeriodDto = {
   id: string;
   tenantId: string;
   name: string;
-  startDate: string;
-  endDate: string;
-  status: number;
+  startDate: string; // DateOnly serialized
+  endDate: string; // DateOnly serialized
+  status: number; // 1 Open, 2 Closed
 };
 
 export type BalanceSheetResponse = {
@@ -148,6 +146,7 @@ export type ReportLineDto = {
   amount?: number;
 };
 
+// ----------- READS -----------
 export async function getDashboardSummary() {
   const response = await api.get<DashboardSummaryResponse>('/api/finance/dashboard-summary');
   return response.data;
@@ -175,5 +174,96 @@ export async function getBalanceSheet() {
 
 export async function getIncomeStatement() {
   const response = await api.get<IncomeStatementResponse>('/api/finance/reports/income-statement');
+  return response.data;
+}
+
+// ----------- WRITES (Step 22B) -----------
+export type CreateLedgerAccountRequest = {
+  code: string;
+  name: string;
+  category: number;
+  normalBalance: number;
+  isHeader: boolean;
+  isPostingAllowed: boolean;
+  parentLedgerAccountId?: string | null;
+};
+
+export async function createLedgerAccount(payload: CreateLedgerAccountRequest) {
+  const response = await api.post('/api/finance/accounts', payload);
+  return response.data;
+}
+
+export type JournalLineRequest = {
+  ledgerAccountId: string;
+  description?: string | null;
+  debitAmount: number;
+  creditAmount: number;
+};
+
+export type CreateJournalEntryRequest = {
+  entryDateUtc: string;
+  reference?: string | null;
+  description: string;
+  lines: JournalLineRequest[];
+};
+
+export async function createJournalEntry(payload: CreateJournalEntryRequest) {
+  const response = await api.post('/api/finance/journal-entries', payload);
+  return response.data;
+}
+
+export async function postJournalEntry(journalEntryId: string) {
+  const response = await api.post(`/api/finance/journal-entries/${encodeURIComponent(journalEntryId)}/post`, {});
+  return response.data;
+}
+
+export async function voidJournalEntry(journalEntryId: string) {
+  const response = await api.post(`/api/finance/journal-entries/${encodeURIComponent(journalEntryId)}/void`, {});
+  return response.data;
+}
+
+export type ReverseJournalEntryRequest = {
+  reversalDateUtc: string;
+  reference: string;
+  description: string;
+};
+
+export async function reverseJournalEntry(journalEntryId: string, payload: ReverseJournalEntryRequest) {
+  const response = await api.post(`/api/finance/journal-entries/${encodeURIComponent(journalEntryId)}/reverse`, payload);
+  return response.data;
+}
+
+// Opening balances are created as typed journals and posted immediately. :contentReference[oaicite:3]{index=3}
+export type CreateOpeningBalanceRequest = {
+  entryDateUtc: string;
+  reference?: string | null;
+  description: string;
+  lines: JournalLineRequest[];
+};
+
+export async function createOpeningBalance(payload: CreateOpeningBalanceRequest) {
+  const response = await api.post('/api/finance/opening-balances', payload);
+  return response.data;
+}
+
+export type CreateFiscalPeriodRequest = {
+  name: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  isOpen: boolean;
+};
+
+export async function createFiscalPeriod(payload: CreateFiscalPeriodRequest) {
+  const response = await api.post('/api/finance/fiscal-periods', payload);
+  return response.data;
+}
+
+export async function openFiscalPeriod(fiscalPeriodId: string) {
+  const response = await api.post(`/api/finance/fiscal-periods/${encodeURIComponent(fiscalPeriodId)}/open`, {});
+  return response.data;
+}
+
+export async function closeFiscalPeriod(fiscalPeriodId: string) {
+  const response = await api.post(`/api/finance/fiscal-periods/${encodeURIComponent(fiscalPeriodId)}/close`, {});
   return response.data;
 }
