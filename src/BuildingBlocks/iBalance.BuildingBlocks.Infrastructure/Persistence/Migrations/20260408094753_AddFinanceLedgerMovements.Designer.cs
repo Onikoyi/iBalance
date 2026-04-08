@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using iBalance.BuildingBlocks.Infrastructure.Persistence;
 namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260408094753_AddFinanceLedgerMovements")]
+    partial class AddFinanceLedgerMovements
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -22,52 +25,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.FiscalPeriod", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CreatedBy")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateOnly>("EndDate")
-                        .HasColumnType("date");
-
-                    b.Property<string>("LastModifiedBy")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("LastModifiedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateOnly>("StartDate")
-                        .HasColumnType("date");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId");
-
-                    b.HasIndex("TenantId", "Name")
-                        .IsUnique();
-
-                    b.HasIndex("TenantId", "StartDate", "EndDate");
-
-                    b.ToTable("FiscalPeriods", "finance");
-                });
 
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.JournalEntry", b =>
                 {
@@ -102,33 +59,15 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
-                    b.Property<Guid?>("ReversalJournalEntryId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("ReversedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("ReversedJournalEntryId")
-                        .HasColumnType("uuid");
-
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
-                    b.Property<int>("Type")
-                        .HasColumnType("integer");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("ReversalJournalEntryId");
-
-                    b.HasIndex("ReversedJournalEntryId");
-
                     b.HasIndex("TenantId");
-
-                    b.HasIndex("Type");
 
                     b.HasIndex("TenantId", "Reference");
 
@@ -166,50 +105,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.HasIndex("LedgerAccountId");
 
                     b.ToTable("JournalEntryLines", "finance");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.JournalNumberSequence", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CreatedBy")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("LastModifiedBy")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("LastModifiedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("NextNumber")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Padding")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Prefix")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId");
-
-                    b.HasIndex("TenantId", "Prefix")
-                        .IsUnique();
-
-                    b.ToTable("JournalNumberSequences", "finance");
                 });
 
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.LedgerAccount", b =>
@@ -428,19 +323,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("UserAccounts", "platform");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.JournalEntry", b =>
-                {
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.JournalEntry", null)
-                        .WithMany()
-                        .HasForeignKey("ReversalJournalEntryId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.JournalEntry", null)
-                        .WithMany()
-                        .HasForeignKey("ReversedJournalEntryId")
-                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.JournalEntryLine", b =>

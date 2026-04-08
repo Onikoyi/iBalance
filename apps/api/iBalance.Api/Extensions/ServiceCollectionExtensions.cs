@@ -21,6 +21,17 @@ public static class ServiceCollectionExtensions
         services.AddUniversitiesModule(configuration);
         services.AddOilAndGasModule(configuration);
 
+        services.AddCors(options =>
+        {
+            options.AddPolicy("WebClient", policy =>
+            {
+                policy
+                    .WithOrigins("http://localhost:5173")
+                    .AllowAnyHeader()
+                    .AllowAnyMethod();
+            });
+        });
+
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen();
         services.AddControllers();
