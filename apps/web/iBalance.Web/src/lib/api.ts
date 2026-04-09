@@ -1,13 +1,12 @@
 import axios from 'axios';
 
 export const tenantStorageKey = 'ibalance.tenantKey';
+export const tenantLogoStorageKey = 'ibalance.tenantLogo';
+export const companyLogoStorageKey = 'ibalance.companyLogo';
 
 export function getTenantKey(): string {
   const stored = localStorage.getItem(tenantStorageKey);
-  if (stored && stored.trim().length > 0) {
-    return stored;
-  }
-
+  if (stored && stored.trim().length > 0) return stored;
   return import.meta.env.VITE_DEFAULT_TENANT_KEY || 'demo-tenant';
 }
 
@@ -15,20 +14,54 @@ export function setTenantKey(value: string): void {
   localStorage.setItem(tenantStorageKey, value.trim());
 }
 
+export function getTenantLogoDataUrl(): string {
+  return localStorage.getItem(tenantLogoStorageKey) || '';
+}
+
+export function setTenantLogoDataUrl(value: string): void {
+  localStorage.setItem(tenantLogoStorageKey, value);
+}
+
+export function getCompanyLogoDataUrl(): string {
+  return localStorage.getItem(companyLogoStorageKey) || '';
+}
+
+export function setCompanyLogoDataUrl(value: string): void {
+  localStorage.setItem(companyLogoStorageKey, value);
+}
+
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5071',
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
 });
 
 api.interceptors.request.use((config) => {
   const tenantKey = getTenantKey();
-  if (tenantKey) {
-    config.headers['X-Tenant-Key'] = tenantKey;
-  }
+  if (tenantKey) config.headers['X-Tenant-Key'] = tenantKey;
   return config;
 });
+
+/** Backend uses `{ Message = "..." }` for many errors. :contentReference[oaicite:3]{index=3} */
+type ApiErrorShape = {
+  Message?: string;
+  message?: string;
+  RequiredHeader?: string;
+  Reference?: string;
+  [key: string]: unknown;
+};
+
+export function getTenantReadableError(error: unknown, fallback: string) {
+  const anyErr = error as any;
+  const data: ApiErrorShape | undefined = anyErr?.response?.data;
+
+  const msg =
+    (typeof data?.Message === 'string' && data.Message.trim()) ||
+    (typeof data?.message === 'string' && data.message.trim()) ||
+    (typeof anyErr?.message === 'string' && anyErr.message.trim());
+
+  if (msg) return msg;
+  return fallback;
+}
 
 export type DashboardSummaryResponse = {
   tenantContextAvailable: boolean;
@@ -66,8 +99,8 @@ export type LedgerAccountDto = {
   tenantId: string;
   code: string;
   name: string;
-  category: number; // 1..5
-  normalBalance: number; // 1=Debit, 2=Credit
+  category: number;
+  normalBalance: number;
   isHeader: boolean;
   isPostingAllowed: boolean;
   isActive: boolean;
@@ -82,8 +115,8 @@ export type JournalEntryDto = {
   entryDateUtc: string;
   reference: string;
   description: string;
-  status: number; // 1 Draft, 2 Posted, 3 Voided, 4 Reversed
-  type: number; // 1 Normal, 2 OpeningBalance
+  status: number;
+  type: number;
   postedAtUtc: string | null;
   reversedAtUtc: string | null;
   reversalJournalEntryId: string | null;
@@ -104,9 +137,19 @@ export type FiscalPeriodDto = {
   id: string;
   tenantId: string;
   name: string;
-  startDate: string; // DateOnly serialized
-  endDate: string; // DateOnly serialized
-  status: number; // 1 Open, 2 Closed
+  startDate: string;
+  endDate: string;
+  status: number;
+};
+
+export type ReportLineDto = {
+  ledgerAccountId: string;
+  code: string;
+  name: string;
+  totalDebit: number;
+  totalCredit: number;
+  balance?: number;
+  amount?: number;
 };
 
 export type BalanceSheetResponse = {
@@ -136,15 +179,41 @@ export type IncomeStatementResponse = {
   expenses: ReportLineDto[];
 };
 
-export type ReportLineDto = {
+export type TrialBalanceRowDto = {
   ledgerAccountId: string;
   code: string;
   name: string;
+  category: number;
+  normalBalance: number;
   totalDebit: number;
   totalCredit: number;
-  balance?: number;
-  amount?: number;
+  balanceDebit: number;
+  balanceCredit: number;
 };
+
+export type TrialBalanceResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  fromUtc: string | null;
+  toUtc: string | null;
+  count: number;
+  totalDebit: number;
+  totalCredit: number;
+  items: TrialBalanceRowDto[];
+};
+
+export async function getTrialBalance(fromUtc?: string | null, toUtc?: string | null) {
+  const response = await api.get<TrialBalanceResponse>('/api/finance/trial-balance', {
+    params: {
+      ...(fromUtc ? { fromUtc } : {}),
+      ...(toUtc ? { toUtc } : {}),
+    },
+  });
+
+  return response.data;
+}
+
 
 // ----------- READS -----------
 export async function getDashboardSummary() {
@@ -177,7 +246,7 @@ export async function getIncomeStatement() {
   return response.data;
 }
 
-// ----------- WRITES (Step 22B) -----------
+// ----------- WRITES -----------
 export type CreateLedgerAccountRequest = {
   code: string;
   name: string;
@@ -233,7 +302,6 @@ export async function reverseJournalEntry(journalEntryId: string, payload: Rever
   return response.data;
 }
 
-// Opening balances are created as typed journals and posted immediately. :contentReference[oaicite:3]{index=3}
 export type CreateOpeningBalanceRequest = {
   entryDateUtc: string;
   reference?: string | null;
@@ -248,8 +316,8 @@ export async function createOpeningBalance(payload: CreateOpeningBalanceRequest)
 
 export type CreateFiscalPeriodRequest = {
   name: string;
-  startDate: string; // YYYY-MM-DD
-  endDate: string; // YYYY-MM-DD
+  startDate: string;
+  endDate: string;
   isOpen: boolean;
 };
 

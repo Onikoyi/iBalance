@@ -4,6 +4,7 @@ import {
   createJournalEntry,
   createOpeningBalance,
   getAccounts,
+  getDashboardSummary,
   getJournalEntries,
   postJournalEntry,
   reverseJournalEntry,
@@ -11,7 +12,7 @@ import {
   type LedgerAccountDto,
   type JournalEntryDto,
   type JournalLineRequest,
-} from './lib/api';
+} from '../lib/api';
 
 function statusLabel(value: number) {
   switch (value) {
@@ -39,7 +40,7 @@ type LineForm = {
 };
 
 type JournalForm = {
-  entryDateUtc: string; // datetime-local
+  entryDateUtc: string;
   reference: string;
   description: string;
   lines: LineForm[];
@@ -56,7 +57,7 @@ const emptyJournalForm: JournalForm = {
 };
 
 type ReverseForm = {
-  reversalDateUtc: string; // datetime-local
+  reversalDateUtc: string;
   reference: string;
   description: string;
 };
@@ -68,21 +69,28 @@ const emptyReverseForm: ReverseForm = {
 };
 
 function toUtcIsoFromLocalInput(localValue: string): string {
-  // datetime-local => Date => ISO (UTC)
-  const d = new Date(localValue);
-  return d.toISOString();
+  return new Date(localValue).toISOString();
 }
 
 function parseMoney(value: string): number {
   const n = Number(value);
-  if (!Number.isFinite(n)) return 0;
-  return n;
+  return Number.isFinite(n) ? n : 0;
+}
+
+function extractApiMessage(error: any, fallback: string) {
+  return (
+    error?.response?.data?.Message ||
+    error?.response?.data?.message ||
+    error?.message ||
+    fallback
+  );
 }
 
 export function JournalsPage() {
   const qc = useQueryClient();
 
   const [errorText, setErrorText] = useState('');
+  const [infoText, setInfoText] = useState('');
   const [modal, setModal] = useState<null | 'create' | 'opening' | 'reverse'>(null);
 
   const [journalForm, setJournalForm] = useState<JournalForm>(emptyJournalForm);
@@ -99,17 +107,16 @@ export function JournalsPage() {
     queryFn: getAccounts,
   });
 
-  const accountsById = useMemo(() => {
-    const map = new Map<string, LedgerAccountDto>();
-    (accountsQ.data?.items ?? []).forEach((a) => map.set(a.id, a));
-    return map;
-  }, [accountsQ.data?.items]);
+  const dashboardQ = useQuery({
+    queryKey: ['dashboard-summary'],
+    queryFn: getDashboardSummary,
+  });
 
   const postingAccounts = useMemo(() => {
     const items = accountsQ.data?.items ?? [];
     return items
-      .filter((x) => x.isActive && !x.isHeader && x.isPostingAllowed)
-      .sort((a, b) => a.code.localeCompare(b.code));
+      .filter((x: LedgerAccountDto) => x.isActive && !x.isHeader && x.isPostingAllowed)
+      .sort((a: LedgerAccountDto, b: LedgerAccountDto) => a.code.localeCompare(b.code));
   }, [accountsQ.data?.items]);
 
   const createJournalMut = useMutation({
@@ -120,10 +127,10 @@ export function JournalsPage() {
       setModal(null);
       setJournalForm(emptyJournalForm);
       setErrorText('');
+      setInfoText('Journal entry created successfully.');
     },
     onError: (e: any) => {
-      const msg = e?.response?.data?.message || e?.response?.data?.Message || e?.message || 'Failed to create journal entry.';
-      setErrorText(String(msg));
+      setErrorText(extractApiMessage(e, 'Failed to create journal entry.'));
     },
   });
 
@@ -135,10 +142,10 @@ export function JournalsPage() {
       setModal(null);
       setJournalForm(emptyJournalForm);
       setErrorText('');
+      setInfoText('Opening balance created and posted successfully.');
     },
     onError: (e: any) => {
-      const msg = e?.response?.data?.message || e?.response?.data?.Message || e?.message || 'Failed to create opening balance.';
-      setErrorText(String(msg));
+      setErrorText(extractApiMessage(e, 'Failed to create opening balance.'));
     },
   });
 
@@ -147,6 +154,11 @@ export function JournalsPage() {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['journal-entries'] });
       await qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      setInfoText('Journal posted successfully.');
+      setErrorText('');
+    },
+    onError: (e: any) => {
+      setErrorText(extractApiMessage(e, 'Failed to post journal entry.'));
     },
   });
 
@@ -155,6 +167,11 @@ export function JournalsPage() {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['journal-entries'] });
       await qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      setInfoText('Draft journal voided successfully.');
+      setErrorText('');
+    },
+    onError: (e: any) => {
+      setErrorText(extractApiMessage(e, 'Failed to void journal entry.'));
     },
   });
 
@@ -172,10 +189,10 @@ export function JournalsPage() {
       setReverseForm(emptyReverseForm);
       setReverseTargetId('');
       setErrorText('');
+      setInfoText('Journal reversed successfully.');
     },
     onError: (e: any) => {
-      const msg = e?.response?.data?.message || e?.response?.data?.Message || e?.message || 'Failed to reverse journal entry.';
-      setErrorText(String(msg));
+      setErrorText(extractApiMessage(e, 'Failed to reverse journal entry.'));
     },
   });
 
@@ -187,8 +204,12 @@ export function JournalsPage() {
     return { debit, credit };
   }, [journalForm.lines]);
 
+  const hasOpenPeriod = !!dashboardQ.data?.openFiscalPeriod;
+  const hasPostingAccounts = postingAccounts.length > 0;
+
   function openCreate(kind: 'create' | 'opening') {
     setErrorText('');
+    setInfoText('');
     setJournalForm(emptyJournalForm);
     setModal(kind);
   }
@@ -219,30 +240,44 @@ export function JournalsPage() {
   function removeLine(idx: number) {
     setJournalForm((s) => {
       if (s.lines.length <= 2) return s;
-      const next = s.lines.filter((_, i) => i !== idx);
-      return { ...s, lines: next };
+      return { ...s, lines: s.lines.filter((_, i) => i !== idx) };
     });
   }
 
   function validateLines(lines: LineForm[]): { ok: boolean; message?: string } {
-    if (!lines || lines.length < 2) return { ok: false, message: 'A journal must contain at least two lines.' };
+    if (!lines || lines.length < 2) {
+      return { ok: false, message: 'A journal must contain at least two lines.' };
+    }
 
     for (const [i, line] of lines.entries()) {
-      if (!line.ledgerAccountId) return { ok: false, message: `Line ${i + 1}: ledger account is required.` };
+      if (!line.ledgerAccountId) {
+        return { ok: false, message: `Line ${i + 1}: ledger account is required.` };
+      }
 
       const d = parseMoney(line.debitAmount);
       const c = parseMoney(line.creditAmount);
 
-      if (d < 0 || c < 0) return { ok: false, message: `Line ${i + 1}: amounts cannot be negative.` };
-      if (d === 0 && c === 0) return { ok: false, message: `Line ${i + 1}: either debit or credit must be > 0.` };
-      if (d > 0 && c > 0) return { ok: false, message: `Line ${i + 1}: cannot have both debit and credit.` };
+      if (d < 0 || c < 0) {
+        return { ok: false, message: `Line ${i + 1}: amounts cannot be negative.` };
+      }
+
+      if (d === 0 && c === 0) {
+        return { ok: false, message: `Line ${i + 1}: either debit or credit must be greater than zero.` };
+      }
+
+      if (d > 0 && c > 0) {
+        return { ok: false, message: `Line ${i + 1}: use either debit or credit, not both.` };
+      }
     }
 
     const debit = lines.reduce((s, l) => s + parseMoney(l.debitAmount), 0);
     const credit = lines.reduce((s, l) => s + parseMoney(l.creditAmount), 0);
 
     if (Math.abs(debit - credit) > 0.000001) {
-      return { ok: false, message: `Journal is out of balance (debit ${debit.toFixed(2)} vs credit ${credit.toFixed(2)}).` };
+      return {
+        ok: false,
+        message: `Journal is out of balance. Debit ${debit.toFixed(2)} must equal Credit ${credit.toFixed(2)}.`,
+      };
     }
 
     return { ok: true };
@@ -251,7 +286,7 @@ export function JournalsPage() {
   function toLineRequests(lines: LineForm[]): JournalLineRequest[] {
     return lines.map((l) => ({
       ledgerAccountId: l.ledgerAccountId,
-      description: l.description?.trim() ? l.description.trim() : null,
+      description: l.description?.trim() || '',
       debitAmount: parseMoney(l.debitAmount),
       creditAmount: parseMoney(l.creditAmount),
     }));
@@ -259,38 +294,68 @@ export function JournalsPage() {
 
   async function submitJournal(kind: 'create' | 'opening') {
     setErrorText('');
-
+    setInfoText('');
+  
     if (!journalForm.entryDateUtc) {
       setErrorText('Entry date/time is required.');
       return;
     }
+  
+    if (!journalForm.reference.trim()) {
+      setErrorText('Reference is required for now. Leave auto-numbering until an active journal number sequence exists.');
+      return;
+    }
+  
     if (!journalForm.description.trim()) {
       setErrorText('Description is required.');
       return;
     }
-
-    const validation = validateLines(journalForm.lines);
-    if (!validation.ok) {
-      setErrorText(validation.message || 'Invalid lines.');
+  
+    if (kind === 'opening' && !hasOpenPeriod) {
+      setErrorText('No open fiscal period exists for the opening balance date. Create or open a fiscal period first.');
       return;
     }
-
+  
+    if (!hasPostingAccounts) {
+      setErrorText('No posting-enabled accounts exist yet. Create active posting accounts first.');
+      return;
+    }
+  
+    const validation = validateLines(journalForm.lines);
+    if (!validation.ok) {
+      setErrorText(validation.message || 'Invalid journal lines.');
+      return;
+    }
+  
     const payload = {
       entryDateUtc: toUtcIsoFromLocalInput(journalForm.entryDateUtc),
-      reference: journalForm.reference.trim() ? journalForm.reference.trim() : null,
+      reference: journalForm.reference.trim(),
       description: journalForm.description.trim(),
       lines: toLineRequests(journalForm.lines),
     };
-
-    if (kind === 'create') {
-      await createJournalMut.mutateAsync(payload);
-    } else {
-      await createOpeningMut.mutateAsync(payload);
+  
+    try {
+      if (kind === 'create') {
+        const result = await createJournalMut.mutateAsync(payload);
+        console.log('CREATE_JOURNAL_SUCCESS', result);
+      } else {
+        const result = await createOpeningMut.mutateAsync(payload);
+        console.log('CREATE_OPENING_SUCCESS', result);
+      }
+    } catch (error: any) {
+      console.log('CREATE_JOURNAL_OR_OPENING_ERROR', error?.response?.data);
+      setErrorText(
+        error?.response?.data?.Message ||
+        error?.response?.data?.message ||
+        error?.message ||
+        'Submission failed.'
+      );
     }
   }
 
   function openReverse(journalEntryId: string) {
     setErrorText('');
+    setInfoText('');
     setReverseTargetId(journalEntryId);
     setReverseForm(emptyReverseForm);
     setModal('reverse');
@@ -298,27 +363,35 @@ export function JournalsPage() {
 
   async function submitReverse() {
     setErrorText('');
+    setInfoText('');
+
     if (!reverseTargetId) return;
 
     if (!reverseForm.reversalDateUtc) {
       setErrorText('Reversal date/time is required.');
       return;
     }
+
     if (!reverseForm.reference.trim()) {
       setErrorText('Reference is required for reversal.');
       return;
     }
+
     if (!reverseForm.description.trim()) {
       setErrorText('Description is required for reversal.');
       return;
     }
 
-    await reverseMut.mutateAsync({
-      id: reverseTargetId,
-      reversalDateUtc: toUtcIsoFromLocalInput(reverseForm.reversalDateUtc),
-      reference: reverseForm.reference.trim(),
-      description: reverseForm.description.trim(),
-    });
+    try {
+      await reverseMut.mutateAsync({
+        id: reverseTargetId,
+        reversalDateUtc: toUtcIsoFromLocalInput(reverseForm.reversalDateUtc),
+        reference: reverseForm.reference.trim(),
+        description: reverseForm.description.trim(),
+      });
+    } catch {
+      // onError already surfaces the real backend message
+    }
   }
 
   if (journalsQ.isLoading) {
@@ -330,70 +403,91 @@ export function JournalsPage() {
   }
 
   return (
-    <section className="panel">
-      <div className="section-heading">
-        <div>
-          <h2>Journal Entries</h2>
-          <div className="muted">{journalsQ.data.count} journal(s)</div>
+    <div className="page-grid">
+      <section className="panel">
+        <div className="section-heading">
+          <div>
+            <h2>Journal Workflow Readiness</h2>
+            <div className="muted">Step 22C stabilization checks before posting.</div>
+          </div>
         </div>
 
-        <div className="inline-actions">
-          <button className="button primary" onClick={() => openCreate('create')}>New Journal</button>
-          <button className="button" onClick={() => openCreate('opening')}>Opening Balance</button>
+        <div className="detail-stack">
+          <div><strong>Open fiscal period:</strong> {hasOpenPeriod ? `Yes — ${dashboardQ.data?.openFiscalPeriod?.name}` : 'No'}</div>
+          <div><strong>Posting-enabled accounts:</strong> {hasPostingAccounts ? `${postingAccounts.length} available` : 'None available'}</div>
+          <div><strong>Reference rule:</strong> Leave blank only if an active journal number sequence exists in backend.</div>
+          <div><strong>Accounting rule:</strong> Only active, non-header, posting-enabled accounts may be used. </div>
         </div>
-      </div>
+      </section>
 
-      <div className="table-wrap">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Date (UTC)</th>
-              <th>Reference</th>
-              <th>Description</th>
-              <th>Type</th>
-              <th>Status</th>
-              <th>Debit</th>
-              <th>Credit</th>
-              <th style={{ width: 320 }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {journals.map((item: JournalEntryDto) => (
-              <tr key={item.id}>
-                <td>{new Date(item.entryDateUtc).toLocaleString()}</td>
-                <td>{item.reference}</td>
-                <td>{item.description}</td>
-                <td>{typeLabel(item.type)}</td>
-                <td>{statusLabel(item.status)}</td>
-                <td>{Number(item.totalDebit).toFixed(2)}</td>
-                <td>{Number(item.totalCredit).toFixed(2)}</td>
-                <td>
-                  <div className="table-actions">
-                    {item.status === 1 ? (
-                      <>
-                        <button className="button" onClick={() => postMut.mutate(item.id)} disabled={postMut.isPending}>
-                          Post
-                        </button>
-                        <button className="button danger" onClick={() => voidMut.mutate(item.id)} disabled={voidMut.isPending}>
-                          Void
-                        </button>
-                      </>
-                    ) : null}
+      <section className="panel">
+        <div className="section-heading">
+          <div>
+            <h2>Journal Entries</h2>
+            <div className="muted">{journalsQ.data.count} journal(s)</div>
+          </div>
 
-                    {item.status === 2 ? (
-                      <button className="button" onClick={() => openReverse(item.id)}>
-                        Reverse
-                      </button>
-                    ) : null}
+          <div className="inline-actions">
+            <button className="button primary" onClick={() => openCreate('create')}>New Journal</button>
+            <button className="button" onClick={() => openCreate('opening')}>Opening Balance</button>
+          </div>
+        </div>
 
-                    <span className="muted">Lines: {item.lineCount}</span>
-                  </div>
-                </td>
+        {infoText ? <div className="panel" style={{ marginBottom: 12 }}>{infoText}</div> : null}
+        {errorText ? <div className="panel error-panel" style={{ marginBottom: 12 }}>{errorText}</div> : null}
+
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Date (UTC)</th>
+                <th>Reference</th>
+                <th>Description</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Debit</th>
+                <th>Credit</th>
+                <th style={{ width: 320 }}>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {journals.map((item: JournalEntryDto) => (
+                <tr key={item.id}>
+                  <td>{new Date(item.entryDateUtc).toLocaleString()}</td>
+                  <td>{item.reference}</td>
+                  <td>{item.description}</td>
+                  <td>{typeLabel(item.type)}</td>
+                  <td>{statusLabel(item.status)}</td>
+                  <td>{Number(item.totalDebit).toFixed(2)}</td>
+                  <td>{Number(item.totalCredit).toFixed(2)}</td>
+                  <td>
+                    <div className="inline-actions">
+                      {item.status === 1 ? (
+                        <>
+                          <button className="button" onClick={() => postMut.mutate(item.id)} disabled={postMut.isPending}>
+                            Post
+                          </button>
+                          <button className="button danger" onClick={() => voidMut.mutate(item.id)} disabled={voidMut.isPending}>
+                            Void
+                          </button>
+                        </>
+                      ) : null}
+
+                      {item.status === 2 ? (
+                        <button className="button" onClick={() => openReverse(item.id)}>
+                          Reverse
+                        </button>
+                      ) : null}
+
+                      <span className="muted">Lines: {item.lineCount}</span>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       {modal === 'create' || modal === 'opening' ? (
         <div className="modal-backdrop" onMouseDown={closeModal}>
@@ -403,7 +497,7 @@ export function JournalsPage() {
               <button className="button ghost" onClick={closeModal} aria-label="Close">✕</button>
             </div>
 
-            {errorText ? <div className="error-panel">{errorText}</div> : null}
+            {errorText ? <div className="panel error-panel" style={{ marginBottom: 12 }}>{errorText}</div> : null}
 
             <div className="form-grid two">
               <div className="form-row">
@@ -414,16 +508,16 @@ export function JournalsPage() {
                   value={journalForm.entryDateUtc}
                   onChange={(e) => setJournalForm((s) => ({ ...s, entryDateUtc: e.target.value }))}
                 />
-                <div className="muted">Saved as UTC ISO for the API.</div>
+                <div className="muted">Must fall within an open fiscal period.</div>
               </div>
 
               <div className="form-row">
-                <label>Reference (optional if sequence exists)</label>
+                <label>Reference</label>
                 <input
                   className="input"
                   value={journalForm.reference}
                   onChange={(e) => setJournalForm((s) => ({ ...s, reference: e.target.value }))}
-                  placeholder="Leave blank to auto-number if active sequence exists"
+                  placeholder="Provide one if no active sequence exists"
                 />
               </div>
 
@@ -433,7 +527,7 @@ export function JournalsPage() {
                   className="input"
                   value={journalForm.description}
                   onChange={(e) => setJournalForm((s) => ({ ...s, description: e.target.value }))}
-                  placeholder="e.g. April rent accrual"
+                  placeholder="Describe the business transaction"
                 />
               </div>
             </div>
@@ -467,8 +561,8 @@ export function JournalsPage() {
                             value={line.ledgerAccountId}
                             onChange={(e) => setLine(idx, { ledgerAccountId: e.target.value })}
                           >
-                            <option value="">— Select —</option>
-                            {postingAccounts.map((a) => (
+                            <option value="">— Select Posting Account —</option>
+                            {postingAccounts.map((a: LedgerAccountDto) => (
                               <option key={a.id} value={a.id}>
                                 {a.code} - {a.name}
                               </option>
@@ -488,10 +582,10 @@ export function JournalsPage() {
                             className="input"
                             inputMode="decimal"
                             value={line.debitAmount}
-                            onChange={(e) => {
-                              // enforce either debit or credit
-                              setLine(idx, { debitAmount: e.target.value, creditAmount: e.target.value ? '' : line.creditAmount });
-                            }}
+                            onChange={(e) => setLine(idx, {
+                              debitAmount: e.target.value,
+                              creditAmount: e.target.value ? '' : line.creditAmount,
+                            })}
                             placeholder="0.00"
                           />
                         </td>
@@ -500,9 +594,10 @@ export function JournalsPage() {
                             className="input"
                             inputMode="decimal"
                             value={line.creditAmount}
-                            onChange={(e) => {
-                              setLine(idx, { creditAmount: e.target.value, debitAmount: e.target.value ? '' : line.debitAmount });
-                            }}
+                            onChange={(e) => setLine(idx, {
+                              creditAmount: e.target.value,
+                              debitAmount: e.target.value ? '' : line.debitAmount,
+                            })}
                             placeholder="0.00"
                           />
                         </td>
@@ -517,13 +612,9 @@ export function JournalsPage() {
                 </table>
               </div>
 
-              {accountsQ.isLoading ? (
-                <div className="muted" style={{ marginTop: 10 }}>Loading accounts…</div>
-              ) : null}
-
-              {accountsQ.data && postingAccounts.length === 0 ? (
-                <div className="error-panel" style={{ marginTop: 10 }}>
-                  No posting-enabled accounts found. Create posting accounts first.
+              {!hasPostingAccounts ? (
+                <div className="panel error-panel" style={{ marginTop: 10 }}>
+                  No posting-enabled accounts found. Create active posting accounts first.
                 </div>
               ) : null}
             </div>
@@ -556,7 +647,7 @@ export function JournalsPage() {
               <button className="button ghost" onClick={closeModal} aria-label="Close">✕</button>
             </div>
 
-            {errorText ? <div className="error-panel">{errorText}</div> : null}
+            {errorText ? <div className="panel error-panel" style={{ marginBottom: 12 }}>{errorText}</div> : null}
 
             <div className="form-grid two">
               <div className="form-row">
@@ -599,6 +690,6 @@ export function JournalsPage() {
           </div>
         </div>
       ) : null}
-    </section>
+    </div>
   );
 }
