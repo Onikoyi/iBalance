@@ -45,6 +45,9 @@ export function PublicShell({ children }: PropsWithChildren) {
           </Link>
 
           <nav className="public-nav">
+            <NavLink to="/" className={({ isActive }) => `public-link ${isActive ? 'active' : ''}`}>
+              Home
+            </NavLink>
             <NavLink to="/pricing" className={({ isActive }) => `public-link ${isActive ? 'active' : ''}`}>
               Pricing
             </NavLink>
@@ -52,7 +55,16 @@ export function PublicShell({ children }: PropsWithChildren) {
               Tenant Onboarding
             </NavLink>
 
-            {authed ? (
+            {!authed ? (
+              <>
+                <NavLink to="/signup" className={({ isActive }) => `public-link ${isActive ? 'active' : ''}`}>
+                  Sign Up
+                </NavLink>
+                <NavLink to="/login" className={({ isActive }) => `public-link ${isActive ? 'active' : ''}`}>
+                  Login
+                </NavLink>
+              </>
+            ) : (
               <>
                 <NavLink to="/dashboard" className={({ isActive }) => `public-link ${isActive ? 'active' : ''}`}>
                   Finance Console
@@ -61,10 +73,6 @@ export function PublicShell({ children }: PropsWithChildren) {
                   Admin
                 </NavLink>
               </>
-            ) : (
-              <NavLink to="/login" className={({ isActive }) => `public-link ${isActive ? 'active' : ''}`}>
-                Login
-              </NavLink>
             )}
           </nav>
         </div>

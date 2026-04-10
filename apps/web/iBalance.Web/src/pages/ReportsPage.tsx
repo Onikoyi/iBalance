@@ -1,13 +1,14 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   getBalanceSheet,
+  getCompanyLogoDataUrl,
   getIncomeStatement,
   getTenantKey,
   getTenantLogoDataUrl,
-  getCompanyLogoDataUrl,
   getTrialBalance,
 } from '../lib/api';
+import { canViewReports } from '../lib/auth';
 
 function toUtcStart(date: string) {
   return date ? new Date(`${date}T00:00:00`).toISOString() : undefined;
@@ -23,6 +24,19 @@ function printSection(sectionId: string) {
   window.setTimeout(() => {
     document.body.removeAttribute('data-print-target');
   }, 300);
+}
+
+function formatAmount(value: number) {
+  return new Intl.NumberFormat('en-NG', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function formatDateTime(value: string) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'Not available';
+  return parsed.toLocaleString();
 }
 
 function LogoSlot({
@@ -71,10 +85,10 @@ function ReportPrintHeader({ title, subtitle }: ReportHeaderProps) {
         </div>
 
         <div className="print-brand-block">
-          <LogoSlot dataUrl={tenantLogo} fallbackText="Tenant" />
+          <LogoSlot dataUrl={tenantLogo} fallbackText="Organization" />
           <div className="print-brand-meta">
-            <strong>{tenantKey || 'Tenant'}</strong>
-            <span>Client / Tenant</span>
+            <strong>{tenantKey || 'Organization'}</strong>
+            <span>Client Workspace</span>
           </div>
         </div>
       </div>
@@ -90,6 +104,7 @@ function ReportPrintHeader({ title, subtitle }: ReportHeaderProps) {
 export function ReportsPage() {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const canView = canViewReports();
 
   const fromUtc = fromDate ? toUtcStart(fromDate) : undefined;
   const toUtc = toDate ? toUtcEnd(toDate) : undefined;
@@ -97,24 +112,31 @@ export function ReportsPage() {
   const trialBalance = useQuery({
     queryKey: ['trial-balance', fromUtc ?? null, toUtc ?? null],
     queryFn: () => getTrialBalance(fromUtc, toUtc),
+    enabled: canView,
   });
 
   const balanceSheet = useQuery({
     queryKey: ['balance-sheet'],
     queryFn: getBalanceSheet,
+    enabled: canView,
   });
 
   const incomeStatement = useQuery({
     queryKey: ['income-statement', fromUtc ?? null, toUtc ?? null],
     queryFn: () => getIncomeStatement(fromUtc, toUtc),
+    enabled: canView,
   });
 
   const printablePeriodText = useMemo(() => {
-    if (fromDate && toDate) return `From ${fromDate} to ${toDate}`;
-    if (fromDate) return `From ${fromDate}`;
-    if (toDate) return `To ${toDate}`;
-    return 'Current queried period / inception-to-date';
+    if (fromDate && toDate) return `Reporting period: ${fromDate} to ${toDate}`;
+    if (fromDate) return `Reporting period: from ${fromDate}`;
+    if (toDate) return `Reporting period: up to ${toDate}`;
+    return 'Reporting period: current available range';
   }, [fromDate, toDate]);
+
+  if (!canView) {
+    return <div className="panel error-panel">You do not have access to view financial reports.</div>;
+  }
 
   if (trialBalance.isLoading || balanceSheet.isLoading || incomeStatement.isLoading) {
     return <div className="panel">Loading financial reports...</div>;
@@ -128,7 +150,7 @@ export function ReportsPage() {
     !balanceSheet.data ||
     !incomeStatement.data
   ) {
-    return <div className="panel error-panel">Unable to load financial reports.</div>;
+    return <div className="panel error-panel">We could not load the financial reports at this time.</div>;
   }
 
   return (
@@ -136,9 +158,9 @@ export function ReportsPage() {
       <section className="panel no-print">
         <div className="section-heading">
           <div>
-            <h2>Report Filters</h2>
+            <h2>Report filters</h2>
             <div className="muted">
-              Trial Balance and Income Statement use the selected date range. Balance Sheet prints as at current report timestamp.
+              Set a date range for the Trial Balance and Income Statement. The Balance Sheet is shown as at the current report date and time.
             </div>
           </div>
         </div>
@@ -182,16 +204,31 @@ export function ReportsPage() {
           subtitle={printablePeriodText}
         />
 
+        <div className="kv" style={{ marginBottom: 16 }}>
+          <div className="kv-row">
+            <span>Accounts Included</span>
+            <span>{trialBalance.data.count}</span>
+          </div>
+          <div className="kv-row">
+            <span>Total Debit</span>
+            <span>{formatAmount(trialBalance.data.totalDebit)}</span>
+          </div>
+          <div className="kv-row">
+            <span>Total Credit</span>
+            <span>{formatAmount(trialBalance.data.totalCredit)}</span>
+          </div>
+        </div>
+
         <div className="table-wrap">
           <table className="data-table report-print-table">
             <thead>
               <tr>
                 <th>Code</th>
                 <th>Account Name</th>
-                <th>Total Debit</th>
-                <th>Total Credit</th>
-                <th>Balance Debit</th>
-                <th>Balance Credit</th>
+                <th style={{ textAlign: 'right' }}>Total Debit</th>
+                <th style={{ textAlign: 'right' }}>Total Credit</th>
+                <th style={{ textAlign: 'right' }}>Balance Debit</th>
+                <th style={{ textAlign: 'right' }}>Balance Credit</th>
               </tr>
             </thead>
             <tbody>
@@ -199,19 +236,23 @@ export function ReportsPage() {
                 <tr key={item.ledgerAccountId}>
                   <td>{item.code}</td>
                   <td>{item.name}</td>
-                  <td>{item.totalDebit.toFixed(2)}</td>
-                  <td>{item.totalCredit.toFixed(2)}</td>
-                  <td>{item.balanceDebit.toFixed(2)}</td>
-                  <td>{item.balanceCredit.toFixed(2)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatAmount(item.totalDebit)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatAmount(item.totalCredit)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatAmount(item.balanceDebit)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatAmount(item.balanceCredit)}</td>
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr>
+                <th colSpan={2}>Total</th>
+                <th style={{ textAlign: 'right' }}>{formatAmount(trialBalance.data.totalDebit)}</th>
+                <th style={{ textAlign: 'right' }}>{formatAmount(trialBalance.data.totalCredit)}</th>
+                <th />
+                <th />
+              </tr>
+            </tfoot>
           </table>
-        </div>
-
-        <div className="report-totals">
-          <div>Total Debit: {trialBalance.data.totalDebit.toFixed(2)}</div>
-          <div>Total Credit: {trialBalance.data.totalCredit.toFixed(2)}</div>
         </div>
       </section>
 
@@ -220,7 +261,7 @@ export function ReportsPage() {
           <div>
             <h2>Balance Sheet</h2>
             <span className="muted">
-              As at {new Date(balanceSheet.data.asOfUtc).toLocaleString()}
+              As at {formatDateTime(balanceSheet.data.asOfUtc)}
             </span>
           </div>
           <button className="button" onClick={() => printSection('print-balance-sheet')}>
@@ -230,42 +271,56 @@ export function ReportsPage() {
 
         <ReportPrintHeader
           title="Balance Sheet"
-          subtitle={`As at ${new Date(balanceSheet.data.asOfUtc).toLocaleString()}`}
+          subtitle={`As at ${formatDateTime(balanceSheet.data.asOfUtc)}`}
         />
 
         <div className="report-block">
           <h3>Assets</h3>
-          {balanceSheet.data.assets.map((item) => (
-            <div key={item.ledgerAccountId} className="report-line">
-              <span>{item.code} - {item.name}</span>
-              <strong>{(item.balance ?? 0).toFixed(2)}</strong>
-            </div>
-          ))}
+          {balanceSheet.data.assets.length === 0 ? (
+            <div className="muted">No asset balances available.</div>
+          ) : (
+            balanceSheet.data.assets.map((item) => (
+              <div key={item.ledgerAccountId} className="report-line">
+                <span>{item.code} - {item.name}</span>
+                <strong>{formatAmount(item.balance ?? 0)}</strong>
+              </div>
+            ))
+          )}
         </div>
 
         <div className="report-block">
           <h3>Liabilities</h3>
-          {balanceSheet.data.liabilities.map((item) => (
-            <div key={item.ledgerAccountId} className="report-line">
-              <span>{item.code} - {item.name}</span>
-              <strong>{(item.balance ?? 0).toFixed(2)}</strong>
-            </div>
-          ))}
+          {balanceSheet.data.liabilities.length === 0 ? (
+            <div className="muted">No liability balances available.</div>
+          ) : (
+            balanceSheet.data.liabilities.map((item) => (
+              <div key={item.ledgerAccountId} className="report-line">
+                <span>{item.code} - {item.name}</span>
+                <strong>{formatAmount(item.balance ?? 0)}</strong>
+              </div>
+            ))
+          )}
         </div>
 
         <div className="report-block">
           <h3>Equity</h3>
-          {balanceSheet.data.equity.map((item) => (
-            <div key={item.ledgerAccountId} className="report-line">
-              <span>{item.code} - {item.name}</span>
-              <strong>{(item.balance ?? 0).toFixed(2)}</strong>
-            </div>
-          ))}
+          {balanceSheet.data.equity.length === 0 ? (
+            <div className="muted">No equity balances available.</div>
+          ) : (
+            balanceSheet.data.equity.map((item) => (
+              <div key={item.ledgerAccountId} className="report-line">
+                <span>{item.code} - {item.name}</span>
+                <strong>{formatAmount(item.balance ?? 0)}</strong>
+              </div>
+            ))
+          )}
         </div>
 
         <div className="report-totals">
-          <div>Total Assets: {balanceSheet.data.totalAssets.toFixed(2)}</div>
-          <div>Total Liabilities + Equity: {balanceSheet.data.totalLiabilitiesAndEquity.toFixed(2)}</div>
+          <div>Total Assets: {formatAmount(balanceSheet.data.totalAssets)}</div>
+          <div>Total Liabilities: {formatAmount(balanceSheet.data.totalLiabilities)}</div>
+          <div>Total Equity: {formatAmount(balanceSheet.data.totalEquity)}</div>
+          <div>Total Liabilities and Equity: {formatAmount(balanceSheet.data.totalLiabilitiesAndEquity)}</div>
         </div>
       </section>
 
@@ -287,28 +342,36 @@ export function ReportsPage() {
 
         <div className="report-block">
           <h3>Income</h3>
-          {incomeStatement.data.income.map((item) => (
-            <div key={item.ledgerAccountId} className="report-line">
-              <span>{item.code} - {item.name}</span>
-              <strong>{(item.amount ?? 0).toFixed(2)}</strong>
-            </div>
-          ))}
+          {incomeStatement.data.income.length === 0 ? (
+            <div className="muted">No income balances available.</div>
+          ) : (
+            incomeStatement.data.income.map((item) => (
+              <div key={item.ledgerAccountId} className="report-line">
+                <span>{item.code} - {item.name}</span>
+                <strong>{formatAmount(item.amount ?? 0)}</strong>
+              </div>
+            ))
+          )}
         </div>
 
         <div className="report-block">
           <h3>Expenses</h3>
-          {incomeStatement.data.expenses.map((item) => (
-            <div key={item.ledgerAccountId} className="report-line">
-              <span>{item.code} - {item.name}</span>
-              <strong>{(item.amount ?? 0).toFixed(2)}</strong>
-            </div>
-          ))}
+          {incomeStatement.data.expenses.length === 0 ? (
+            <div className="muted">No expense balances available.</div>
+          ) : (
+            incomeStatement.data.expenses.map((item) => (
+              <div key={item.ledgerAccountId} className="report-line">
+                <span>{item.code} - {item.name}</span>
+                <strong>{formatAmount(item.amount ?? 0)}</strong>
+              </div>
+            ))
+          )}
         </div>
 
         <div className="report-totals">
-          <div>Total Income: {incomeStatement.data.totalIncome.toFixed(2)}</div>
-          <div>Total Expenses: {incomeStatement.data.totalExpenses.toFixed(2)}</div>
-          <div>Net Income: {incomeStatement.data.netIncome.toFixed(2)}</div>
+          <div>Total Income: {formatAmount(incomeStatement.data.totalIncome)}</div>
+          <div>Total Expenses: {formatAmount(incomeStatement.data.totalExpenses)}</div>
+          <div>Net Income: {formatAmount(incomeStatement.data.netIncome)}</div>
         </div>
       </section>
     </div>

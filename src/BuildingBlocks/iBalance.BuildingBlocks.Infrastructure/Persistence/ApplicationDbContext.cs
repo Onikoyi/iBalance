@@ -31,6 +31,11 @@ public class ApplicationDbContext : DbContext
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<UserAccount> UserAccounts => Set<UserAccount>();
+    public DbSet<SubscriptionPackage> SubscriptionPackages => Set<SubscriptionPackage>();
+    public DbSet<BillingSettings> BillingSettings => Set<BillingSettings>();
+    public DbSet<TenantSubscriptionApplication> TenantSubscriptionApplications => Set<TenantSubscriptionApplication>();
+    public DbSet<TenantLicense> TenantLicenses => Set<TenantLicense>();
+
     public DbSet<LedgerAccount> LedgerAccounts => Set<LedgerAccount>();
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
     public DbSet<JournalEntryLine> JournalEntryLines => Set<JournalEntryLine>();
@@ -47,7 +52,74 @@ public class ApplicationDbContext : DbContext
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(PlatformPersistenceMarker).Assembly);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(FinancePersistenceMarker).Assembly);
 
+        modelBuilder.Entity<SubscriptionPackage>(builder =>
+        {
+            builder.ToTable("SubscriptionPackages", "platform");
+            builder.HasKey(x => x.Id);
+            builder.Property(x => x.Id).ValueGeneratedNever();
+            builder.Property(x => x.Code).HasMaxLength(50).IsRequired();
+            builder.Property(x => x.Name).HasMaxLength(120).IsRequired();
+            builder.Property(x => x.Description).HasMaxLength(500);
+            builder.Property(x => x.CurrencyCode).HasMaxLength(10).IsRequired();
+            builder.Property(x => x.MonthlyPrice).HasPrecision(18, 2);
+            builder.HasIndex(x => x.Code).IsUnique();
+        });
+
+        modelBuilder.Entity<BillingSettings>(builder =>
+        {
+            builder.ToTable("BillingSettings", "platform");
+            builder.HasKey(x => x.Id);
+            builder.Property(x => x.Id).ValueGeneratedNever();
+            builder.Property(x => x.AccountName).HasMaxLength(200);
+            builder.Property(x => x.BankName).HasMaxLength(200);
+            builder.Property(x => x.AccountNumber).HasMaxLength(50);
+            builder.Property(x => x.SupportEmail).HasMaxLength(200);
+            builder.Property(x => x.PaymentInstructions).HasMaxLength(2000);
+        });
+
+        modelBuilder.Entity<TenantSubscriptionApplication>(builder =>
+        {
+            builder.ToTable("TenantSubscriptionApplications", "platform");
+            builder.HasKey(x => x.Id);
+            builder.Property(x => x.Id).ValueGeneratedNever();
+            builder.Property(x => x.CompanyName).HasMaxLength(200).IsRequired();
+            builder.Property(x => x.DesiredTenantKey).HasMaxLength(100).IsRequired();
+            builder.Property(x => x.AdminFirstName).HasMaxLength(100).IsRequired();
+            builder.Property(x => x.AdminLastName).HasMaxLength(100).IsRequired();
+            builder.Property(x => x.AdminEmail).HasMaxLength(256).IsRequired();
+            builder.Property(x => x.AdminPasswordHash).HasMaxLength(512).IsRequired();
+            builder.Property(x => x.AdminPasswordSalt).HasMaxLength(256).IsRequired();
+            builder.Property(x => x.PackageCodeSnapshot).HasMaxLength(50).IsRequired();
+            builder.Property(x => x.PackageNameSnapshot).HasMaxLength(120).IsRequired();
+            builder.Property(x => x.AmountSnapshot).HasPrecision(18, 2);
+            builder.Property(x => x.CurrencyCodeSnapshot).HasMaxLength(10).IsRequired();
+            builder.Property(x => x.PaymentReference).HasMaxLength(100).IsRequired();
+            builder.Property(x => x.PaymentConfirmationNote).HasMaxLength(1000);
+            builder.Property(x => x.RejectionReason).HasMaxLength(1000);
+            builder.Property(x => x.ConfirmedByUserId).HasMaxLength(100);
+            builder.HasIndex(x => x.PaymentReference).IsUnique();
+            builder.HasIndex(x => x.DesiredTenantKey);
+            builder.HasOne<SubscriptionPackage>()
+                .WithMany()
+                .HasForeignKey(x => x.SubscriptionPackageId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<TenantLicense>(builder =>
+        {
+            builder.ToTable("TenantLicenses", "platform");
+            builder.HasKey(x => x.Id);
+            builder.Property(x => x.Id).ValueGeneratedNever();
+            builder.Property(x => x.PackageName).HasMaxLength(120).IsRequired();
+            builder.Property(x => x.CurrencyCode).HasMaxLength(10).IsRequired();
+            builder.Property(x => x.AmountPaid).HasPrecision(18, 2);
+            builder.HasIndex(x => x.TenantId).IsUnique();
+        });
+
         modelBuilder.Entity<UserAccount>()
+            .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+
+        modelBuilder.Entity<TenantLicense>()
             .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
 
         modelBuilder.Entity<LedgerAccount>()

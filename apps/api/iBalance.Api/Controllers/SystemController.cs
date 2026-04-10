@@ -1,6 +1,8 @@
 using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
+using iBalance.BuildingBlocks.Infrastructure.Security;
 using iBalance.Modules.Platform.Domain.Entities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -34,11 +36,13 @@ public sealed class SystemController : ControllerBase
         });
     }
 
+    [Authorize(Roles = "PlatformAdmin,TenantAdmin")]
     [HttpPost("test-user-accounts")]
     public async Task<IActionResult> CreateTestUserAccount(
         [FromBody] CreateTestUserAccountRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] PasswordHasher passwordHasher,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -52,12 +56,47 @@ public sealed class SystemController : ControllerBase
             });
         }
 
+        if (string.IsNullOrWhiteSpace(request.Email))
+        {
+            return BadRequest(new { Message = "Email is required." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.FirstName))
+        {
+            return BadRequest(new { Message = "FirstName is required." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.LastName))
+        {
+            return BadRequest(new { Message = "LastName is required." });
+        }
+
+        var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+
+        var exists = await dbContext.UserAccounts
+            .AsNoTracking()
+            .AnyAsync(x => x.Email == normalizedEmail, cancellationToken);
+
+        if (exists)
+        {
+            return Conflict(new
+            {
+                Message = "A user account with the same email already exists for the current tenant.",
+                Email = normalizedEmail
+            });
+        }
+
+        var password = passwordHasher.HashPassword("Password123!");
+
         var userAccount = new UserAccount(
             Guid.NewGuid(),
             tenantContext.TenantId,
-            request.Email,
+            normalizedEmail,
             request.FirstName,
             request.LastName,
+            "TenantAdmin",
+            password.Hash,
+            password.Salt,
             true);
 
         dbContext.UserAccounts.Add(userAccount);
@@ -71,10 +110,13 @@ public sealed class SystemController : ControllerBase
             Email = userAccount.Email,
             FirstName = userAccount.FirstName,
             LastName = userAccount.LastName,
-            IsActive = userAccount.IsActive
+            Role = userAccount.Role,
+            IsActive = userAccount.IsActive,
+            DefaultPassword = "Password123!"
         });
     }
 
+    [Authorize(Roles = "PlatformAdmin,TenantAdmin")]
     [HttpGet("test-user-accounts")]
     public async Task<IActionResult> GetTestUserAccounts(
         [FromServices] ApplicationDbContext dbContext,
@@ -93,6 +135,7 @@ public sealed class SystemController : ControllerBase
                 x.Email,
                 x.FirstName,
                 x.LastName,
+                x.Role,
                 x.IsActive
             })
             .ToListAsync(cancellationToken);

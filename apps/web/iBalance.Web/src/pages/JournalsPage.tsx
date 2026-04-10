@@ -6,6 +6,7 @@ import {
   getAccounts,
   getDashboardSummary,
   getJournalEntries,
+  getTenantReadableError,
   postJournalEntry,
   reverseJournalEntry,
   voidJournalEntry,
@@ -13,6 +14,11 @@ import {
   type JournalEntryDto,
   type JournalLineRequest,
 } from '../lib/api';
+import {
+  canCreateJournals,
+  canPostOrReverseJournals,
+  canViewFinance,
+} from '../lib/auth';
 
 function statusLabel(value: number) {
   switch (value) {
@@ -20,16 +26,30 @@ function statusLabel(value: number) {
     case 2: return 'Posted';
     case 3: return 'Voided';
     case 4: return 'Reversed';
-    default: return 'Unknown';
+    default: return 'Unavailable';
   }
 }
 
 function typeLabel(value: number) {
   switch (value) {
-    case 1: return 'Normal';
+    case 1: return 'Journal Entry';
     case 2: return 'Opening Balance';
-    default: return 'Unknown';
+    case 3: return 'Reversal Entry';
+    default: return 'Unavailable';
   }
+}
+
+function formatDateTime(value: string) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'Not available';
+  return parsed.toLocaleString();
+}
+
+function formatAmount(value: number) {
+  return new Intl.NumberFormat('en-NG', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
 }
 
 type LineForm = {
@@ -77,15 +97,6 @@ function parseMoney(value: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-function extractApiMessage(error: any, fallback: string) {
-  return (
-    error?.response?.data?.Message ||
-    error?.response?.data?.message ||
-    error?.message ||
-    fallback
-  );
-}
-
 export function JournalsPage() {
   const qc = useQueryClient();
 
@@ -95,21 +106,28 @@ export function JournalsPage() {
 
   const [journalForm, setJournalForm] = useState<JournalForm>(emptyJournalForm);
   const [reverseForm, setReverseForm] = useState<ReverseForm>(emptyReverseForm);
-  const [reverseTargetId, setReverseTargetId] = useState<string>('');
+  const [reverseTargetId, setReverseTargetId] = useState('');
+
+  const canView = canViewFinance();
+  const canCreate = canCreateJournals();
+  const canPostReverse = canPostOrReverseJournals();
 
   const journalsQ = useQuery({
     queryKey: ['journal-entries'],
     queryFn: getJournalEntries,
+    enabled: canView,
   });
 
   const accountsQ = useQuery({
     queryKey: ['accounts'],
     queryFn: getAccounts,
+    enabled: canView,
   });
 
   const dashboardQ = useQuery({
     queryKey: ['dashboard-summary'],
     queryFn: getDashboardSummary,
+    enabled: canView,
   });
 
   const postingAccounts = useMemo(() => {
@@ -119,6 +137,16 @@ export function JournalsPage() {
       .sort((a: LedgerAccountDto, b: LedgerAccountDto) => a.code.localeCompare(b.code));
   }, [accountsQ.data?.items]);
 
+  const journalSummary = useMemo(() => {
+    const items = journalsQ.data?.items ?? [];
+    return {
+      total: items.length,
+      drafts: items.filter((x: JournalEntryDto) => x.status === 1).length,
+      posted: items.filter((x: JournalEntryDto) => x.status === 2).length,
+      reversed: items.filter((x: JournalEntryDto) => x.status === 4).length,
+    };
+  }, [journalsQ.data?.items]);
+
   const createJournalMut = useMutation({
     mutationFn: createJournalEntry,
     onSuccess: async () => {
@@ -127,10 +155,11 @@ export function JournalsPage() {
       setModal(null);
       setJournalForm(emptyJournalForm);
       setErrorText('');
-      setInfoText('Journal entry created successfully.');
+      setInfoText('The journal entry has been created successfully.');
     },
-    onError: (e: any) => {
-      setErrorText(extractApiMessage(e, 'Failed to create journal entry.'));
+    onError: (e) => {
+      setErrorText(getTenantReadableError(e, 'We could not create the journal entry at this time.'));
+      setInfoText('');
     },
   });
 
@@ -142,10 +171,11 @@ export function JournalsPage() {
       setModal(null);
       setJournalForm(emptyJournalForm);
       setErrorText('');
-      setInfoText('Opening balance created and posted successfully.');
+      setInfoText('The opening balance has been created and posted successfully.');
     },
-    onError: (e: any) => {
-      setErrorText(extractApiMessage(e, 'Failed to create opening balance.'));
+    onError: (e) => {
+      setErrorText(getTenantReadableError(e, 'We could not create the opening balance at this time.'));
+      setInfoText('');
     },
   });
 
@@ -154,11 +184,12 @@ export function JournalsPage() {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['journal-entries'] });
       await qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
-      setInfoText('Journal posted successfully.');
+      setInfoText('The journal entry has been posted successfully.');
       setErrorText('');
     },
-    onError: (e: any) => {
-      setErrorText(extractApiMessage(e, 'Failed to post journal entry.'));
+    onError: (e) => {
+      setErrorText(getTenantReadableError(e, 'We could not post the journal entry at this time.'));
+      setInfoText('');
     },
   });
 
@@ -167,11 +198,12 @@ export function JournalsPage() {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['journal-entries'] });
       await qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
-      setInfoText('Draft journal voided successfully.');
+      setInfoText('The draft journal has been voided successfully.');
       setErrorText('');
     },
-    onError: (e: any) => {
-      setErrorText(extractApiMessage(e, 'Failed to void journal entry.'));
+    onError: (e) => {
+      setErrorText(getTenantReadableError(e, 'We could not void the draft journal at this time.'));
+      setInfoText('');
     },
   });
 
@@ -189,10 +221,11 @@ export function JournalsPage() {
       setReverseForm(emptyReverseForm);
       setReverseTargetId('');
       setErrorText('');
-      setInfoText('Journal reversed successfully.');
+      setInfoText('The journal entry has been reversed successfully.');
     },
-    onError: (e: any) => {
-      setErrorText(extractApiMessage(e, 'Failed to reverse journal entry.'));
+    onError: (e) => {
+      setErrorText(getTenantReadableError(e, 'We could not reverse the journal entry at this time.'));
+      setInfoText('');
     },
   });
 
@@ -208,6 +241,12 @@ export function JournalsPage() {
   const hasPostingAccounts = postingAccounts.length > 0;
 
   function openCreate(kind: 'create' | 'opening') {
+    if (!canCreate) {
+      setErrorText('You currently have view access only for journal information.');
+      setInfoText('');
+      return;
+    }
+
     setErrorText('');
     setInfoText('');
     setJournalForm(emptyJournalForm);
@@ -246,12 +285,12 @@ export function JournalsPage() {
 
   function validateLines(lines: LineForm[]): { ok: boolean; message?: string } {
     if (!lines || lines.length < 2) {
-      return { ok: false, message: 'A journal must contain at least two lines.' };
+      return { ok: false, message: 'Please enter at least two journal lines.' };
     }
 
     for (const [i, line] of lines.entries()) {
       if (!line.ledgerAccountId) {
-        return { ok: false, message: `Line ${i + 1}: ledger account is required.` };
+        return { ok: false, message: `Line ${i + 1}: please choose an account.` };
       }
 
       const d = parseMoney(line.debitAmount);
@@ -262,11 +301,11 @@ export function JournalsPage() {
       }
 
       if (d === 0 && c === 0) {
-        return { ok: false, message: `Line ${i + 1}: either debit or credit must be greater than zero.` };
+        return { ok: false, message: `Line ${i + 1}: enter a debit or a credit amount.` };
       }
 
       if (d > 0 && c > 0) {
-        return { ok: false, message: `Line ${i + 1}: use either debit or credit, not both.` };
+        return { ok: false, message: `Line ${i + 1}: enter either a debit or a credit amount, not both.` };
       }
     }
 
@@ -276,7 +315,7 @@ export function JournalsPage() {
     if (Math.abs(debit - credit) > 0.000001) {
       return {
         ok: false,
-        message: `Journal is out of balance. Debit ${debit.toFixed(2)} must equal Credit ${credit.toFixed(2)}.`,
+        message: `The journal is not balanced. Total debit ${formatAmount(debit)} must equal total credit ${formatAmount(credit)}.`,
       };
     }
 
@@ -295,65 +334,64 @@ export function JournalsPage() {
   async function submitJournal(kind: 'create' | 'opening') {
     setErrorText('');
     setInfoText('');
-  
+
+    if (!canCreate) {
+      setErrorText('You currently have view access only for journal information.');
+      return;
+    }
+
     if (!journalForm.entryDateUtc) {
-      setErrorText('Entry date/time is required.');
+      setErrorText('Please enter the journal date and time.');
       return;
     }
-  
+
     if (!journalForm.reference.trim()) {
-      setErrorText('Reference is required for now. Leave auto-numbering until an active journal number sequence exists.');
+      setErrorText('Please enter a journal reference.');
       return;
     }
-  
+
     if (!journalForm.description.trim()) {
-      setErrorText('Description is required.');
+      setErrorText('Please enter a journal description.');
       return;
     }
-  
+
     if (kind === 'opening' && !hasOpenPeriod) {
-      setErrorText('No open fiscal period exists for the opening balance date. Create or open a fiscal period first.');
+      setErrorText('There is no open fiscal period available for the selected opening balance date.');
       return;
     }
-  
+
     if (!hasPostingAccounts) {
-      setErrorText('No posting-enabled accounts exist yet. Create active posting accounts first.');
+      setErrorText('No posting accounts are available yet. Please create posting-enabled accounts first.');
       return;
     }
-  
+
     const validation = validateLines(journalForm.lines);
     if (!validation.ok) {
-      setErrorText(validation.message || 'Invalid journal lines.');
+      setErrorText(validation.message || 'Please review the journal lines and try again.');
       return;
     }
-  
+
     const payload = {
       entryDateUtc: toUtcIsoFromLocalInput(journalForm.entryDateUtc),
       reference: journalForm.reference.trim(),
       description: journalForm.description.trim(),
       lines: toLineRequests(journalForm.lines),
     };
-  
-    try {
-      if (kind === 'create') {
-        const result = await createJournalMut.mutateAsync(payload);
-        console.log('CREATE_JOURNAL_SUCCESS', result);
-      } else {
-        const result = await createOpeningMut.mutateAsync(payload);
-        console.log('CREATE_OPENING_SUCCESS', result);
-      }
-    } catch (error: any) {
-      console.log('CREATE_JOURNAL_OR_OPENING_ERROR', error?.response?.data);
-      setErrorText(
-        error?.response?.data?.Message ||
-        error?.response?.data?.message ||
-        error?.message ||
-        'Submission failed.'
-      );
+
+    if (kind === 'create') {
+      await createJournalMut.mutateAsync(payload);
+    } else {
+      await createOpeningMut.mutateAsync(payload);
     }
   }
 
   function openReverse(journalEntryId: string) {
+    if (!canPostReverse) {
+      setErrorText('You do not have access to reverse journal entries.');
+      setInfoText('');
+      return;
+    }
+
     setErrorText('');
     setInfoText('');
     setReverseTargetId(journalEntryId);
@@ -365,41 +403,46 @@ export function JournalsPage() {
     setErrorText('');
     setInfoText('');
 
+    if (!canPostReverse) {
+      setErrorText('You do not have access to reverse journal entries.');
+      return;
+    }
+
     if (!reverseTargetId) return;
 
     if (!reverseForm.reversalDateUtc) {
-      setErrorText('Reversal date/time is required.');
+      setErrorText('Please enter the reversal date and time.');
       return;
     }
 
     if (!reverseForm.reference.trim()) {
-      setErrorText('Reference is required for reversal.');
+      setErrorText('Please enter a reversal reference.');
       return;
     }
 
     if (!reverseForm.description.trim()) {
-      setErrorText('Description is required for reversal.');
+      setErrorText('Please enter a reversal description.');
       return;
     }
 
-    try {
-      await reverseMut.mutateAsync({
-        id: reverseTargetId,
-        reversalDateUtc: toUtcIsoFromLocalInput(reverseForm.reversalDateUtc),
-        reference: reverseForm.reference.trim(),
-        description: reverseForm.description.trim(),
-      });
-    } catch {
-      // onError already surfaces the real backend message
-    }
+    await reverseMut.mutateAsync({
+      id: reverseTargetId,
+      reversalDateUtc: toUtcIsoFromLocalInput(reverseForm.reversalDateUtc),
+      reference: reverseForm.reference.trim(),
+      description: reverseForm.description.trim(),
+    });
+  }
+
+  if (!canView) {
+    return <div className="panel error-panel">You do not have access to view journal activity.</div>;
   }
 
   if (journalsQ.isLoading) {
-    return <div className="panel">Loading journal entries.</div>;
+    return <div className="panel">Loading journal activity...</div>;
   }
 
   if (journalsQ.error || !journalsQ.data) {
-    return <div className="panel error-panel">Unable to load journal entries.</div>;
+    return <div className="panel error-panel">We could not load journal activity at this time.</div>;
   }
 
   return (
@@ -407,73 +450,111 @@ export function JournalsPage() {
       <section className="panel">
         <div className="section-heading">
           <div>
-            <h2>Journal Workflow Readiness</h2>
-            <div className="muted">Step 22C stabilization checks before posting.</div>
+            <h2>Journal overview</h2>
+            <div className="muted">Manage journal activity, posting readiness, and balanced entries.</div>
           </div>
         </div>
 
-        <div className="detail-stack">
-          <div><strong>Open fiscal period:</strong> {hasOpenPeriod ? `Yes — ${dashboardQ.data?.openFiscalPeriod?.name}` : 'No'}</div>
-          <div><strong>Posting-enabled accounts:</strong> {hasPostingAccounts ? `${postingAccounts.length} available` : 'None available'}</div>
-          <div><strong>Reference rule:</strong> Leave blank only if an active journal number sequence exists in backend.</div>
-          <div><strong>Accounting rule:</strong> Only active, non-header, posting-enabled accounts may be used. </div>
+        <div className="kv">
+          <div className="kv-row">
+            <span>Total Journals</span>
+            <span>{journalSummary.total}</span>
+          </div>
+          <div className="kv-row">
+            <span>Draft Journals</span>
+            <span>{journalSummary.drafts}</span>
+          </div>
+          <div className="kv-row">
+            <span>Posted Journals</span>
+            <span>{journalSummary.posted}</span>
+          </div>
+          <div className="kv-row">
+            <span>Reversed Journals</span>
+            <span>{journalSummary.reversed}</span>
+          </div>
+          <div className="kv-row">
+            <span>Current Fiscal Period</span>
+            <span>{hasOpenPeriod ? dashboardQ.data?.openFiscalPeriod?.name : 'No open period available'}</span>
+          </div>
+          <div className="kv-row">
+            <span>Posting Accounts</span>
+            <span>{hasPostingAccounts ? `${postingAccounts.length} available` : 'Not yet available'}</span>
+          </div>
         </div>
+
+        <div className="hero-actions" style={{ marginTop: 16 }}>
+          {canCreate ? (
+            <>
+              <button className="button primary" onClick={() => openCreate('create')}>New Journal</button>
+              <button className="button" onClick={() => openCreate('opening')}>Opening Balance</button>
+            </>
+          ) : null}
+        </div>
+
+        {!canCreate && !canPostReverse ? (
+          <div className="panel" style={{ marginTop: 16 }}>
+            <div className="muted">You currently have read-only access to journal information.</div>
+          </div>
+        ) : null}
+
+        {infoText ? (
+          <div className="panel" style={{ marginTop: 16 }}>
+            <div className="muted">{infoText}</div>
+          </div>
+        ) : null}
+
+        {errorText ? (
+          <div className="panel error-panel" style={{ marginTop: 16 }}>
+            {errorText}
+          </div>
+        ) : null}
       </section>
 
       <section className="panel">
         <div className="section-heading">
-          <div>
-            <h2>Journal Entries</h2>
-            <div className="muted">{journalsQ.data.count} journal(s)</div>
-          </div>
-
-          <div className="inline-actions">
-            <button className="button primary" onClick={() => openCreate('create')}>New Journal</button>
-            <button className="button" onClick={() => openCreate('opening')}>Opening Balance</button>
-          </div>
+          <h2>Journal register</h2>
+          <span className="muted">{journalsQ.data.count} journal(s)</span>
         </div>
-
-        {infoText ? <div className="panel" style={{ marginBottom: 12 }}>{infoText}</div> : null}
-        {errorText ? <div className="panel error-panel" style={{ marginBottom: 12 }}>{errorText}</div> : null}
 
         <div className="table-wrap">
           <table className="data-table">
             <thead>
               <tr>
-                <th>Date (UTC)</th>
+                <th>Date</th>
                 <th>Reference</th>
                 <th>Description</th>
                 <th>Type</th>
                 <th>Status</th>
-                <th>Debit</th>
-                <th>Credit</th>
+                <th style={{ textAlign: 'right' }}>Debit</th>
+                <th style={{ textAlign: 'right' }}>Credit</th>
                 <th style={{ width: 320 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {journals.map((item: JournalEntryDto) => (
                 <tr key={item.id}>
-                  <td>{new Date(item.entryDateUtc).toLocaleString()}</td>
+                  <td>{formatDateTime(item.entryDateUtc)}</td>
                   <td>{item.reference}</td>
                   <td>{item.description}</td>
                   <td>{typeLabel(item.type)}</td>
                   <td>{statusLabel(item.status)}</td>
-                  <td>{Number(item.totalDebit).toFixed(2)}</td>
-                  <td>{Number(item.totalCredit).toFixed(2)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatAmount(Number(item.totalDebit))}</td>
+                  <td style={{ textAlign: 'right' }}>{formatAmount(Number(item.totalCredit))}</td>
                   <td>
                     <div className="inline-actions">
-                      {item.status === 1 ? (
-                        <>
-                          <button className="button" onClick={() => postMut.mutate(item.id)} disabled={postMut.isPending}>
-                            Post
-                          </button>
-                          <button className="button danger" onClick={() => voidMut.mutate(item.id)} disabled={voidMut.isPending}>
-                            Void
-                          </button>
-                        </>
+                      {item.status === 1 && canPostReverse ? (
+                        <button className="button" onClick={() => postMut.mutate(item.id)} disabled={postMut.isPending}>
+                          Post
+                        </button>
                       ) : null}
 
-                      {item.status === 2 ? (
+                      {item.status === 1 && canCreate ? (
+                        <button className="button danger" onClick={() => voidMut.mutate(item.id)} disabled={voidMut.isPending}>
+                          Void
+                        </button>
+                      ) : null}
+
+                      {item.status === 2 && canPostReverse ? (
                         <button className="button" onClick={() => openReverse(item.id)}>
                           Reverse
                         </button>
@@ -501,14 +582,13 @@ export function JournalsPage() {
 
             <div className="form-grid two">
               <div className="form-row">
-                <label>Entry Date/Time</label>
+                <label>Date and Time</label>
                 <input
                   type="datetime-local"
                   className="input"
                   value={journalForm.entryDateUtc}
                   onChange={(e) => setJournalForm((s) => ({ ...s, entryDateUtc: e.target.value }))}
                 />
-                <div className="muted">Must fall within an open fiscal period.</div>
               </div>
 
               <div className="form-row">
@@ -517,7 +597,7 @@ export function JournalsPage() {
                   className="input"
                   value={journalForm.reference}
                   onChange={(e) => setJournalForm((s) => ({ ...s, reference: e.target.value }))}
-                  placeholder="Provide one if no active sequence exists"
+                  placeholder="Enter reference"
                 />
               </div>
 
@@ -527,17 +607,19 @@ export function JournalsPage() {
                   className="input"
                   value={journalForm.description}
                   onChange={(e) => setJournalForm((s) => ({ ...s, description: e.target.value }))}
-                  placeholder="Describe the business transaction"
+                  placeholder="Enter a clear description"
                 />
               </div>
             </div>
 
             <div style={{ marginTop: 14 }}>
               <div className="section-heading" style={{ marginBottom: 10 }}>
-                <h2 style={{ fontSize: 18 }}>Lines</h2>
+                <h2 style={{ fontSize: 18 }}>Journal lines</h2>
                 <div className="inline-actions">
-                  <span className="muted">Debit {totals.debit.toFixed(2)} / Credit {totals.credit.toFixed(2)}</span>
-                  <button className="button" onClick={addLine}>Add line</button>
+                  <span className="muted">
+                    Debit {formatAmount(totals.debit)} / Credit {formatAmount(totals.credit)}
+                  </span>
+                  <button className="button" onClick={addLine}>Add Line</button>
                 </div>
               </div>
 
@@ -547,8 +629,8 @@ export function JournalsPage() {
                     <tr>
                       <th style={{ width: 340 }}>Account</th>
                       <th>Description</th>
-                      <th style={{ width: 140 }}>Debit</th>
-                      <th style={{ width: 140 }}>Credit</th>
+                      <th style={{ width: 140, textAlign: 'right' }}>Debit</th>
+                      <th style={{ width: 140, textAlign: 'right' }}>Credit</th>
                       <th style={{ width: 110 }} />
                     </tr>
                   </thead>
@@ -561,7 +643,7 @@ export function JournalsPage() {
                             value={line.ledgerAccountId}
                             onChange={(e) => setLine(idx, { ledgerAccountId: e.target.value })}
                           >
-                            <option value="">— Select Posting Account —</option>
+                            <option value="">— Select Account —</option>
                             {postingAccounts.map((a: LedgerAccountDto) => (
                               <option key={a.id} value={a.id}>
                                 {a.code} - {a.name}
@@ -574,7 +656,7 @@ export function JournalsPage() {
                             className="input"
                             value={line.description}
                             onChange={(e) => setLine(idx, { description: e.target.value })}
-                            placeholder="Optional"
+                            placeholder="Optional description"
                           />
                         </td>
                         <td>
@@ -614,7 +696,7 @@ export function JournalsPage() {
 
               {!hasPostingAccounts ? (
                 <div className="panel error-panel" style={{ marginTop: 10 }}>
-                  No posting-enabled accounts found. Create active posting accounts first.
+                  No posting accounts are currently available.
                 </div>
               ) : null}
             </div>
@@ -631,8 +713,8 @@ export function JournalsPage() {
                 {createJournalMut.isPending || createOpeningMut.isPending
                   ? 'Saving…'
                   : modal === 'opening'
-                    ? 'Create & Post Opening Balance'
-                    : 'Create Draft Journal'}
+                    ? 'Create Opening Balance'
+                    : 'Create Journal'}
               </button>
             </div>
           </div>
@@ -651,7 +733,7 @@ export function JournalsPage() {
 
             <div className="form-grid two">
               <div className="form-row">
-                <label>Reversal Date/Time</label>
+                <label>Reversal Date and Time</label>
                 <input
                   type="datetime-local"
                   className="input"
@@ -666,7 +748,7 @@ export function JournalsPage() {
                   className="input"
                   value={reverseForm.reference}
                   onChange={(e) => setReverseForm((s) => ({ ...s, reference: e.target.value }))}
-                  placeholder="Required"
+                  placeholder="Enter reversal reference"
                 />
               </div>
 
@@ -676,7 +758,7 @@ export function JournalsPage() {
                   className="input"
                   value={reverseForm.description}
                   onChange={(e) => setReverseForm((s) => ({ ...s, description: e.target.value }))}
-                  placeholder="Required"
+                  placeholder="Enter reversal description"
                 />
               </div>
             </div>
@@ -684,7 +766,7 @@ export function JournalsPage() {
             <div className="modal-footer">
               <button className="button" onClick={closeModal} disabled={reverseMut.isPending}>Cancel</button>
               <button className="button primary" onClick={submitReverse} disabled={reverseMut.isPending}>
-                {reverseMut.isPending ? 'Reversing…' : 'Reverse'}
+                {reverseMut.isPending ? 'Processing…' : 'Reverse Journal'}
               </button>
             </div>
           </div>

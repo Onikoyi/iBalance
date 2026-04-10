@@ -34,6 +34,7 @@ app.UseCors("WebClient");
 
 app.UseRouting();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

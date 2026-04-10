@@ -1,16 +1,20 @@
+using iBalance.Api.Security;
 using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
 using iBalance.Modules.Finance.Domain.Entities;
 using iBalance.Modules.Finance.Domain.Enums;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace iBalance.Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/finance")]
 public sealed class FinanceController : ControllerBase
 {
+    [Authorize(Policy = AuthorizationPolicies.FinanceJournalsCreate)]
     [HttpPost("opening-balances")]
     public async Task<IActionResult> CreateOpeningBalanceJournal(
         [FromBody] CreateOpeningBalanceRequest request,
@@ -186,6 +190,7 @@ public sealed class FinanceController : ControllerBase
         }
     }
 
+    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
     [HttpPost("journal-number-sequences")]
     public async Task<IActionResult> CreateJournalNumberSequence(
         [FromBody] CreateJournalNumberSequenceRequest request,
@@ -248,6 +253,7 @@ public sealed class FinanceController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
     [HttpGet("journal-number-sequences")]
     public async Task<IActionResult> GetJournalNumberSequences(
         [FromServices] ApplicationDbContext dbContext,
@@ -281,6 +287,7 @@ public sealed class FinanceController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.FinanceView)]
     [HttpGet("dashboard-summary")]
     public async Task<IActionResult> GetDashboardSummary(
         [FromServices] ApplicationDbContext dbContext,
@@ -347,6 +354,7 @@ public sealed class FinanceController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.FinanceJournalsCreate)]
     [HttpPut("journal-entries/{journalEntryId:guid}")]
     public async Task<IActionResult> UpdateDraftJournalEntry(
         Guid journalEntryId,
@@ -493,6 +501,7 @@ public sealed class FinanceController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.FinanceFiscalPeriodsManage)]
     [HttpPost("fiscal-periods")]
     public async Task<IActionResult> CreateFiscalPeriod(
         [FromBody] CreateFiscalPeriodRequest request,
@@ -576,6 +585,7 @@ public sealed class FinanceController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.FinanceView)]
     [HttpGet("fiscal-periods")]
     public async Task<IActionResult> GetFiscalPeriods(
         [FromServices] ApplicationDbContext dbContext,
@@ -608,6 +618,7 @@ public sealed class FinanceController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.FinanceFiscalPeriodsManage)]
     [HttpPost("fiscal-periods/{fiscalPeriodId:guid}/open")]
     public async Task<IActionResult> OpenFiscalPeriod(
         Guid fiscalPeriodId,
@@ -652,6 +663,7 @@ public sealed class FinanceController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.FinanceFiscalPeriodsManage)]
     [HttpPost("fiscal-periods/{fiscalPeriodId:guid}/close")]
     public async Task<IActionResult> CloseFiscalPeriod(
         Guid fiscalPeriodId,
@@ -696,6 +708,7 @@ public sealed class FinanceController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
     [HttpPost("accounts")]
     public async Task<IActionResult> CreateLedgerAccount(
         [FromBody] CreateLedgerAccountRequest request,
@@ -808,6 +821,7 @@ public sealed class FinanceController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.FinanceView)]
     [HttpGet("accounts")]
     public async Task<IActionResult> GetLedgerAccounts(
         [FromServices] ApplicationDbContext dbContext,
@@ -846,6 +860,7 @@ public sealed class FinanceController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.FinanceJournalsCreate)]
     [HttpPost("journal-entries")]
     public async Task<IActionResult> CreateJournalEntry(
         [FromBody] CreateJournalEntryRequest request,
@@ -989,6 +1004,7 @@ public sealed class FinanceController : ControllerBase
         }
     }
 
+    [Authorize(Policy = AuthorizationPolicies.FinanceView)]
     [HttpGet("journal-entries")]
     public async Task<IActionResult> GetJournalEntries(
         [FromServices] ApplicationDbContext dbContext,
@@ -1039,6 +1055,7 @@ public sealed class FinanceController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.FinanceJournalsPost)]
     [HttpPost("journal-entries/{journalEntryId:guid}/post")]
     public async Task<IActionResult> PostJournalEntry(
         Guid journalEntryId,
@@ -1168,6 +1185,7 @@ public sealed class FinanceController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.FinanceJournalsCreate)]
     [HttpPost("journal-entries/{journalEntryId:guid}/void")]
     public async Task<IActionResult> VoidJournalEntry(
         Guid journalEntryId,
@@ -1222,6 +1240,7 @@ public sealed class FinanceController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.FinanceJournalsReverse)]
     [HttpPost("journal-entries/{journalEntryId:guid}/reverse")]
     public async Task<IActionResult> ReverseJournalEntry(
         Guid journalEntryId,
@@ -1399,6 +1418,7 @@ public sealed class FinanceController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.FinanceView)]
     [HttpGet("ledger-movements")]
     public async Task<IActionResult> GetLedgerMovements(
         [FromServices] ApplicationDbContext dbContext,
@@ -1436,6 +1456,7 @@ public sealed class FinanceController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
     [HttpGet("trial-balance")]
     public async Task<IActionResult> GetTrialBalance(
         [FromQuery] DateTime? fromUtc,
@@ -1523,6 +1544,7 @@ public sealed class FinanceController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
     [HttpGet("reports/balance-sheet")]
     public async Task<IActionResult> GetBalanceSheet(
         [FromQuery] DateTime? asOfUtc,
@@ -1648,6 +1670,7 @@ public sealed class FinanceController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
     [HttpGet("reports/income-statement")]
     public async Task<IActionResult> GetIncomeStatement(
         [FromQuery] DateTime? fromUtc,
@@ -1771,6 +1794,7 @@ public sealed class FinanceController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
     [HttpGet("accounts/{ledgerAccountId:guid}/ledger")]
     public async Task<IActionResult> GetLedgerAccountStatement(
         Guid ledgerAccountId,

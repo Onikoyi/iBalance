@@ -1,3 +1,4 @@
+using iBalance.Api.Security;
 using iBalance.BuildingBlocks.Infrastructure.DependencyInjection;
 using iBalance.Modules.Finance.DependencyInjection;
 using iBalance.Modules.OilAndGas.DependencyInjection;
@@ -20,6 +21,57 @@ public static class ServiceCollectionExtensions
         services.AddFinanceModule(configuration);
         services.AddUniversitiesModule(configuration);
         services.AddOilAndGasModule(configuration);
+
+        services.AddAuthorization(options =>
+        {
+            options.AddPolicy(AuthorizationPolicies.AdminAccess, policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.RequireRole("PlatformAdmin", "TenantAdmin");
+            });
+
+            options.AddPolicy(AuthorizationPolicies.FinanceView, policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.RequireRole("PlatformAdmin", "TenantAdmin", "Accountant", "Approver", "Viewer");
+            });
+
+            options.AddPolicy(AuthorizationPolicies.FinanceSetupManage, policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.RequireRole("PlatformAdmin", "TenantAdmin", "Accountant");
+            });
+
+            options.AddPolicy(AuthorizationPolicies.FinanceJournalsCreate, policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.RequireRole("PlatformAdmin", "TenantAdmin", "Accountant");
+            });
+
+            options.AddPolicy(AuthorizationPolicies.FinanceJournalsPost, policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.RequireRole("PlatformAdmin", "TenantAdmin", "Accountant", "Approver");
+            });
+
+            options.AddPolicy(AuthorizationPolicies.FinanceJournalsReverse, policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.RequireRole("PlatformAdmin", "TenantAdmin", "Accountant", "Approver");
+            });
+
+            options.AddPolicy(AuthorizationPolicies.FinanceFiscalPeriodsManage, policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.RequireRole("PlatformAdmin", "TenantAdmin", "Accountant");
+            });
+
+            options.AddPolicy(AuthorizationPolicies.FinanceReportsView, policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.RequireRole("PlatformAdmin", "TenantAdmin", "Accountant", "Approver", "Viewer");
+            });
+        });
 
         services.AddCors(options =>
         {

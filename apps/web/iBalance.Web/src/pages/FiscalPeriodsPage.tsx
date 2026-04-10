@@ -4,9 +4,11 @@ import {
   closeFiscalPeriod,
   createFiscalPeriod,
   getFiscalPeriods,
+  getTenantReadableError,
   openFiscalPeriod,
   type FiscalPeriodDto,
 } from '../lib/api';
+import { canManageFiscalPeriods, canViewFinance } from '../lib/auth';
 
 function statusLabel(value: number) {
   return value === 1 ? 'Open' : 'Closed';
@@ -32,9 +34,13 @@ export function FiscalPeriodsPage() {
   const [errorText, setErrorText] = useState('');
   const [form, setForm] = useState<FormState>(emptyForm);
 
+  const canView = canViewFinance();
+  const canManage = canManageFiscalPeriods();
+
   const { data, isLoading, error } = useQuery({
     queryKey: ['fiscal-periods'],
     queryFn: getFiscalPeriods,
+    enabled: canView,
   });
 
   const createMut = useMutation({
@@ -46,9 +52,8 @@ export function FiscalPeriodsPage() {
       setForm(emptyForm);
       setErrorText('');
     },
-    onError: (e: any) => {
-      const msg = e?.response?.data?.message || e?.response?.data?.Message || e?.message || 'Failed to create fiscal period.';
-      setErrorText(String(msg));
+    onError: (e) => {
+      setErrorText(getTenantReadableError(e, 'Failed to create fiscal period.'));
     },
   });
 
@@ -58,6 +63,9 @@ export function FiscalPeriodsPage() {
       await qc.invalidateQueries({ queryKey: ['fiscal-periods'] });
       await qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
     },
+    onError: (e) => {
+      setErrorText(getTenantReadableError(e, 'Failed to open fiscal period.'));
+    },
   });
 
   const closeMut = useMutation({
@@ -65,6 +73,9 @@ export function FiscalPeriodsPage() {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['fiscal-periods'] });
       await qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
+    },
+    onError: (e) => {
+      setErrorText(getTenantReadableError(e, 'Failed to close fiscal period.'));
     },
   });
 
@@ -74,6 +85,11 @@ export function FiscalPeriodsPage() {
   }, [data?.items]);
 
   function openModal() {
+    if (!canManage) {
+      setErrorText('You do not have permission to manage fiscal periods.');
+      return;
+    }
+
     setErrorText('');
     setForm(emptyForm);
     setShowCreate(true);
@@ -85,6 +101,12 @@ export function FiscalPeriodsPage() {
 
   async function submit() {
     setErrorText('');
+
+    if (!canManage) {
+      setErrorText('You do not have permission to manage fiscal periods.');
+      return;
+    }
+
     if (!form.name.trim() || !form.startDate || !form.endDate) {
       setErrorText('Name, Start Date, and End Date are required.');
       return;
@@ -103,6 +125,10 @@ export function FiscalPeriodsPage() {
     });
   }
 
+  if (!canView) {
+    return <div className="panel error-panel">You do not have permission to view fiscal periods.</div>;
+  }
+
   if (isLoading) {
     return <div className="panel">Loading fiscal periods.</div>;
   }
@@ -119,8 +145,18 @@ export function FiscalPeriodsPage() {
           <div className="muted">{data.count} period(s)</div>
         </div>
 
-        <button className="button primary" onClick={openModal}>New Fiscal Period</button>
+        {canManage ? (
+          <button className="button primary" onClick={openModal}>New Fiscal Period</button>
+        ) : null}
       </div>
+
+      {!canManage ? (
+        <div className="panel" style={{ marginBottom: 12 }}>
+          <div className="muted">You have read-only access to fiscal periods.</div>
+        </div>
+      ) : null}
+
+      {errorText ? <div className="error-panel">{errorText}</div> : null}
 
       <div className="table-wrap">
         <table className="data-table">
@@ -142,14 +178,18 @@ export function FiscalPeriodsPage() {
                 <td>{statusLabel(item.status)}</td>
                 <td>
                   <div className="table-actions">
-                    {item.status !== 1 ? (
-                      <button className="button" onClick={() => openMut.mutate(item.id)} disabled={openMut.isPending}>
-                        Open
-                      </button>
+                    {canManage ? (
+                      item.status !== 1 ? (
+                        <button className="button" onClick={() => openMut.mutate(item.id)} disabled={openMut.isPending}>
+                          Open
+                        </button>
+                      ) : (
+                        <button className="button" onClick={() => closeMut.mutate(item.id)} disabled={closeMut.isPending}>
+                          Close
+                        </button>
+                      )
                     ) : (
-                      <button className="button" onClick={() => closeMut.mutate(item.id)} disabled={closeMut.isPending}>
-                        Close
-                      </button>
+                      <span className="muted">Read only</span>
                     )}
                   </div>
                 </td>

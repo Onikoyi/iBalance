@@ -9,9 +9,12 @@ import { ReportsPage } from './pages/ReportsPage';
 import { LandingPage } from './pages/LandingPage';
 import { PricingPublicPage } from './pages/PricingPublicPage';
 import { TenantOnboardingPage } from './pages/TenantOnboardingPage';
+import { SubscriptionRequestPage } from './pages/SubscriptionRequestPage';
+import { LicenseStatusPage } from './pages/LicenseStatusPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 import { LoginPage } from './pages/auth/LoginPage';
+import { SignUpPage } from './pages/auth/SignUpPage';
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 
@@ -22,16 +25,17 @@ import { AdminShell } from './components/layout/AdminShell';
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
 import { AdminUsersPage } from './pages/admin/AdminUsersPage';
+import { AdminTenantDetailPage } from './pages/admin/AdminTenantDetailPage';
 
 export default function App() {
   return (
     <Routes>
-      {/* Public */}
       <Route path="/" element={<LandingPage />} />
       <Route path="/pricing" element={<PricingPublicPage />} />
       <Route path="/onboarding" element={<TenantOnboardingPage />} />
+      <Route path="/subscribe" element={<SubscriptionRequestPage />} />
+      <Route path="/license-status" element={<LicenseStatusPage />} />
 
-      {/* Auth */}
       <Route
         path="/login"
         element={
@@ -40,14 +44,35 @@ export default function App() {
           </PublicOnly>
         }
       />
-      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route
+        path="/signup"
+        element={
+          <PublicOnly>
+            <SignUpPage />
+          </PublicOnly>
+        }
+      />
+      <Route
+        path="/forgot-password"
+        element={
+          <PublicOnly>
+            <ForgotPasswordPage />
+          </PublicOnly>
+        }
+      />
+      <Route
+        path="/reset-password"
+        element={
+          <PublicOnly>
+            <ResetPasswordPage />
+          </PublicOnly>
+        }
+      />
 
-      {/* Finance (protected) */}
       <Route
         path="/dashboard"
         element={
-          <RequireAuth>
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
             <AppShell>
               <DashboardPage />
             </AppShell>
@@ -57,7 +82,7 @@ export default function App() {
       <Route
         path="/accounts"
         element={
-          <RequireAuth>
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
             <AppShell>
               <AccountsPage />
             </AppShell>
@@ -67,7 +92,7 @@ export default function App() {
       <Route
         path="/journals"
         element={
-          <RequireAuth>
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
             <AppShell>
               <JournalsPage />
             </AppShell>
@@ -77,7 +102,7 @@ export default function App() {
       <Route
         path="/fiscal-periods"
         element={
-          <RequireAuth>
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant']}>
             <AppShell>
               <FiscalPeriodsPage />
             </AppShell>
@@ -87,7 +112,7 @@ export default function App() {
       <Route
         path="/reports"
         element={
-          <RequireAuth>
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
             <AppShell>
               <ReportsPage />
             </AppShell>
@@ -95,11 +120,10 @@ export default function App() {
         }
       />
 
-      {/* Admin (protected) */}
       <Route
         path="/admin"
         element={
-          <RequireAuth>
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin']}>
             <AdminShell>
               <AdminDashboardPage />
             </AdminShell>
@@ -109,7 +133,7 @@ export default function App() {
       <Route
         path="/admin/settings"
         element={
-          <RequireAuth>
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin']}>
             <AdminShell>
               <AdminSettingsPage />
             </AdminShell>
@@ -119,18 +143,25 @@ export default function App() {
       <Route
         path="/admin/users"
         element={
-          <RequireAuth>
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin']}>
             <AdminShell>
               <AdminUsersPage />
             </AdminShell>
           </RequireAuth>
         }
       />
+      <Route
+        path="/admin/tenants/:tenantId"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin']}>
+            <AdminShell>
+              <AdminTenantDetailPage />
+            </AdminShell>
+          </RequireAuth>
+        }
+      />
 
-      {/* Back-compat: if any old redirect exists */}
       <Route path="/home" element={<Navigate to="/" replace />} />
-
-      {/* Catch-all */}
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );

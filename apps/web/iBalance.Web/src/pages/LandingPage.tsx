@@ -6,61 +6,83 @@ export function LandingPage() {
     <PublicShell>
       <div className="public-container">
         <section className="hero">
-          <div className="badge">Production-grade • Audit-first • Multi-tenant</div>
-          <h1 className="hero-title">iBalance Accounting Cloud</h1>
+          <div className="badge">Secure • Multi-tenant • Finance-ready</div>
+          <h1 className="hero-title">Modern accounting for growing organizations</h1>
           <p className="hero-subtitle">
-            A disciplined finance core with tenant isolation, immutable ledger movements, and reporting that can be
-            reproduced from ledger history. Built for real accounting controls — not demos.
+            iBalance Accounting Cloud helps organizations manage financial operations with clarity,
+            control, and confidence. From setup to reporting, every experience is built for real business use.
           </p>
 
           <div className="hero-actions">
-            <Link to="/onboarding" className="button primary">
-              Get Started (Tenant Onboarding)
-            </Link>
-            <Link to="/pricing" className="button">
-              View Pricing
-            </Link>
-            <Link to="/dashboard" className="button">
-              Open Finance Console
-            </Link>
+            <Link to="/pricing" className="button primary">View Pricing</Link>
+            <Link to="/subscribe" className="button">Start Subscription</Link>
+            <Link to="/login" className="button">Sign In</Link>
           </div>
 
           <div className="kv">
             <div className="kv-row">
-              <span>Tenant isolation</span>
-              <span>Header-based tenant context</span>
+              <span>For organizations</span>
+              <span>Tenant-based access and branded experience</span>
             </div>
             <div className="kv-row">
-              <span>Posting engine</span>
-              <span>Journal-driven • immutable movements</span>
+              <span>For finance teams</span>
+              <span>Structured records, reporting, and controlled workflows</span>
             </div>
             <div className="kv-row">
-              <span>Controls</span>
-              <span>Period locks • reversal/correction flows</span>
+              <span>For leadership</span>
+              <span>Clear visibility into financial performance and reporting</span>
             </div>
           </div>
         </section>
 
         <section className="grid-3">
           <div className="feature-card">
-            <h2 style={{ margin: 0 }}>Auditability</h2>
+            <h2 style={{ margin: 0 }}>Structured financial control</h2>
             <p className="muted">
-              Posted effects are represented by movements; corrections happen by reversal rather than destructive edits.
+              Manage accounts, journals, fiscal periods, and reports in a disciplined environment designed for professional finance operations.
             </p>
           </div>
 
           <div className="feature-card">
-            <h2 style={{ margin: 0 }}>Tenant-ready</h2>
+            <h2 style={{ margin: 0 }}>Tenant-specific experience</h2>
             <p className="muted">
-              Configure a tenant key, optional tenant logo, and run a clean tenant-branded experience.
+              Each organization works within its own secure space, with its own access context, identity, and operational setup.
             </p>
           </div>
 
           <div className="feature-card">
-            <h2 style={{ margin: 0 }}>Finance Console</h2>
+            <h2 style={{ margin: 0 }}>Professional reporting</h2>
             <p className="muted">
-              Chart of accounts, journals, fiscal periods, and reports in a production-grade shell.
+              Present financial information clearly with reports that are easier to review, share, and print for operational and management use.
             </p>
+          </div>
+        </section>
+
+        <section className="panel">
+          <div className="section-heading">
+            <h2>Get started</h2>
+            <span className="muted">A simple path to productive use</span>
+          </div>
+
+          <div className="kv">
+            <div className="kv-row">
+              <span>1. Choose a plan</span>
+              <span>Select the package that matches your organization’s needs</span>
+            </div>
+            <div className="kv-row">
+              <span>2. Create your subscription</span>
+              <span>Reserve your tenant key and create your first administrator account</span>
+            </div>
+            <div className="kv-row">
+              <span>3. Sign in and begin setup</span>
+              <span>Access your finance workspace and start configuring operations</span>
+            </div>
+          </div>
+
+          <div className="hero-actions" style={{ marginTop: 16 }}>
+            <Link to="/pricing" className="button primary">Explore Pricing</Link>
+            <Link to="/subscribe" className="button">Create Subscription</Link>
+            <Link to="/login" className="button">Sign In</Link>
           </div>
         </section>
       </div>

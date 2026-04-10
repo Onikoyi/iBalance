@@ -6,6 +6,7 @@ function LogoSlot({ dataUrl, fallbackText }: { dataUrl: string; fallbackText: st
   if (dataUrl) {
     return <img src={dataUrl} alt={fallbackText} style={{ height: 34, maxWidth: 160, objectFit: 'contain' }} />;
   }
+
   return (
     <div
       style={{
@@ -25,7 +26,11 @@ function LogoSlot({ dataUrl, fallbackText }: { dataUrl: string; fallbackText: st
   );
 }
 
-export function AuthShell({ children }: PropsWithChildren) {
+type AuthShellProps = PropsWithChildren<{
+  wide?: boolean;
+}>;
+
+export function AuthShell({ children, wide = false }: AuthShellProps) {
   const tenantLogo = getTenantLogoDataUrl();
   const companyLogo = getCompanyLogoDataUrl();
 
@@ -45,7 +50,9 @@ export function AuthShell({ children }: PropsWithChildren) {
       </header>
 
       <main className="auth-main">
-        <div className="auth-card">{children}</div>
+        <div className={`auth-card ${wide ? 'wide' : ''}`} data-variant={wide ? 'wide' : 'default'}>
+          {children}
+        </div>
       </main>
 
       <footer className="auth-footer">

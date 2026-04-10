@@ -30,6 +30,23 @@ public sealed class UserAccountConfiguration : IEntityTypeConfiguration<UserAcco
             .HasMaxLength(100)
             .IsRequired();
 
+        builder.Property(x => x.Role)
+            .HasMaxLength(50)
+            .IsRequired();
+
+        builder.Property(x => x.PasswordHash)
+            .HasMaxLength(512)
+            .IsRequired();
+
+        builder.Property(x => x.PasswordSalt)
+            .HasMaxLength(256)
+            .IsRequired();
+
+        builder.Property(x => x.PasswordResetTokenHash)
+            .HasMaxLength(512);
+
+        builder.Property(x => x.PasswordResetTokenExpiresOnUtc);
+
         builder.Property(x => x.IsActive)
             .IsRequired();
 

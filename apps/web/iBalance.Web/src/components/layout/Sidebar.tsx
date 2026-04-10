@@ -1,15 +1,25 @@
 import { BarChart3, BookOpen, CalendarRange, FileStack, LayoutDashboard } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
+import {
+  canManageFinanceSetup,
+  canManageFiscalPeriods,
+  canViewFinance,
+  canViewReports,
+  getCurrentRole,
+} from '../../lib/auth';
 
-const links = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/accounts', label: 'Chart of Accounts', icon: BookOpen },
-  { to: '/journals', label: 'Journal Entries', icon: FileStack },
-  { to: '/fiscal-periods', label: 'Fiscal Periods', icon: CalendarRange },
-  { to: '/reports', label: 'Reports', icon: BarChart3 },
+const allLinks = [
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, show: () => canViewFinance() },
+  { to: '/accounts', label: 'Chart of Accounts', icon: BookOpen, show: () => canManageFinanceSetup() },
+  { to: '/journals', label: 'Journal Entries', icon: FileStack, show: () => canViewFinance() },
+  { to: '/fiscal-periods', label: 'Fiscal Periods', icon: CalendarRange, show: () => canManageFiscalPeriods() },
+  { to: '/reports', label: 'Reports', icon: BarChart3, show: () => canViewReports() },
 ];
 
 export function Sidebar() {
+  const role = getCurrentRole();
+  const links = allLinks.filter((link) => link.show());
+
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -18,6 +28,10 @@ export function Sidebar() {
           <div className="brand-name">iBalance</div>
           <div className="brand-subtitle">Accounting Cloud</div>
         </div>
+      </div>
+
+      <div className="muted" style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13 }}>
+        Role: <strong style={{ color: '#fff' }}>{role || 'Unknown'}</strong>
       </div>
 
       <nav className="nav-menu">
