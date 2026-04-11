@@ -34,7 +34,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<PasswordHasher>();
 
         services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
-        services.AddScoped<IEmailSender, SmtpEmailSender>();
+        services.AddHttpClient<IEmailSender, ResendEmailSender>();
 
         var connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("DefaultConnection was not configured.");

@@ -42,6 +42,14 @@ public class ApplicationDbContext : DbContext
     public DbSet<LedgerMovement> LedgerMovements => Set<LedgerMovement>();
     public DbSet<FiscalPeriod> FiscalPeriods => Set<FiscalPeriod>();
     public DbSet<JournalNumberSequence> JournalNumberSequences => Set<JournalNumberSequence>();
+    public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<SalesInvoice> SalesInvoices => Set<SalesInvoice>();
+    public DbSet<SalesInvoiceLine> SalesInvoiceLines => Set<SalesInvoiceLine>();
+    public DbSet<CustomerReceipt> CustomerReceipts => Set<CustomerReceipt>();
+    public DbSet<Vendor> Vendors => Set<Vendor>();
+    public DbSet<PurchaseInvoice> PurchaseInvoices => Set<PurchaseInvoice>();
+    public DbSet<PurchaseInvoiceLine> PurchaseInvoiceLines => Set<PurchaseInvoiceLine>();
+    public DbSet<VendorPayment> VendorPayments => Set<VendorPayment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -116,6 +124,256 @@ public class ApplicationDbContext : DbContext
             builder.HasIndex(x => x.TenantId).IsUnique();
         });
 
+        modelBuilder.Entity<CustomerReceipt>(entity =>
+{
+    entity.ToTable("CustomerReceipts");
+
+    entity.HasKey(x => x.Id);
+
+    entity.Property(x => x.ReceiptNumber)
+        .HasMaxLength(50)
+        .IsRequired();
+
+    entity.Property(x => x.Description)
+        .HasMaxLength(500)
+        .IsRequired();
+
+    entity.Property(x => x.Amount)
+        .HasPrecision(18, 2);
+
+    entity.HasIndex(x => new { x.TenantId, x.ReceiptNumber })
+        .IsUnique();
+
+    entity.HasOne(x => x.Customer)
+        .WithMany()
+        .HasForeignKey(x => x.CustomerId)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    entity.HasOne(x => x.SalesInvoice)
+        .WithMany()
+        .HasForeignKey(x => x.SalesInvoiceId)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
+});
+
+        modelBuilder.Entity<Customer>(entity =>
+{
+    entity.ToTable("Customers");
+
+    entity.HasKey(x => x.Id);
+
+    entity.Property(x => x.CustomerCode)
+        .HasMaxLength(50)
+        .IsRequired();
+
+    entity.Property(x => x.CustomerName)
+        .HasMaxLength(200)
+        .IsRequired();
+
+    entity.Property(x => x.Email)
+        .HasMaxLength(256);
+
+    entity.Property(x => x.PhoneNumber)
+        .HasMaxLength(50);
+
+    entity.Property(x => x.BillingAddress)
+        .HasMaxLength(1000);
+
+    entity.HasIndex(x => new { x.TenantId, x.CustomerCode })
+        .IsUnique();
+
+    entity.HasIndex(x => new { x.TenantId, x.CustomerName });
+
+    entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
+});
+
+modelBuilder.Entity<SalesInvoice>(entity =>
+{
+    entity.ToTable("SalesInvoices");
+
+    entity.HasKey(x => x.Id);
+
+    entity.Property(x => x.InvoiceNumber)
+        .HasMaxLength(50)
+        .IsRequired();
+
+    entity.Property(x => x.Description)
+        .HasMaxLength(500)
+        .IsRequired();
+
+    entity.Property(x => x.TotalAmount)
+        .HasPrecision(18, 2);
+
+    entity.Property(x => x.AmountPaid)
+        .HasPrecision(18, 2);
+
+    entity.Property(x => x.BalanceAmount)
+        .HasPrecision(18, 2);
+
+    entity.HasIndex(x => new { x.TenantId, x.InvoiceNumber })
+        .IsUnique();
+
+    entity.HasOne(x => x.Customer)
+        .WithMany(x => x.SalesInvoices)
+        .HasForeignKey(x => x.CustomerId)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
+});
+
+modelBuilder.Entity<SalesInvoiceLine>(entity =>
+{
+    entity.ToTable("SalesInvoiceLines");
+
+    entity.HasKey(x => x.Id);
+
+    entity.Property(x => x.Description)
+        .HasMaxLength(500)
+        .IsRequired();
+
+    entity.Property(x => x.Quantity)
+        .HasPrecision(18, 2);
+
+    entity.Property(x => x.UnitPrice)
+        .HasPrecision(18, 2);
+
+    entity.Property(x => x.LineTotal)
+        .HasPrecision(18, 2);
+
+    entity.HasOne(x => x.SalesInvoice)
+        .WithMany(x => x.Lines)
+        .HasForeignKey(x => x.SalesInvoiceId)
+        .OnDelete(DeleteBehavior.Cascade);
+
+    entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
+});
+
+modelBuilder.Entity<Vendor>(entity =>
+{
+    entity.ToTable("Vendors");
+
+    entity.HasKey(x => x.Id);
+
+    entity.Property(x => x.VendorCode)
+        .HasMaxLength(50)
+        .IsRequired();
+
+    entity.Property(x => x.VendorName)
+        .HasMaxLength(200)
+        .IsRequired();
+
+    entity.Property(x => x.Email)
+        .HasMaxLength(256);
+
+    entity.Property(x => x.PhoneNumber)
+        .HasMaxLength(50);
+
+    entity.Property(x => x.BillingAddress)
+        .HasMaxLength(1000);
+
+    entity.HasIndex(x => new { x.TenantId, x.VendorCode })
+        .IsUnique();
+
+    entity.HasIndex(x => new { x.TenantId, x.VendorName });
+
+    entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
+});
+
+modelBuilder.Entity<PurchaseInvoice>(entity =>
+{
+    entity.ToTable("PurchaseInvoices");
+
+    entity.HasKey(x => x.Id);
+
+    entity.Property(x => x.InvoiceNumber)
+        .HasMaxLength(50)
+        .IsRequired();
+
+    entity.Property(x => x.Description)
+        .HasMaxLength(500)
+        .IsRequired();
+
+    entity.Property(x => x.TotalAmount)
+        .HasPrecision(18, 2);
+
+    entity.Property(x => x.AmountPaid)
+        .HasPrecision(18, 2);
+
+    entity.Property(x => x.BalanceAmount)
+        .HasPrecision(18, 2);
+
+    entity.HasIndex(x => new { x.TenantId, x.InvoiceNumber })
+        .IsUnique();
+
+    entity.HasOne(x => x.Vendor)
+        .WithMany(x => x.PurchaseInvoices)
+        .HasForeignKey(x => x.VendorId)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
+});
+
+modelBuilder.Entity<PurchaseInvoiceLine>(entity =>
+{
+    entity.ToTable("PurchaseInvoiceLines");
+
+    entity.HasKey(x => x.Id);
+
+    entity.Property(x => x.Description)
+        .HasMaxLength(500)
+        .IsRequired();
+
+    entity.Property(x => x.Quantity)
+        .HasPrecision(18, 2);
+
+    entity.Property(x => x.UnitPrice)
+        .HasPrecision(18, 2);
+
+    entity.Property(x => x.LineTotal)
+        .HasPrecision(18, 2);
+
+    entity.HasOne(x => x.PurchaseInvoice)
+        .WithMany(x => x.Lines)
+        .HasForeignKey(x => x.PurchaseInvoiceId)
+        .OnDelete(DeleteBehavior.Cascade);
+
+    entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
+});
+
+modelBuilder.Entity<VendorPayment>(entity =>
+{
+    entity.ToTable("VendorPayments");
+
+    entity.HasKey(x => x.Id);
+
+    entity.Property(x => x.PaymentNumber)
+        .HasMaxLength(50)
+        .IsRequired();
+
+    entity.Property(x => x.Description)
+        .HasMaxLength(500)
+        .IsRequired();
+
+    entity.Property(x => x.Amount)
+        .HasPrecision(18, 2);
+
+    entity.HasIndex(x => new { x.TenantId, x.PaymentNumber })
+        .IsUnique();
+
+    entity.HasOne(x => x.Vendor)
+        .WithMany()
+        .HasForeignKey(x => x.VendorId)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    entity.HasOne(x => x.PurchaseInvoice)
+        .WithMany()
+        .HasForeignKey(x => x.PurchaseInvoiceId)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
+});
+
         modelBuilder.Entity<UserAccount>()
             .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
 
@@ -135,6 +393,18 @@ public class ApplicationDbContext : DbContext
             .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
 
         modelBuilder.Entity<JournalNumberSequence>()
+            .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+
+        modelBuilder.Entity<Vendor>()
+            .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+
+        modelBuilder.Entity<PurchaseInvoice>()
+            .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+
+        modelBuilder.Entity<PurchaseInvoiceLine>()
+            .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+
+        modelBuilder.Entity<VendorPayment>()
             .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
     }
 

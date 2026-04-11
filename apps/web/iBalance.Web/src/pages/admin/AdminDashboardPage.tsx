@@ -2,7 +2,11 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getAdminTenantOverview, getPlatformAdminTenants } from '../../lib/api';
-import { isPlatformAdmin } from '../../lib/auth';
+import {
+  canManagePlatformCommercials,
+  canManageTenantUsers,
+  isPlatformAdmin,
+} from '../../lib/auth';
 
 function tenantStatusLabel(value?: number) {
   switch (value) {
@@ -42,6 +46,8 @@ function formatMoney(amount?: number | null, currencyCode?: string | null) {
 
 export function AdminDashboardPage() {
   const platformAdmin = isPlatformAdmin();
+  const canManageUsers = canManageTenantUsers();
+  const canManageCommercials = canManagePlatformCommercials();
 
   const tenantOverviewQ = useQuery({
     queryKey: ['admin-tenant-overview'],
@@ -123,8 +129,8 @@ export function AdminDashboardPage() {
             </div>
 
             <div className="inline-actions">
-              <Link to="/admin/users" className="button">User Management</Link>
-              <Link to="/admin/settings" className="button">Commercial Settings</Link>
+              {canManageUsers ? <Link to="/admin/users" className="button">User Management</Link> : null}
+              {canManageCommercials ? <Link to="/admin/settings" className="button">Commercial Settings</Link> : null}
             </div>
           </div>
 
@@ -318,8 +324,8 @@ export function AdminDashboardPage() {
         </div>
 
         <div className="hero-actions" style={{ marginTop: 16 }}>
-          <Link to="/admin/users" className="button primary">Manage Users</Link>
-          <Link to="/admin/settings" className="button">Commercial Settings</Link>
+          {canManageUsers ? <Link to="/admin/users" className="button primary">Manage Users</Link> : null}
+          {canManageCommercials ? <Link to="/admin/settings" className="button">Commercial Settings</Link> : null}
         </div>
       </section>
     </div>

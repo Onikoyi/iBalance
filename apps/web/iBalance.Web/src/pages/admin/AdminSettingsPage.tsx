@@ -16,6 +16,7 @@ import {
   updateSubscriptionPackage,
   type UpsertSubscriptionPackageRequest,
 } from '../../lib/api';
+import { canManagePlatformCommercials } from '../../lib/auth';
 
 async function fileToDataUrl(file: File) {
   return await new Promise<string>((resolve, reject) => {
@@ -65,6 +66,7 @@ function formatDate(value?: string | null) {
 
 export function AdminSettingsPage() {
   const qc = useQueryClient();
+  const canManageCommercials = canManagePlatformCommercials();
 
   const [tenantKeyInput, setTenantKeyInput] = useState(getTenantKey());
   const [tenantLogo, setTenantLogo] = useState(getTenantLogoDataUrl());
@@ -85,16 +87,19 @@ export function AdminSettingsPage() {
   const billingQ = useQuery({
     queryKey: ['admin-billing-settings'],
     queryFn: getAdminBillingSettings,
+    enabled: canManageCommercials,
   });
 
   const packagesQ = useQuery({
     queryKey: ['admin-subscription-packages'],
     queryFn: getAdminSubscriptionPackages,
+    enabled: canManageCommercials,
   });
 
   const tenantOverviewQ = useQuery({
     queryKey: ['admin-tenant-overview'],
     queryFn: getAdminTenantOverview,
+    enabled: canManageCommercials,
   });
 
   useEffect(() => {
@@ -179,6 +184,22 @@ export function AdminSettingsPage() {
     setCompanyLogo(dataUrl);
     setCompanyLogoDataUrl(dataUrl);
     setMessage('Company logo updated.');
+  }
+
+  if (!canManageCommercials) {
+    return (
+      <div className="page-grid">
+        <section className="panel">
+          <div className="section-heading">
+            <h2>Commercial Settings</h2>
+            <span className="muted">Access restricted</span>
+          </div>
+          <div className="muted">
+            Only Platform Administrators can manage commercial settings, billing configuration, and subscription packages.
+          </div>
+        </section>
+      </div>
+    );
   }
 
   return (

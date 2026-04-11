@@ -148,6 +148,43 @@ export type LedgerAccountDto = {
   parentName: string | null;
 };
 
+export type LedgerStatementLineDto = {
+  id: string;
+  journalEntryId: string;
+  journalEntryLineId: string;
+  movementDateUtc: string;
+  reference: string;
+  description: string;
+  debitAmount: number;
+  creditAmount: number;
+  runningBalanceDebit: number;
+  runningBalanceCredit: number;
+};
+
+export type LedgerAccountStatementResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  ledgerAccount: {
+    id: string;
+    code: string;
+    name: string;
+    category: number;
+    normalBalance: number;
+    isHeader: boolean;
+    isPostingAllowed: boolean;
+    isActive: boolean;
+  };
+  fromUtc: string | null;
+  toUtc: string | null;
+  count: number;
+  totalDebit: number;
+  totalCredit: number;
+  closingBalanceDebit: number;
+  closingBalanceCredit: number;
+  items: LedgerStatementLineDto[];
+};
+
 export type JournalEntryDto = {
   id: string;
   tenantId: string;
@@ -416,7 +453,7 @@ export type PlatformAdminTenantDetailResponse = {
   license: {
     isConfigured: boolean;
     packageName?: string | null;
-    amountPaid?: number | null;
+    amountPaid?: string | null;
     currencyCode?: string | null;
     licenseStartDateUtc?: string | null;
     licenseEndDateUtc?: string | null;
@@ -449,6 +486,412 @@ export type RenewTenantLicenseRequest = {
 export type ChangeTenantPackageRequest = {
   subscriptionPackageId: string;
 };
+
+export type CustomerDto = {
+  id: string;
+  customerCode: string;
+  customerName: string;
+  email?: string | null;
+  phoneNumber?: string | null;
+  billingAddress?: string | null;
+  isActive: boolean;
+  createdOnUtc: string;
+};
+
+export type CustomersResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  count: number;
+  items: CustomerDto[];
+};
+
+export type CreateCustomerRequest = {
+  customerCode: string;
+  customerName: string;
+  email?: string | null;
+  phoneNumber?: string | null;
+  billingAddress?: string | null;
+  isActive: boolean;
+};
+
+export type SalesInvoiceLineDto = {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+};
+
+export type SalesInvoiceDto = {
+  id: string;
+  customerId: string;
+  customerCode: string;
+  customerName: string;
+  invoiceDateUtc: string;
+  invoiceNumber: string;
+  description: string;
+  status: number;
+  totalAmount: number;
+  amountPaid: number;
+  balanceAmount: number;
+  journalEntryId?: string | null;
+  postedOnUtc?: string | null;
+  lineCount: number;
+};
+
+export type SalesInvoicesResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  count: number;
+  items: SalesInvoiceDto[];
+};
+
+export type CreateSalesInvoiceRequest = {
+  customerId: string;
+  invoiceDateUtc: string;
+  invoiceNumber: string;
+  description: string;
+  lines: SalesInvoiceLineDto[];
+};
+
+export type PostSalesInvoiceRequest = {
+  receivableLedgerAccountId: string;
+  revenueLedgerAccountId: string;
+};
+
+export type CustomerReceiptDto = {
+  id: string;
+  customerId: string;
+  customerCode: string;
+  customerName: string;
+  salesInvoiceId: string;
+  invoiceNumber: string;
+  receiptDateUtc: string;
+  receiptNumber: string;
+  description: string;
+  amount: number;
+  status: number;
+  journalEntryId?: string | null;
+  postedOnUtc?: string | null;
+};
+
+export type CustomerReceiptsResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  count: number;
+  items: CustomerReceiptDto[];
+};
+
+export type CustomerReceiptDetailResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  receipt: {
+    id: string;
+    customerId: string;
+    customerCode: string;
+    customerName: string;
+    customerEmail?: string | null;
+    customerPhoneNumber?: string | null;
+    customerBillingAddress?: string | null;
+    salesInvoiceId: string;
+    invoiceNumber: string;
+    invoiceDescription: string;
+    invoiceDateUtc?: string | null;
+    invoiceTotalAmount: number;
+    invoiceAmountPaid: number;
+    invoiceBalanceAmount: number;
+    receiptDateUtc: string;
+    receiptNumber: string;
+    description: string;
+    amount: number;
+    status: number;
+    journalEntryId?: string | null;
+    postedOnUtc?: string | null;
+    createdOnUtc: string;
+    createdBy?: string | null;
+    lastModifiedOnUtc?: string | null;
+    lastModifiedBy?: string | null;
+    invoiceLines: {
+      id: string;
+      description: string;
+      quantity: number;
+      unitPrice: number;
+      lineTotal: number;
+    }[];
+  };
+};
+
+export type VendorStatementResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  vendor: {
+    id: string;
+    vendorCode: string;
+    vendorName: string;
+    email?: string | null;
+    phoneNumber?: string | null;
+    billingAddress?: string | null;
+    isActive: boolean;
+  };
+  fromUtc?: string | null;
+  toUtc?: string | null;
+  totalInvoices: number;
+  totalPayments: number;
+  totalInvoiced: number;
+  totalPaid: number;
+  closingBalance: number;
+  count: number;
+  items: {
+    type: string;
+    dateUtc: string;
+    reference: string;
+    description: string;
+    debitAmount: number;
+    creditAmount: number;
+    invoiceAmount: number;
+    paymentAmount: number;
+    runningBalance: number;
+    status: number;
+  }[];
+};
+
+export type CreateCustomerReceiptRequest = {
+  customerId: string;
+  salesInvoiceId: string;
+  receiptDateUtc: string;
+  receiptNumber: string;
+  description: string;
+  amount: number;
+};
+
+export type PostCustomerReceiptRequest = {
+  cashOrBankLedgerAccountId: string;
+  receivableLedgerAccountId: string;
+};
+
+export type VendorDto = {
+  id: string;
+  vendorCode: string;
+  vendorName: string;
+  email?: string | null;
+  phoneNumber?: string | null;
+  billingAddress?: string | null;
+  isActive: boolean;
+  createdOnUtc: string;
+};
+
+export type VendorsResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  count: number;
+  items: VendorDto[];
+};
+
+export type CreateVendorRequest = {
+  vendorCode: string;
+  vendorName: string;
+  email?: string | null;
+  phoneNumber?: string | null;
+  billingAddress?: string | null;
+  isActive: boolean;
+};
+
+export type PurchaseInvoiceLineDto = {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+};
+
+export type PurchaseInvoiceDto = {
+  id: string;
+  vendorId: string;
+  vendorCode: string;
+  vendorName: string;
+  invoiceDateUtc: string;
+  invoiceNumber: string;
+  description: string;
+  status: number;
+  totalAmount: number;
+  amountPaid: number;
+  balanceAmount: number;
+  journalEntryId?: string | null;
+  postedOnUtc?: string | null;
+  lineCount: number;
+};
+
+export type PurchaseInvoicesResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  count: number;
+  items: PurchaseInvoiceDto[];
+};
+
+export type CreatePurchaseInvoiceRequest = {
+  vendorId: string;
+  invoiceDateUtc: string;
+  invoiceNumber: string;
+  description: string;
+  lines: PurchaseInvoiceLineDto[];
+};
+
+export type PostPurchaseInvoiceRequest = {
+  payableLedgerAccountId: string;
+  expenseLedgerAccountId: string;
+};
+
+export type VendorPaymentDto = {
+  id: string;
+  vendorId: string;
+  vendorCode: string;
+  vendorName: string;
+  purchaseInvoiceId: string;
+  invoiceNumber: string;
+  paymentDateUtc: string;
+  paymentNumber: string;
+  description: string;
+  amount: number;
+  status: number;
+  journalEntryId?: string | null;
+  postedOnUtc?: string | null;
+};
+
+export type VendorPaymentsResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  count: number;
+  items: VendorPaymentDto[];
+};
+
+export type VendorPaymentDetailResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  payment: {
+    id: string;
+    vendorId: string;
+    vendorCode: string;
+    vendorName: string;
+    vendorEmail?: string | null;
+    vendorPhoneNumber?: string | null;
+    vendorBillingAddress?: string | null;
+    purchaseInvoiceId: string;
+    invoiceNumber: string;
+    invoiceDescription: string;
+    invoiceDateUtc?: string | null;
+    invoiceTotalAmount: number;
+    invoiceAmountPaid: number;
+    invoiceBalanceAmount: number;
+    paymentDateUtc: string;
+    paymentNumber: string;
+    description: string;
+    amount: number;
+    status: number;
+    journalEntryId?: string | null;
+    postedOnUtc?: string | null;
+    createdOnUtc: string;
+    createdBy?: string | null;
+    lastModifiedOnUtc?: string | null;
+    lastModifiedBy?: string | null;
+    invoiceLines: {
+      id: string;
+      description: string;
+      quantity: number;
+      unitPrice: number;
+      lineTotal: number;
+    }[];
+  };
+};
+
+export type CreateVendorPaymentRequest = {
+  vendorId: string;
+  purchaseInvoiceId: string;
+  paymentDateUtc: string;
+  paymentNumber: string;
+  description: string;
+  amount: number;
+};
+
+export type PostVendorPaymentRequest = {
+  cashOrBankLedgerAccountId: string;
+  payableLedgerAccountId: string;
+};
+
+export async function getVendors() {
+  const response = await api.get<VendorsResponse>('/api/finance/ap/vendors');
+  return response.data;
+}
+
+export async function createVendor(payload: CreateVendorRequest) {
+  const response = await api.post('/api/finance/ap/vendors', payload);
+  return response.data;
+}
+
+export async function getPurchaseInvoices() {
+  const response = await api.get<PurchaseInvoicesResponse>('/api/finance/ap/purchase-invoices');
+  return response.data;
+}
+
+export async function createPurchaseInvoice(payload: CreatePurchaseInvoiceRequest) {
+  const response = await api.post('/api/finance/ap/purchase-invoices', payload);
+  return response.data;
+}
+
+export async function postPurchaseInvoice(purchaseInvoiceId: string, payload: PostPurchaseInvoiceRequest) {
+  const response = await api.post(
+    `/api/finance/ap/purchase-invoices/${encodeURIComponent(purchaseInvoiceId)}/post`,
+    payload
+  );
+  return response.data;
+}
+
+export async function getVendorPayments() {
+  const response = await api.get<VendorPaymentsResponse>('/api/finance/ap/vendor-payments');
+  return response.data;
+}
+
+export async function getVendorPaymentDetail(vendorPaymentId: string) {
+  const response = await api.get<VendorPaymentDetailResponse>(
+    `/api/finance/ap/vendor-payments/${encodeURIComponent(vendorPaymentId)}`
+  );
+  return response.data;
+}
+
+export async function getVendorStatement(
+  vendorId: string,
+  fromUtc?: string | null,
+  toUtc?: string | null
+) {
+  const response = await api.get<VendorStatementResponse>(
+    `/api/finance/ap/vendors/${encodeURIComponent(vendorId)}/statement`,
+    {
+      params: {
+        ...(fromUtc ? { fromUtc } : {}),
+        ...(toUtc ? { toUtc } : {}),
+      },
+    }
+  );
+
+  return response.data;
+}
+
+export async function createVendorPayment(payload: CreateVendorPaymentRequest) {
+  const response = await api.post('/api/finance/ap/vendor-payments', payload);
+  return response.data;
+}
+
+export async function postVendorPayment(vendorPaymentId: string, payload: PostVendorPaymentRequest) {
+  const response = await api.post(
+    `/api/finance/ap/vendor-payments/${encodeURIComponent(vendorPaymentId)}/post`,
+    payload
+  );
+  return response.data;
+}
 
 export async function getTrialBalance(fromUtc?: string | null, toUtc?: string | null) {
   const response = await api.get<TrialBalanceResponse>('/api/finance/trial-balance', {
@@ -588,7 +1031,6 @@ export async function issueAdminUserPasswordReset(userId: string) {
     message: string;
     userId: string;
     email: string;
-    resetTokenPreview?: string | null;
     expiresAtUtc: string;
   };
 }
@@ -646,6 +1088,61 @@ export async function reactivatePlatformTenant(tenantId: string) {
   return response.data;
 }
 
+// ----------- ACCOUNTS RECEIVABLE -----------
+
+export async function getCustomers() {
+  const response = await api.get<CustomersResponse>('/api/finance/ar/customers');
+  return response.data;
+}
+
+export async function createCustomer(payload: CreateCustomerRequest) {
+  const response = await api.post('/api/finance/ar/customers', payload);
+  return response.data;
+}
+
+export async function getSalesInvoices() {
+  const response = await api.get<SalesInvoicesResponse>('/api/finance/ar/sales-invoices');
+  return response.data;
+}
+
+export async function createSalesInvoice(payload: CreateSalesInvoiceRequest) {
+  const response = await api.post('/api/finance/ar/sales-invoices', payload);
+  return response.data;
+}
+
+export async function postSalesInvoice(salesInvoiceId: string, payload: PostSalesInvoiceRequest) {
+  const response = await api.post(
+    `/api/finance/ar/sales-invoices/${encodeURIComponent(salesInvoiceId)}/post`,
+    payload
+  );
+  return response.data;
+}
+
+export async function getCustomerReceipts() {
+  const response = await api.get<CustomerReceiptsResponse>('/api/finance/ar/customer-receipts');
+  return response.data;
+}
+
+export async function getCustomerReceiptDetail(customerReceiptId: string) {
+  const response = await api.get<CustomerReceiptDetailResponse>(
+    `/api/finance/ar/customer-receipts/${encodeURIComponent(customerReceiptId)}`
+  );
+  return response.data;
+}
+
+export async function createCustomerReceipt(payload: CreateCustomerReceiptRequest) {
+  const response = await api.post('/api/finance/ar/customer-receipts', payload);
+  return response.data;
+}
+
+export async function postCustomerReceipt(customerReceiptId: string, payload: PostCustomerReceiptRequest) {
+  const response = await api.post(
+    `/api/finance/ar/customer-receipts/${encodeURIComponent(customerReceiptId)}/post`,
+    payload
+  );
+  return response.data;
+}
+
 // ----------- READS -----------
 
 export async function getDashboardSummary() {
@@ -655,6 +1152,24 @@ export async function getDashboardSummary() {
 
 export async function getAccounts() {
   const response = await api.get<ListEnvelope<LedgerAccountDto>>('/api/finance/accounts');
+  return response.data;
+}
+
+export async function getLedgerAccountStatement(
+  ledgerAccountId: string,
+  fromUtc?: string | null,
+  toUtc?: string | null
+) {
+  const response = await api.get<LedgerAccountStatementResponse>(
+    `/api/finance/accounts/${encodeURIComponent(ledgerAccountId)}/ledger`,
+    {
+      params: {
+        ...(fromUtc ? { fromUtc } : {}),
+        ...(toUtc ? { toUtc } : {}),
+      },
+    }
+  );
+
   return response.data;
 }
 

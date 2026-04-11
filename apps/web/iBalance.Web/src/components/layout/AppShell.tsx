@@ -29,23 +29,38 @@ function licenseLabel(value?: number) {
 function pageTitleForPath(pathname: string) {
   if (pathname.startsWith('/accounts')) return 'Chart of Accounts';
   if (pathname.startsWith('/journals')) return 'Journal Management';
+  if (pathname.startsWith('/customers')) return 'Customer Management';
+  if (pathname.startsWith('/sales-invoices')) return 'Sales Invoice Management';
+  if (pathname.startsWith('/customer-receipts')) return 'Customer Receipt Management';
   if (pathname.startsWith('/fiscal-periods')) return 'Fiscal Period Management';
   if (pathname.startsWith('/reports')) return 'Financial Reports';
   if (pathname.startsWith('/admin')) return 'Administration';
   return 'Finance Dashboard';
 }
 
+function pageSubtitleForPath(pathname: string) {
+  if (pathname.startsWith('/accounts')) return 'Manage ledger structure and posting accounts.';
+  if (pathname.startsWith('/journals')) return 'Manage journals, posting workflow, and reversals.';
+  if (pathname.startsWith('/customers')) return 'Register and maintain accounts receivable customers.';
+  if (pathname.startsWith('/sales-invoices')) return 'Raise and review sales invoices for receivables operations.';
+  if (pathname.startsWith('/customer-receipts')) return 'Capture customer collections and apply receipts against receivables.';
+  if (pathname.startsWith('/fiscal-periods')) return 'Manage accounting periods and open or close operations.';
+  if (pathname.startsWith('/reports')) return 'Review financial performance and print-ready reports.';
+  if (pathname.startsWith('/admin')) return 'Manage tenant operations, users, subscriptions, and recovery.';
+  return 'Review operational activity across your accounting workspace.';
+}
+
 function LogoSlot({
-  dataUrl,
+  src,
   fallbackText,
 }: {
-  dataUrl: string;
+  src: string;
   fallbackText: string;
 }) {
-  if (dataUrl) {
+  if (src) {
     return (
       <img
-        src={dataUrl}
+        src={src}
         alt={fallbackText}
         style={{ height: 36, maxWidth: 150, objectFit: 'contain' }}
       />
@@ -78,6 +93,7 @@ export function AppShell({ children }: PropsWithChildren) {
   const [tenantKeyInput, setTenantKeyInput] = useState(getTenantKey());
 
   const title = useMemo(() => pageTitleForPath(location.pathname), [location.pathname]);
+  const subtitle = useMemo(() => pageSubtitleForPath(location.pathname), [location.pathname]);
 
   const tenantLogo = getTenantLogoDataUrl();
   const companyLogo = getCompanyLogoDataUrl();
@@ -138,6 +154,7 @@ export function AppShell({ children }: PropsWithChildren) {
               <div>
                 <div className="eyebrow">Nikosoft Technologies</div>
                 <h1 style={{ margin: 0 }}>{title}</h1>
+                <div className="muted" style={{ marginTop: 4 }}>{subtitle}</div>
               </div>
             </div>
 
@@ -175,6 +192,9 @@ export function AppShell({ children }: PropsWithChildren) {
             </div>
 
             <div className="inline-actions" style={{ justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              <Link to="/customers" className="button">Customers</Link>
+              <Link to="/sales-invoices" className="button">Sales Invoices</Link>
+              <Link to="/customer-receipts" className="button">Customer Receipts</Link>
               {canAccessAdmin() ? <Link to="/admin" className="button">Administration</Link> : null}
               <Link to="/license-status" className="button">Subscription Status</Link>
               <button className="button" onClick={signOut}>Sign Out</button>

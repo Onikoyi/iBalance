@@ -142,6 +142,30 @@ export function isPlatformAdmin(): boolean {
   return getCurrentRole() === 'PlatformAdmin';
 }
 
+export function isTenantAdmin(): boolean {
+  return getCurrentRole() === 'TenantAdmin';
+}
+
+export function canManagePlatformAdministration(): boolean {
+  return isPlatformAdmin();
+}
+
+export function canManagePlatformCommercials(): boolean {
+  return hasPermission('admin.settings.manage') && isPlatformAdmin();
+}
+
+export function canViewPlatformTenantConsole(): boolean {
+  return isPlatformAdmin();
+}
+
+export function canManageOwnTenantAdministration(): boolean {
+  return isTenantAdmin();
+}
+
+export function canManageTenantUsers(): boolean {
+  return hasPermission('admin.users.manage');
+}
+
 export function hasPermission(permission: AppPermission): boolean {
   return roleHasPermission(getCurrentRole(), permission);
 }
@@ -156,11 +180,11 @@ export function hasAnyRole(allowedRoles: UserRole[]): boolean {
 }
 
 export function canAccessAdmin(): boolean {
-  return hasPermission('admin.access');
+  return isPlatformAdmin() || isTenantAdmin();
 }
 
 export function canManageAdminSettings(): boolean {
-  return hasPermission('admin.settings.manage');
+  return canManagePlatformCommercials();
 }
 
 export function canManageUsers(): boolean {

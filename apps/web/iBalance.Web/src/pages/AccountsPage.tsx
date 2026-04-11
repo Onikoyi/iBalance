@@ -1,6 +1,16 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createLedgerAccount, getAccounts, getTenantReadableError, type LedgerAccountDto } from '../lib/api';
+import {
+  createLedgerAccount,
+  getAccounts,
+  getCompanyLogoDataUrl,
+  getLedgerAccountStatement,
+  getTenantKey,
+  getTenantLogoDataUrl,
+  getTenantReadableError,
+  type LedgerAccountDto,
+  type LedgerAccountStatementResponse,
+} from '../lib/api';
 import { canManageFinanceSetup, canViewFinance } from '../lib/auth';
 
 function categoryLabel(value: number) {
@@ -16,6 +26,39 @@ function categoryLabel(value: number) {
 
 function normalBalanceLabel(value: number) {
   return value === 1 ? 'Debit' : 'Credit';
+}
+
+function formatAmount(value: number) {
+  return new Intl.NumberFormat('en-NG', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return '—';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '—';
+  return parsed.toLocaleString();
+}
+
+function formatDisplayDate(value?: string | null) {
+  if (!value) return '—';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '—';
+  return parsed.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+function buildReportingPeriodText(fromDate: string, toDate: string) {
+  if (!fromDate || !toDate) {
+    return 'Reporting Period: Select From Date and To Date';
+  }
+
+  return `Reporting Period: ${formatDisplayDate(`${fromDate}T00:00:00`)} to ${formatDisplayDate(`${toDate}T00:00:00`)}`;
 }
 
 type FormState = {
@@ -143,6 +186,200 @@ function formatStatus(value: boolean, positiveLabel: string, negativeLabel: stri
   return value ? positiveLabel : negativeLabel;
 }
 
+type PrintLedgerArgs = {
+  tenantKey: string;
+  tenantLogo: string;
+  companyLogo: string;
+  statement: LedgerAccountStatementResponse;
+  reportingPeriodText: string;
+};
+
+function buildLedgerPrintHtml(args: PrintLedgerArgs) {
+  const { tenantKey, tenantLogo, companyLogo, statement, reportingPeriodText } = args;
+
+  const logoOrFallback = (src: string, fallback: string) =>
+    src
+      ? `<img src="${src}" alt="${fallback}" style="height:44px;max-width:180px;object-fit:contain;" />`
+      : `<div style="min-width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:rgba(75,29,115,0.12);font-weight:700;">${fallback}</div>`;
+
+  const rowsHtml = statement.items.length === 0
+    ? `<tr><td colspan="7" style="padding:12px;color:#6b7280;">No ledger movements were found for the selected account and reporting period.</td></tr>`
+    : statement.items.map((item) => `
+        <tr>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${formatDateTime(item.movementDateUtc)}</td>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${item.reference}</td>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${item.description}</td>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">${formatAmount(item.debitAmount)}</td>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">${formatAmount(item.creditAmount)}</td>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">${formatAmount(item.runningBalanceDebit)}</td>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">${formatAmount(item.runningBalanceCredit)}</td>
+        </tr>
+      `).join('');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Ledger Statement - ${statement.ledgerAccount.code}</title>
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      color: #111827;
+      margin: 0;
+      padding: 24px;
+      background: #ffffff;
+    }
+    .page {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .brand-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+    .brand-block {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .brand-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .brand-meta strong {
+      font-size: 15px;
+    }
+    .brand-meta span {
+      font-size: 12px;
+      color: #6b7280;
+    }
+    .title-block {
+      margin-bottom: 18px;
+      border-bottom: 2px solid #e5e7eb;
+      padding-bottom: 12px;
+    }
+    .title-block h1 {
+      margin: 0 0 8px 0;
+      font-size: 26px;
+    }
+    .muted {
+      color: #6b7280;
+      font-size: 14px;
+    }
+    .kv {
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 18px;
+    }
+    .kv-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 10px 14px;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .kv-row:last-child {
+      border-bottom: none;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+    th {
+      text-align: left;
+      padding: 8px;
+      border-bottom: 1px solid #d1d5db;
+      font-size: 14px;
+    }
+    tfoot th {
+      border-top: 1px solid #d1d5db;
+      border-bottom: none;
+    }
+    .right {
+      text-align: right;
+    }
+    @media print {
+      body {
+        padding: 0;
+      }
+      .page {
+        max-width: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="brand-row">
+      <div class="brand-block">
+        ${logoOrFallback(companyLogo, 'iBalance')}
+        <div class="brand-meta">
+          <strong>Nikosoft Technologies</strong>
+          <span>iBalance Accounting Cloud</span>
+        </div>
+      </div>
+      <div class="brand-block">
+        ${logoOrFallback(tenantLogo, 'Org')}
+        <div class="brand-meta">
+          <strong>${tenantKey || 'Organization'}</strong>
+          <span>Client Workspace</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="title-block">
+      <h1>Ledger Statement</h1>
+      <div class="muted">${statement.ledgerAccount.code} - ${statement.ledgerAccount.name}</div>
+      <div class="muted">${reportingPeriodText}</div>
+    </div>
+
+    <div class="kv">
+      <div class="kv-row"><span>Account Code</span><span>${statement.ledgerAccount.code}</span></div>
+      <div class="kv-row"><span>Account Name</span><span>${statement.ledgerAccount.name}</span></div>
+      <div class="kv-row"><span>Category</span><span>${categoryLabel(statement.ledgerAccount.category)}</span></div>
+      <div class="kv-row"><span>Normal Balance</span><span>${normalBalanceLabel(statement.ledgerAccount.normalBalance)}</span></div>
+      <div class="kv-row"><span>Total Debit</span><span>${formatAmount(statement.totalDebit)}</span></div>
+      <div class="kv-row"><span>Total Credit</span><span>${formatAmount(statement.totalCredit)}</span></div>
+      <div class="kv-row"><span>Closing Balance (Debit)</span><span>${formatAmount(statement.closingBalanceDebit)}</span></div>
+      <div class="kv-row"><span>Closing Balance (Credit)</span><span>${formatAmount(statement.closingBalanceCredit)}</span></div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Reference</th>
+          <th>Description</th>
+          <th class="right">Debit</th>
+          <th class="right">Credit</th>
+          <th class="right">Running Debit</th>
+          <th class="right">Running Credit</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rowsHtml}
+      </tbody>
+      <tfoot>
+        <tr>
+          <th colspan="3">Totals</th>
+          <th class="right">${formatAmount(statement.totalDebit)}</th>
+          <th class="right">${formatAmount(statement.totalCredit)}</th>
+          <th class="right">${formatAmount(statement.closingBalanceDebit)}</th>
+          <th class="right">${formatAmount(statement.closingBalanceCredit)}</th>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</body>
+</html>`;
+}
+
 export function AccountsPage() {
   const qc = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
@@ -151,8 +388,16 @@ export function AccountsPage() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [isUploading, setIsUploading] = useState(false);
 
+  const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [statementFromDate, setStatementFromDate] = useState('');
+  const [statementToDate, setStatementToDate] = useState('');
+
   const canView = canViewFinance();
   const canManage = canManageFinanceSetup();
+
+  const tenantLogo = getTenantLogoDataUrl();
+  const companyLogo = getCompanyLogoDataUrl();
+  const tenantKey = getTenantKey();
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['accounts'],
@@ -174,6 +419,23 @@ export function AccountsPage() {
       headers: items.filter((x) => x.isHeader).length,
     };
   }, [data?.items]);
+
+  const isStatementRangeValid = !!statementFromDate && !!statementToDate;
+  const reportingPeriodText = buildReportingPeriodText(statementFromDate, statementToDate);
+
+  const statementFromUtc = isStatementRangeValid
+    ? new Date(`${statementFromDate}T00:00:00`).toISOString()
+    : null;
+
+  const statementToUtc = isStatementRangeValid
+    ? new Date(`${statementToDate}T23:59:59`).toISOString()
+    : null;
+
+  const ledgerStatementQ = useQuery({
+    queryKey: ['ledger-account-statement', selectedAccountId, statementFromUtc, statementToUtc],
+    queryFn: () => getLedgerAccountStatement(selectedAccountId, statementFromUtc, statementToUtc),
+    enabled: canView && !!selectedAccountId && isStatementRangeValid,
+  });
 
   const createMut = useMutation({
     mutationFn: createLedgerAccount,
@@ -255,6 +517,32 @@ export function AccountsPage() {
     a.click();
 
     URL.revokeObjectURL(url);
+  }
+
+  function printSelectedLedger() {
+    if (!ledgerStatementQ.data || !isStatementRangeValid) {
+      return;
+    }
+
+    const html = buildLedgerPrintHtml({
+      tenantKey,
+      tenantLogo,
+      companyLogo,
+      statement: ledgerStatementQ.data,
+      reportingPeriodText,
+    });
+
+    const printWindow = window.open('', '_blank', 'width=1200,height=900');
+    if (!printWindow) return;
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+
+    printWindow.onload = () => {
+      printWindow.focus();
+      printWindow.print();
+    };
   }
 
   async function onUploadFile(file: File | null) {
@@ -403,7 +691,7 @@ export function AccountsPage() {
 
   return (
     <div className="page-grid">
-      <section className="panel">
+      <section className="panel no-print">
         <div className="section-heading">
           <div>
             <h2>Chart of accounts</h2>
@@ -471,7 +759,7 @@ export function AccountsPage() {
         ) : null}
       </section>
 
-      <section className="panel">
+      <section className="panel no-print">
         <div className="section-heading">
           <h2>Account listing</h2>
           <span className="muted">{data.count} account(s)</span>
@@ -488,6 +776,7 @@ export function AccountsPage() {
                 <th>Type</th>
                 <th>Posting</th>
                 <th>Parent Account</th>
+                <th style={{ width: 140 }}>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -500,11 +789,205 @@ export function AccountsPage() {
                   <td>{formatStatus(item.isHeader, 'Header', 'Posting Account')}</td>
                   <td>{formatStatus(item.isPostingAllowed, 'Enabled', 'Not Enabled')}</td>
                   <td>{item.parentCode ? `${item.parentCode} - ${item.parentName}` : '—'}</td>
+                  <td>
+                    <button
+                      className="button"
+                      onClick={() => setSelectedAccountId(item.id)}
+                    >
+                      Drill Down
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section className="panel printable-report">
+        <div className="section-heading no-print">
+          <div>
+            <h2>Ledger drill-down</h2>
+            <span className="muted">Review postings, movements, and running balance for a selected account</span>
+          </div>
+
+          <div className="inline-actions">
+            <button
+              className="button"
+              onClick={printSelectedLedger}
+              disabled={!selectedAccountId || !ledgerStatementQ.data || !isStatementRangeValid}
+            >
+              Print Ledger Report
+            </button>
+          </div>
+        </div>
+
+        <div className="form-grid two no-print">
+          <div className="form-row">
+            <label>Ledger Account</label>
+            <select
+              className="select"
+              value={selectedAccountId}
+              onChange={(e) => setSelectedAccountId(e.target.value)}
+            >
+              <option value="">— Select Ledger Account —</option>
+              {data.items.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.code} - {item.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-row">
+            <label>From Date</label>
+            <input
+              className="input"
+              type="date"
+              value={statementFromDate}
+              onChange={(e) => setStatementFromDate(e.target.value)}
+            />
+          </div>
+
+          <div className="form-row">
+            <label>To Date</label>
+            <input
+              className="input"
+              type="date"
+              value={statementToDate}
+              onChange={(e) => setStatementToDate(e.target.value)}
+            />
+          </div>
+
+          <div className="form-row">
+            <label>Clear Filters</label>
+            <div className="inline-actions">
+              <button
+                className="button"
+                onClick={() => {
+                  setStatementFromDate('');
+                  setStatementToDate('');
+                }}
+              >
+                Reset Dates
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="panel no-print" style={{ marginBottom: 16 }}>
+          <div className="muted">{reportingPeriodText}</div>
+        </div>
+
+        {!selectedAccountId ? (
+          <div className="muted">Select an account and choose both From Date and To Date to view its ledger statement.</div>
+        ) : !isStatementRangeValid ? (
+          <div className="panel error-panel">
+            Please select both From Date and To Date before viewing or printing the ledger statement.
+          </div>
+        ) : ledgerStatementQ.isLoading ? (
+          <div className="muted">Loading ledger statement...</div>
+        ) : ledgerStatementQ.isError || !ledgerStatementQ.data ? (
+          <div className="panel error-panel">
+            We could not load the ledger statement at this time.
+          </div>
+        ) : (
+          <>
+            <div className="print-report-header">
+              <div className="print-report-title-block">
+                <h2>
+                  Ledger Statement — {ledgerStatementQ.data.ledgerAccount.code} - {ledgerStatementQ.data.ledgerAccount.name}
+                </h2>
+                <div className="muted">{reportingPeriodText}</div>
+              </div>
+            </div>
+
+            <div className="kv" style={{ marginBottom: 16 }}>
+              <div className="kv-row">
+                <span>Account Code</span>
+                <span>{ledgerStatementQ.data.ledgerAccount.code}</span>
+              </div>
+              <div className="kv-row">
+                <span>Account Name</span>
+                <span>{ledgerStatementQ.data.ledgerAccount.name}</span>
+              </div>
+              <div className="kv-row">
+                <span>Category</span>
+                <span>{categoryLabel(ledgerStatementQ.data.ledgerAccount.category)}</span>
+              </div>
+              <div className="kv-row">
+                <span>Normal Balance</span>
+                <span>{normalBalanceLabel(ledgerStatementQ.data.ledgerAccount.normalBalance)}</span>
+              </div>
+              <div className="kv-row">
+                <span>Reporting Period</span>
+                <span>{reportingPeriodText.replace('Reporting Period: ', '')}</span>
+              </div>
+              <div className="kv-row">
+                <span>Total Debit</span>
+                <span>{formatAmount(ledgerStatementQ.data.totalDebit)}</span>
+              </div>
+              <div className="kv-row">
+                <span>Total Credit</span>
+                <span>{formatAmount(ledgerStatementQ.data.totalCredit)}</span>
+              </div>
+              <div className="kv-row">
+                <span>Closing Balance (Debit)</span>
+                <span>{formatAmount(ledgerStatementQ.data.closingBalanceDebit)}</span>
+              </div>
+              <div className="kv-row">
+                <span>Closing Balance (Credit)</span>
+                <span>{formatAmount(ledgerStatementQ.data.closingBalanceCredit)}</span>
+              </div>
+            </div>
+
+            <div className="table-wrap">
+              <table className="data-table report-print-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Reference</th>
+                    <th>Description</th>
+                    <th style={{ textAlign: 'right' }}>Debit</th>
+                    <th style={{ textAlign: 'right' }}>Credit</th>
+                    <th style={{ textAlign: 'right' }}>Running Debit</th>
+                    <th style={{ textAlign: 'right' }}>Running Credit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ledgerStatementQ.data.items.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="muted">
+                        No ledger movements were found for the selected account and reporting period.
+                      </td>
+                    </tr>
+                  ) : (
+                    ledgerStatementQ.data.items.map((item) => (
+                      <tr key={item.id}>
+                        <td>{formatDateTime(item.movementDateUtc)}</td>
+                        <td>{item.reference}</td>
+                        <td>{item.description}</td>
+                        <td style={{ textAlign: 'right' }}>{formatAmount(item.debitAmount)}</td>
+                        <td style={{ textAlign: 'right' }}>{formatAmount(item.creditAmount)}</td>
+                        <td style={{ textAlign: 'right' }}>{formatAmount(item.runningBalanceDebit)}</td>
+                        <td style={{ textAlign: 'right' }}>{formatAmount(item.runningBalanceCredit)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <th colSpan={3}>Totals</th>
+                    <th style={{ textAlign: 'right' }}>{formatAmount(ledgerStatementQ.data.totalDebit)}</th>
+                    <th style={{ textAlign: 'right' }}>{formatAmount(ledgerStatementQ.data.totalCredit)}</th>
+                    <th style={{ textAlign: 'right' }}>{formatAmount(ledgerStatementQ.data.closingBalanceDebit)}</th>
+                    <th style={{ textAlign: 'right' }}>{formatAmount(ledgerStatementQ.data.closingBalanceCredit)}</th>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </>
+        )}
       </section>
 
       {showCreate ? (

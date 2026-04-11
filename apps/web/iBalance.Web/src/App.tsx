@@ -5,6 +5,15 @@ import { DashboardPage } from './pages/DashboardPage';
 import { FiscalPeriodsPage } from './pages/FiscalPeriodsPage';
 import { JournalsPage } from './pages/JournalsPage';
 import { ReportsPage } from './pages/ReportsPage';
+import { CustomersPage } from './pages/CustomersPage';
+import { SalesInvoicesPage } from './pages/SalesInvoicesPage';
+import { CustomerReceiptsPage } from './pages/CustomerReceiptsPage';
+import { CustomerReceiptPrintPage } from './pages/CustomerReceiptPrintPage';
+import { VendorsPage } from './pages/VendorsPage';
+import { PurchaseInvoicesPage } from './pages/PurchaseInvoicesPage';
+import { VendorPaymentsPage } from './pages/VendorPaymentsPage';
+import { VendorPaymentVoucherPrintPage } from './pages/VendorPaymentVoucherPrintPage';
+import { VendorStatementPage } from './pages/VendorStatementPage';
 
 import { LandingPage } from './pages/LandingPage';
 import { PricingPublicPage } from './pages/PricingPublicPage';
@@ -99,6 +108,98 @@ export default function App() {
           </RequireAuth>
         }
       />
+      <Route
+        path="/customers"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <CustomersPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/sales-invoices"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <SalesInvoicesPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/customer-receipts"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <CustomerReceiptsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/customer-receipts/:customerReceiptId/print"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <CustomerReceiptPrintPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/vendors"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <VendorsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/vendors/:vendorId/statement"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <VendorStatementPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/purchase-invoices"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <PurchaseInvoicesPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/vendor-payments"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <VendorPaymentsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/vendor-payments/:vendorPaymentId/voucher"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <VendorPaymentVoucherPrintPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
       <Route
         path="/fiscal-periods"
         element={
