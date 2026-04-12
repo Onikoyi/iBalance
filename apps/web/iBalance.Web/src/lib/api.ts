@@ -611,8 +611,13 @@ export type CustomerReceiptDetailResponse = {
     postedOnUtc?: string | null;
     createdOnUtc: string;
     createdBy?: string | null;
+    createdByDisplayName?: string | null;
+    preparedByDisplayName?: string | null;
     lastModifiedOnUtc?: string | null;
     lastModifiedBy?: string | null;
+    lastModifiedByDisplayName?: string | null;
+    approvedByDisplayName?: string | null;
+    approvedOnUtc?: string | null;
     invoiceLines: {
       id: string;
       description: string;
@@ -796,8 +801,13 @@ export type VendorPaymentDetailResponse = {
     postedOnUtc?: string | null;
     createdOnUtc: string;
     createdBy?: string | null;
+    createdByDisplayName?: string | null;
+    preparedByDisplayName?: string | null;
     lastModifiedOnUtc?: string | null;
     lastModifiedBy?: string | null;
+    lastModifiedByDisplayName?: string | null;
+    approvedByDisplayName?: string | null;
+    approvedOnUtc?: string | null;
     invoiceLines: {
       id: string;
       description: string;

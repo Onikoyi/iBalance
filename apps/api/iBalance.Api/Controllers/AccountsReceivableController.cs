@@ -605,6 +605,28 @@ public sealed class AccountsReceivableController : ControllerBase
             .Include(x => x.Lines)
             .FirstOrDefaultAsync(x => x.Id == receipt.SalesInvoiceId, cancellationToken);
 
+                    var auditUserIds = new List<Guid>();
+
+        if (TryParseUserId(receipt.CreatedBy, out var createdByUserId))
+        {
+            auditUserIds.Add(createdByUserId);
+        }
+
+        if (TryParseUserId(receipt.LastModifiedBy, out var lastModifiedByUserId))
+        {
+            auditUserIds.Add(lastModifiedByUserId);
+        }
+
+        var userNames = auditUserIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await dbContext.UserAccounts
+                .AsNoTracking()
+                .Where(x => auditUserIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, x => x.FullName, cancellationToken);
+
+        var createdByDisplayName = ResolveUserDisplayName(receipt.CreatedBy, userNames);
+        var lastModifiedByDisplayName = ResolveUserDisplayName(receipt.LastModifiedBy, userNames);
+
         return Ok(new
         {
             TenantContextAvailable = true,
@@ -635,8 +657,13 @@ public sealed class AccountsReceivableController : ControllerBase
                 receipt.PostedOnUtc,
                 receipt.CreatedOnUtc,
                 receipt.CreatedBy,
+                CreatedByDisplayName = createdByDisplayName,
+                PreparedByDisplayName = createdByDisplayName,
                 receipt.LastModifiedOnUtc,
                 receipt.LastModifiedBy,
+                LastModifiedByDisplayName = lastModifiedByDisplayName,
+                ApprovedByDisplayName = (string?)null,
+                ApprovedOnUtc = (DateTime?)null,
                 InvoiceLines = (invoice?.Lines ?? Enumerable.Empty<SalesInvoiceLine>())
                 .OrderBy(x => x.CreatedOnUtc)
                 .Select(x => new
@@ -1028,6 +1055,25 @@ public sealed class AccountsReceivableController : ControllerBase
                      x.StartDate <= postingDate &&
                      x.EndDate >= postingDate,
                 cancellationToken);
+    }
+
+        private static bool TryParseUserId(string? rawUserId, out Guid userId)
+    {
+        return Guid.TryParse(rawUserId, out userId);
+    }
+
+    private static string? ResolveUserDisplayName(
+        string? rawUserId,
+        IReadOnlyDictionary<Guid, string> userNames)
+    {
+        if (!Guid.TryParse(rawUserId, out var userId))
+        {
+            return string.IsNullOrWhiteSpace(rawUserId) ? null : rawUserId;
+        }
+
+        return userNames.TryGetValue(userId, out var displayName)
+            ? displayName
+            : rawUserId;
     }
 
     public sealed record CreateCustomerRequest(

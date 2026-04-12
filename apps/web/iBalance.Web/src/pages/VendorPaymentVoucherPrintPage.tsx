@@ -56,8 +56,13 @@ type VoucherData = {
     postedOnUtc?: string | null;
     createdOnUtc: string;
     createdBy?: string | null;
+    createdByDisplayName?: string | null;
+    preparedByDisplayName?: string | null;
     lastModifiedOnUtc?: string | null;
     lastModifiedBy?: string | null;
+    lastModifiedByDisplayName?: string | null;
+    approvedByDisplayName?: string | null;
+    approvedOnUtc?: string | null;
     invoiceLines: {
       id: string;
       description: string;
@@ -293,10 +298,12 @@ function buildVoucherPrintHtml(args: {
     <div class="section" style="margin-top:16px;">
       <h2>Approval / Audit Trail</h2>
       <div class="kv">
-        <div class="kv-row"><span>Created On</span><span>${formatDateTime(payment.createdOnUtc)}</span></div>
-        <div class="kv-row"><span>Created By</span><span>${payment.createdBy || 'Not available'}</span></div>
+        <div class="kv-row"><span>Prepared On</span><span>${formatDateTime(payment.createdOnUtc)}</span></div>
+        <div class="kv-row"><span>Prepared By</span><span>${payment.preparedByDisplayName || payment.createdByDisplayName || payment.createdBy || 'Not available'}</span></div>
         <div class="kv-row"><span>Last Modified On</span><span>${formatDateTime(payment.lastModifiedOnUtc)}</span></div>
-        <div class="kv-row"><span>Last Modified By</span><span>${payment.lastModifiedBy || 'Not available'}</span></div>
+        <div class="kv-row"><span>Last Modified By</span><span>${payment.lastModifiedByDisplayName || payment.lastModifiedBy || 'Not available'}</span></div>
+        <div class="kv-row"><span>Approved On</span><span>${formatDateTime(payment.approvedOnUtc)}</span></div>
+        <div class="kv-row"><span>Approved By</span><span>${payment.approvedByDisplayName || 'Pending workflow approval'}</span></div>
       </div>
     </div>
   </div>
@@ -528,10 +535,12 @@ export function VendorPaymentVoucherPrintPage() {
           </div>
 
           <div className="kv">
-            <div className="kv-row"><span>Created On</span><span>{formatDateTime(payment.createdOnUtc)}</span></div>
-            <div className="kv-row"><span>Created By</span><span>{payment.createdBy || 'Not available'}</span></div>
+            <div className="kv-row"><span>Prepared On</span><span>{formatDateTime(payment.createdOnUtc)}</span></div>
+            <div className="kv-row"><span>Prepared By</span><span>{payment.preparedByDisplayName || payment.createdByDisplayName || payment.createdBy || 'Not available'}</span></div>
             <div className="kv-row"><span>Last Modified On</span><span>{formatDateTime(payment.lastModifiedOnUtc)}</span></div>
-            <div className="kv-row"><span>Last Modified By</span><span>{payment.lastModifiedBy || 'Not available'}</span></div>
+            <div className="kv-row"><span>Last Modified By</span><span>{payment.lastModifiedByDisplayName || payment.lastModifiedBy || 'Not available'}</span></div>
+            <div className="kv-row"><span>Approved On</span><span>{formatDateTime(payment.approvedOnUtc)}</span></div>
+            <div className="kv-row"><span>Approved By</span><span>{payment.approvedByDisplayName || 'Pending workflow approval'}</span></div>
           </div>
         </section>
       </section>

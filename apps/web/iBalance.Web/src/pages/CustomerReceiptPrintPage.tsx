@@ -57,6 +57,15 @@ function buildReceiptHtml(args: {
     invoiceTotalAmount: number;
     invoiceAmountPaid: number;
     invoiceBalanceAmount: number;
+    createdOnUtc: string;
+    createdBy?: string | null;
+    createdByDisplayName?: string | null;
+    preparedByDisplayName?: string | null;
+    lastModifiedOnUtc?: string | null;
+    lastModifiedBy?: string | null;
+    lastModifiedByDisplayName?: string | null;
+    approvedByDisplayName?: string | null;
+    approvedOnUtc?: string | null;
     invoiceLines: {
       id: string;
       description: string;
@@ -285,6 +294,18 @@ function buildReceiptHtml(args: {
       ${linesHtml}
     </div>
 
+    <div class="section">
+      <h2>Approval / Audit Trail</h2>
+      <div class="kv">
+        <div class="kv-row"><span>Prepared On</span><span>${formatUtcDate(receipt.createdOnUtc)}</span></div>
+        <div class="kv-row"><span>Prepared By</span><span>${receipt.preparedByDisplayName || receipt.createdByDisplayName || receipt.createdBy || 'Not available'}</span></div>
+        <div class="kv-row"><span>Last Modified On</span><span>${formatUtcDate(receipt.lastModifiedOnUtc)}</span></div>
+        <div class="kv-row"><span>Last Modified By</span><span>${receipt.lastModifiedByDisplayName || receipt.lastModifiedBy || 'Not available'}</span></div>
+        <div class="kv-row"><span>Approved On</span><span>${formatUtcDate(receipt.approvedOnUtc)}</span></div>
+        <div class="kv-row"><span>Approved By</span><span>${receipt.approvedByDisplayName || 'Pending workflow approval'}</span></div>
+      </div>
+    </div>
+
     <div class="totals">
       <div>Receipt Number: ${receipt.receiptNumber}</div>
       <div>Amount Received: ${formatAmount(receipt.amount)}</div>
@@ -509,6 +530,36 @@ export function CustomerReceiptPrintPage() {
               </table>
             </div>
           )}
+        </div>
+
+        <div className="report-block">
+          <h3>Approval / Audit Trail</h3>
+          <div className="kv">
+            <div className="kv-row">
+              <span>Prepared On</span>
+              <span>{formatUtcDate(receipt.createdOnUtc)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Prepared By</span>
+              <span>{receipt.preparedByDisplayName || receipt.createdByDisplayName || receipt.createdBy || 'Not available'}</span>
+            </div>
+            <div className="kv-row">
+              <span>Last Modified On</span>
+              <span>{formatUtcDate(receipt.lastModifiedOnUtc)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Last Modified By</span>
+              <span>{receipt.lastModifiedByDisplayName || receipt.lastModifiedBy || 'Not available'}</span>
+            </div>
+            <div className="kv-row">
+              <span>Approved On</span>
+              <span>{formatUtcDate(receipt.approvedOnUtc)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Approved By</span>
+              <span>{receipt.approvedByDisplayName || 'Pending workflow approval'}</span>
+            </div>
+          </div>
         </div>
 
         <div className="report-totals">

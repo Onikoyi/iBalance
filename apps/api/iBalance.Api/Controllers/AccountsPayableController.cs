@@ -58,7 +58,7 @@ public sealed class AccountsPayableController : ControllerBase
         });
     }
 
-        [HttpGet("vendors/{vendorId:guid}/statement")]
+    [HttpGet("vendors/{vendorId:guid}/statement")]
     public async Task<IActionResult> GetVendorStatement(
         Guid vendorId,
         [FromQuery] DateTime? fromUtc,
@@ -715,8 +715,7 @@ public sealed class AccountsPayableController : ControllerBase
         });
     }
 
-
-        [HttpGet("vendor-payments/{vendorPaymentId:guid}")]
+    [HttpGet("vendor-payments/{vendorPaymentId:guid}")]
     public async Task<IActionResult> GetVendorPaymentDetail(
         Guid vendorPaymentId,
         [FromServices] ApplicationDbContext dbContext,
@@ -750,6 +749,28 @@ public sealed class AccountsPayableController : ControllerBase
             });
         }
 
+        var auditUserIds = new List<Guid>();
+
+        if (TryParseUserId(payment.CreatedBy, out var createdByUserId))
+        {
+            auditUserIds.Add(createdByUserId);
+        }
+
+        if (TryParseUserId(payment.LastModifiedBy, out var lastModifiedByUserId))
+        {
+            auditUserIds.Add(lastModifiedByUserId);
+        }
+
+        var userNames = auditUserIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await dbContext.UserAccounts
+                .AsNoTracking()
+                .Where(x => auditUserIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, x => x.FullName, cancellationToken);
+
+        var createdByDisplayName = ResolveUserDisplayName(payment.CreatedBy, userNames);
+        var lastModifiedByDisplayName = ResolveUserDisplayName(payment.LastModifiedBy, userNames);
+
         return Ok(new
         {
             TenantContextAvailable = true,
@@ -780,29 +801,34 @@ public sealed class AccountsPayableController : ControllerBase
                 payment.PostedOnUtc,
                 payment.CreatedOnUtc,
                 payment.CreatedBy,
+                CreatedByDisplayName = createdByDisplayName,
+                PreparedByDisplayName = createdByDisplayName,
                 payment.LastModifiedOnUtc,
                 payment.LastModifiedBy,
+                LastModifiedByDisplayName = lastModifiedByDisplayName,
+                ApprovedByDisplayName = (string?)null,
+                ApprovedOnUtc = (DateTime?)null,
                 InvoiceLines = (payment.PurchaseInvoice != null
-                ? payment.PurchaseInvoice.Lines
-                    .OrderBy(x => x.CreatedOnUtc)
-                    .Select(x => new
-                    {
-                        x.Id,
-                        x.Description,
-                        x.Quantity,
-                        x.UnitPrice,
-                        x.LineTotal
-                    })
-                : Enumerable.Empty<object>()
-                    .Select(_ => new
-                    {
-                        Id = Guid.Empty,
-                        Description = string.Empty,
-                        Quantity = 0m,
-                        UnitPrice = 0m,
-                        LineTotal = 0m
-                    }))
-                .ToList()
+                    ? payment.PurchaseInvoice.Lines
+                        .OrderBy(x => x.CreatedOnUtc)
+                        .Select(x => new
+                        {
+                            x.Id,
+                            x.Description,
+                            x.Quantity,
+                            x.UnitPrice,
+                            x.LineTotal
+                        })
+                    : Enumerable.Empty<object>()
+                        .Select(_ => new
+                        {
+                            Id = Guid.Empty,
+                            Description = string.Empty,
+                            Quantity = 0m,
+                            UnitPrice = 0m,
+                            LineTotal = 0m
+                        }))
+                    .ToList()
             }
         });
     }
@@ -1183,6 +1209,25 @@ public sealed class AccountsPayableController : ControllerBase
                      x.StartDate <= postingDate &&
                      x.EndDate >= postingDate,
                 cancellationToken);
+    }
+
+    private static bool TryParseUserId(string? rawUserId, out Guid userId)
+    {
+        return Guid.TryParse(rawUserId, out userId);
+    }
+
+    private static string? ResolveUserDisplayName(
+        string? rawUserId,
+        IReadOnlyDictionary<Guid, string> userNames)
+    {
+        if (!Guid.TryParse(rawUserId, out var userId))
+        {
+            return string.IsNullOrWhiteSpace(rawUserId) ? null : rawUserId;
+        }
+
+        return userNames.TryGetValue(userId, out var displayName)
+            ? displayName
+            : rawUserId;
     }
 
     public sealed record CreateVendorRequest(
