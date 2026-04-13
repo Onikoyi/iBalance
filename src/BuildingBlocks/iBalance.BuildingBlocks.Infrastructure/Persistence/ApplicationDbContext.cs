@@ -441,6 +441,33 @@ public class ApplicationDbContext : DbContext
             entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
         });
 
+        modelBuilder.Entity<LedgerAccount>(entity =>
+        {
+            entity.ToTable("LedgerAccounts", "finance");
+
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Code)
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(x => x.Name)
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.Property(x => x.Purpose)
+                .HasMaxLength(500);
+
+            entity.Property(x => x.IsCashOrBankAccount)
+                .IsRequired()
+                .HasDefaultValue(false);
+
+            entity.HasIndex(x => new { x.TenantId, x.Code })
+                .IsUnique();
+
+            entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
+        });
+
         modelBuilder.Entity<UserAccount>()
             .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
 

@@ -138,11 +138,13 @@ export type LedgerAccountDto = {
   tenantId: string;
   code: string;
   name: string;
+  purpose?: string | null;
   category: number;
   normalBalance: number;
   isHeader: boolean;
   isPostingAllowed: boolean;
   isActive: boolean;
+  isCashOrBankAccount: boolean;
   parentLedgerAccountId: string | null;
   parentCode: string | null;
   parentName: string | null;
@@ -174,6 +176,7 @@ export type LedgerAccountStatementResponse = {
     isHeader: boolean;
     isPostingAllowed: boolean;
     isActive: boolean;
+    isCashOrBankAccount: boolean;
   };
   fromUtc: string | null;
   toUtc: string | null;
@@ -183,6 +186,56 @@ export type LedgerAccountStatementResponse = {
   closingBalanceDebit: number;
   closingBalanceCredit: number;
   items: LedgerStatementLineDto[];
+};
+
+export type CashbookAccountDto = {
+  id: string;
+  code: string;
+  name: string;
+  category: number;
+  normalBalance: number;
+  isCashOrBankAccount: boolean;
+};
+
+export type CashbookLineDto = {
+  id: string;
+  journalEntryId: string;
+  journalEntryLineId: string;
+  movementDateUtc: string;
+  reference: string;
+  description: string;
+  debitAmount: number;
+  creditAmount: number;
+  runningBalanceDebit: number;
+  runningBalanceCredit: number;
+};
+
+export type CashbookResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  fromUtc: string | null;
+  toUtc: string | null;
+  cashOrBankAccounts: CashbookAccountDto[];
+  selectedLedgerAccount: {
+    id: string;
+    code: string;
+    name: string;
+    category: number;
+    normalBalance: number;
+    isHeader: boolean;
+    isPostingAllowed: boolean;
+    isActive: boolean;
+    isCashOrBankAccount: boolean;
+  } | null;
+  openingBalanceDebit: number;
+  openingBalanceCredit: number;
+  totalDebit: number;
+  totalCredit: number;
+  closingBalanceDebit: number;
+  closingBalanceCredit: number;
+  count: number;
+  items: CashbookLineDto[];
 };
 
 export type JournalEntryDto = {
@@ -1305,6 +1358,22 @@ export async function getLedgerAccountStatement(
   return response.data;
 }
 
+export async function getCashbook(
+  ledgerAccountId?: string | null,
+  fromUtc?: string | null,
+  toUtc?: string | null
+) {
+  const response = await api.get<CashbookResponse>('/api/finance/reports/cashbook', {
+    params: {
+      ...(ledgerAccountId ? { ledgerAccountId } : {}),
+      ...(fromUtc ? { fromUtc } : {}),
+      ...(toUtc ? { toUtc } : {}),
+    },
+  });
+
+  return response.data;
+}
+
 export async function getJournalEntries() {
   const response = await api.get<ListEnvelope<JournalEntryDto>>('/api/finance/journal-entries');
   return response.data;
@@ -1340,6 +1409,8 @@ export type CreateLedgerAccountRequest = {
   isHeader: boolean;
   isPostingAllowed: boolean;
   parentLedgerAccountId?: string | null;
+  purpose?: string | null;
+  isCashOrBankAccount: boolean;
 };
 
 export async function createLedgerAccount(payload: CreateLedgerAccountRequest) {

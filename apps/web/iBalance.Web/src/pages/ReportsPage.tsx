@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   getBalanceSheet,
+  getCashbook,
   getCompanyLogoDataUrl,
   getCustomerReceipts,
   getIncomeStatement,
@@ -375,6 +376,7 @@ export function ReportsPage() {
   const [fromDate, setFromDate] = useState(defaultFromDate);
   const [toDate, setToDate] = useState(defaultToDate);
   const [balanceSheetAsAtDate, setBalanceSheetAsAtDate] = useState(defaultToDate);
+  const [cashbookLedgerAccountId, setCashbookLedgerAccountId] = useState('');
 
   const canView = canViewReports();
 
@@ -400,6 +402,12 @@ export function ReportsPage() {
   const incomeStatement = useQuery({
     queryKey: ['income-statement', fromUtc ?? null, toUtc ?? null],
     queryFn: () => getIncomeStatement(fromUtc, toUtc),
+    enabled: canView && isPeriodRangeValid,
+  });
+
+  const cashbook = useQuery({
+    queryKey: ['cashbook', cashbookLedgerAccountId || null, fromUtc ?? null, toUtc ?? null],
+    queryFn: () => getCashbook(cashbookLedgerAccountId || null, fromUtc, toUtc),
     enabled: canView && isPeriodRangeValid,
   });
 
@@ -703,6 +711,72 @@ export function ReportsPage() {
     }));
   }
 
+  function printCashbookStandalone() {
+    const selectedLedgerAccount = cashbook.data?.selectedLedgerAccount;
+    const selectedAccountLabel = selectedLedgerAccount
+      ? `${selectedLedgerAccount.code} - ${selectedLedgerAccount.name}`
+      : 'No treasury account selected';
+
+    const bodyHtml = `
+      <div class="kv">
+        <div class="kv-row"><span>Reporting Period</span><span>${periodText.replace('Reporting Period: ', '')}</span></div>
+        <div class="kv-row"><span>Treasury Account</span><span>${selectedAccountLabel}</span></div>
+        <div class="kv-row"><span>Opening Balance (Debit)</span><span>${formatAmount(cashbook.data?.openingBalanceDebit ?? 0)}</span></div>
+        <div class="kv-row"><span>Opening Balance (Credit)</span><span>${formatAmount(cashbook.data?.openingBalanceCredit ?? 0)}</span></div>
+        <div class="kv-row"><span>Total Debit</span><span>${formatAmount(cashbook.data?.totalDebit ?? 0)}</span></div>
+        <div class="kv-row"><span>Total Credit</span><span>${formatAmount(cashbook.data?.totalCredit ?? 0)}</span></div>
+        <div class="kv-row"><span>Closing Balance (Debit)</span><span>${formatAmount(cashbook.data?.closingBalanceDebit ?? 0)}</span></div>
+        <div class="kv-row"><span>Closing Balance (Credit)</span><span>${formatAmount(cashbook.data?.closingBalanceCredit ?? 0)}</span></div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Reference</th>
+              <th>Description</th>
+              <th class="right">Debit</th>
+              <th class="right">Credit</th>
+              <th class="right">Running Debit</th>
+              <th class="right">Running Credit</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(cashbook.data?.items ?? []).length === 0
+              ? '<tr><td colspan="7" class="muted">No cashbook movements were found for the selected treasury account and reporting period.</td></tr>'
+              : (cashbook.data?.items ?? []).map((item) => `
+                  <tr>
+                    <td>${formatDateTime(item.movementDateUtc)}</td>
+                    <td>${item.reference}</td>
+                    <td>${item.description}</td>
+                    <td class="right">${formatAmount(item.debitAmount)}</td>
+                    <td class="right">${formatAmount(item.creditAmount)}</td>
+                    <td class="right">${formatAmount(item.runningBalanceDebit)}</td>
+                    <td class="right">${formatAmount(item.runningBalanceCredit)}</td>
+                  </tr>
+                `).join('')}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th colspan="3">Totals</th>
+              <th class="right">${formatAmount(cashbook.data?.totalDebit ?? 0)}</th>
+              <th class="right">${formatAmount(cashbook.data?.totalCredit ?? 0)}</th>
+              <th class="right">${formatAmount(cashbook.data?.closingBalanceDebit ?? 0)}</th>
+              <th class="right">${formatAmount(cashbook.data?.closingBalanceCredit ?? 0)}</th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    `;
+
+    openStandalonePrint(buildStandaloneHtml({
+      title: 'Cashbook',
+      subtitle: `${periodText} | ${selectedAccountLabel}`,
+      bodyHtml,
+    }));
+  }
+
   function printReceivablesSummaryStandalone() {
     const bodyHtml = `
       <div class="kv">
@@ -944,6 +1018,7 @@ export function ReportsPage() {
     trialBalance.isLoading ||
     balanceSheet.isLoading ||
     incomeStatement.isLoading ||
+    cashbook.isLoading ||
     salesInvoicesQ.isLoading ||
     customerReceiptsQ.isLoading ||
     purchaseInvoicesQ.isLoading ||
@@ -956,6 +1031,7 @@ export function ReportsPage() {
     trialBalance.error ||
     balanceSheet.error ||
     incomeStatement.error ||
+    cashbook.error ||
     salesInvoicesQ.error ||
     customerReceiptsQ.error ||
     purchaseInvoicesQ.error ||
@@ -963,6 +1039,7 @@ export function ReportsPage() {
     !trialBalance.data ||
     !balanceSheet.data ||
     !incomeStatement.data ||
+    !cashbook.data ||
     !salesInvoicesQ.data ||
     !customerReceiptsQ.data ||
     !purchaseInvoicesQ.data ||
@@ -1012,6 +1089,22 @@ export function ReportsPage() {
               value={balanceSheetAsAtDate}
               onChange={(e) => setBalanceSheetAsAtDate(e.target.value)}
             />
+          </div>
+
+          <div className="form-row">
+            <label>Cashbook Treasury Account</label>
+            <select
+              className="select"
+              value={cashbookLedgerAccountId}
+              onChange={(e) => setCashbookLedgerAccountId(e.target.value)}
+            >
+              <option value="">— Select Treasury Account —</option>
+              {cashbook.data.cashOrBankAccounts.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.code} - {item.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="form-row">
@@ -1212,6 +1305,120 @@ export function ReportsPage() {
           <div>Total Expenses: {formatAmount(incomeStatement.data.totalExpenses)}</div>
           <div>Net Income: {formatAmount(incomeStatement.data.netIncome)}</div>
         </div>
+      </section>
+
+      <section id="print-cashbook" className="panel printable-report">
+        <div className="section-heading no-print">
+          <div>
+            <h2>Cashbook</h2>
+            <span className="muted">{periodText}</span>
+          </div>
+          <button
+            className="button"
+            onClick={printCashbookStandalone}
+            disabled={!cashbook.data.selectedLedgerAccount}
+          >
+            Print Cashbook
+          </button>
+        </div>
+
+        <ReportPrintHeader
+          title="Cashbook"
+          subtitle={
+            cashbook.data.selectedLedgerAccount
+              ? `${periodText} | ${cashbook.data.selectedLedgerAccount.code} - ${cashbook.data.selectedLedgerAccount.name}`
+              : periodText
+          }
+        />
+
+        {!cashbook.data.selectedLedgerAccount ? (
+          <div className="panel error-panel">
+            Select a treasury account above to view the cashbook.
+          </div>
+        ) : (
+          <>
+            <div className="kv" style={{ marginBottom: 16 }}>
+              <div className="kv-row">
+                <span>Reporting Period</span>
+                <span>{periodText.replace('Reporting Period: ', '')}</span>
+              </div>
+              <div className="kv-row">
+                <span>Treasury Account</span>
+                <span>{cashbook.data.selectedLedgerAccount.code} - {cashbook.data.selectedLedgerAccount.name}</span>
+              </div>
+              <div className="kv-row">
+                <span>Opening Balance (Debit)</span>
+                <span>{formatAmount(cashbook.data.openingBalanceDebit)}</span>
+              </div>
+              <div className="kv-row">
+                <span>Opening Balance (Credit)</span>
+                <span>{formatAmount(cashbook.data.openingBalanceCredit)}</span>
+              </div>
+              <div className="kv-row">
+                <span>Total Debit</span>
+                <span>{formatAmount(cashbook.data.totalDebit)}</span>
+              </div>
+              <div className="kv-row">
+                <span>Total Credit</span>
+                <span>{formatAmount(cashbook.data.totalCredit)}</span>
+              </div>
+              <div className="kv-row">
+                <span>Closing Balance (Debit)</span>
+                <span>{formatAmount(cashbook.data.closingBalanceDebit)}</span>
+              </div>
+              <div className="kv-row">
+                <span>Closing Balance (Credit)</span>
+                <span>{formatAmount(cashbook.data.closingBalanceCredit)}</span>
+              </div>
+            </div>
+
+            <div className="table-wrap">
+              <table className="data-table report-print-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Reference</th>
+                    <th>Description</th>
+                    <th style={{ textAlign: 'right' }}>Debit</th>
+                    <th style={{ textAlign: 'right' }}>Credit</th>
+                    <th style={{ textAlign: 'right' }}>Running Debit</th>
+                    <th style={{ textAlign: 'right' }}>Running Credit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cashbook.data.items.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="muted">
+                        No cashbook movements were found for the selected treasury account and reporting period.
+                      </td>
+                    </tr>
+                  ) : (
+                    cashbook.data.items.map((item) => (
+                      <tr key={item.id}>
+                        <td>{formatDateTime(item.movementDateUtc)}</td>
+                        <td>{item.reference}</td>
+                        <td>{item.description}</td>
+                        <td style={{ textAlign: 'right' }}>{formatAmount(item.debitAmount)}</td>
+                        <td style={{ textAlign: 'right' }}>{formatAmount(item.creditAmount)}</td>
+                        <td style={{ textAlign: 'right' }}>{formatAmount(item.runningBalanceDebit)}</td>
+                        <td style={{ textAlign: 'right' }}>{formatAmount(item.runningBalanceCredit)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <th colSpan={3}>Totals</th>
+                    <th style={{ textAlign: 'right' }}>{formatAmount(cashbook.data.totalDebit)}</th>
+                    <th style={{ textAlign: 'right' }}>{formatAmount(cashbook.data.totalCredit)}</th>
+                    <th style={{ textAlign: 'right' }}>{formatAmount(cashbook.data.closingBalanceDebit)}</th>
+                    <th style={{ textAlign: 'right' }}>{formatAmount(cashbook.data.closingBalanceCredit)}</th>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </>
+        )}
       </section>
 
       <section id="print-accounts-receivable-summary" className="panel printable-report">

@@ -750,6 +750,14 @@ public sealed class FinanceController : ControllerBase
             });
         }
 
+        if (request.IsHeader && request.IsCashOrBankAccount)
+        {
+            return BadRequest(new
+            {
+                Message = "Header accounts cannot be marked as cash or bank accounts."
+            });
+        }
+
         LedgerAccount? parentLedgerAccount = null;
 
         if (request.ParentLedgerAccountId.HasValue)
@@ -781,6 +789,7 @@ public sealed class FinanceController : ControllerBase
 
         var normalizedCode = request.Code.Trim().ToUpperInvariant();
         var normalizedName = request.Name.Trim();
+        var normalizedPurpose = string.IsNullOrWhiteSpace(request.Purpose) ? null : request.Purpose.Trim();
 
         var codeExists = await dbContext.LedgerAccounts
             .AsNoTracking()
@@ -805,7 +814,9 @@ public sealed class FinanceController : ControllerBase
             request.IsHeader,
             request.IsPostingAllowed,
             true,
-            request.ParentLedgerAccountId);
+            request.ParentLedgerAccountId,
+            normalizedPurpose,
+            request.IsCashOrBankAccount);
 
         dbContext.LedgerAccounts.Add(ledgerAccount);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -817,11 +828,13 @@ public sealed class FinanceController : ControllerBase
             ledgerAccount.TenantId,
             ledgerAccount.Code,
             ledgerAccount.Name,
+            ledgerAccount.Purpose,
             ledgerAccount.Category,
             ledgerAccount.NormalBalance,
             ledgerAccount.IsHeader,
             ledgerAccount.IsPostingAllowed,
             ledgerAccount.IsActive,
+            ledgerAccount.IsCashOrBankAccount,
             ledgerAccount.ParentLedgerAccountId
         });
     }
@@ -844,11 +857,13 @@ public sealed class FinanceController : ControllerBase
                 x.TenantId,
                 x.Code,
                 x.Name,
+                x.Purpose,
                 x.Category,
                 x.NormalBalance,
                 x.IsHeader,
                 x.IsPostingAllowed,
                 x.IsActive,
+                x.IsCashOrBankAccount,
                 x.ParentLedgerAccountId,
                 ParentCode = x.ParentLedgerAccount != null ? x.ParentLedgerAccount.Code : null,
                 ParentName = x.ParentLedgerAccount != null ? x.ParentLedgerAccount.Name : null
@@ -2032,6 +2047,201 @@ public sealed class FinanceController : ControllerBase
     }
 
     [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+    [HttpGet("reports/cashbook")]
+    public async Task<IActionResult> GetCashbook(
+        [FromQuery] Guid? ledgerAccountId,
+        [FromQuery] DateTime? fromUtc,
+        [FromQuery] DateTime? toUtc,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        var cashAndBankAccounts = await dbContext.LedgerAccounts
+            .AsNoTracking()
+            .Where(x =>
+                x.IsCashOrBankAccount &&
+                x.IsActive &&
+                !x.IsHeader &&
+                x.IsPostingAllowed)
+            .OrderBy(x => x.Code)
+            .Select(x => new
+            {
+                x.Id,
+                x.Code,
+                x.Name,
+                x.Category,
+                x.NormalBalance,
+                x.IsCashOrBankAccount
+            })
+            .ToListAsync(cancellationToken);
+
+        if (!ledgerAccountId.HasValue)
+        {
+            return Ok(new
+            {
+                TenantContextAvailable = tenantContext.IsAvailable,
+                TenantId = tenantContext.IsAvailable ? tenantContext.TenantId : (Guid?)null,
+                TenantKey = tenantContext.IsAvailable ? tenantContext.TenantKey : null,
+                FromUtc = fromUtc,
+                ToUtc = toUtc,
+                CashOrBankAccounts = cashAndBankAccounts,
+                SelectedLedgerAccount = (object?)null,
+                OpeningBalanceDebit = 0m,
+                OpeningBalanceCredit = 0m,
+                TotalDebit = 0m,
+                TotalCredit = 0m,
+                ClosingBalanceDebit = 0m,
+                ClosingBalanceCredit = 0m,
+                Count = 0,
+                Items = Array.Empty<object>()
+            });
+        }
+
+        var selectedLedgerAccount = await dbContext.LedgerAccounts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                x => x.Id == ledgerAccountId.Value,
+                cancellationToken);
+
+        if (selectedLedgerAccount is null)
+        {
+            return NotFound(new
+            {
+                Message = "Ledger account was not found for the current tenant.",
+                LedgerAccountId = ledgerAccountId
+            });
+        }
+
+        if (!selectedLedgerAccount.IsCashOrBankAccount || selectedLedgerAccount.IsHeader || !selectedLedgerAccount.IsPostingAllowed || !selectedLedgerAccount.IsActive)
+        {
+            return BadRequest(new
+            {
+                Message = "Selected ledger account is not an active posting cash or bank account.",
+                LedgerAccountId = ledgerAccountId
+            });
+        }
+
+        var openingRowsQuery = dbContext.LedgerMovements
+            .AsNoTracking()
+            .Where(x => x.LedgerAccountId == ledgerAccountId.Value);
+
+        if (fromUtc.HasValue)
+        {
+            openingRowsQuery = openingRowsQuery.Where(x => x.MovementDateUtc < fromUtc.Value);
+        }
+        else
+        {
+            openingRowsQuery = openingRowsQuery.Where(x => false);
+        }
+
+        var openingRows = await openingRowsQuery
+            .Select(x => new
+            {
+                x.DebitAmount,
+                x.CreditAmount
+            })
+            .ToListAsync(cancellationToken);
+
+        var runningBalance = 0m;
+
+        foreach (var openingRow in openingRows)
+        {
+            runningBalance += selectedLedgerAccount.NormalBalance == AccountNature.Debit
+                ? openingRow.DebitAmount - openingRow.CreditAmount
+                : openingRow.CreditAmount - openingRow.DebitAmount;
+        }
+
+        var movementQuery = dbContext.LedgerMovements
+            .AsNoTracking()
+            .Where(x => x.LedgerAccountId == ledgerAccountId.Value);
+
+        if (fromUtc.HasValue)
+        {
+            movementQuery = movementQuery.Where(x => x.MovementDateUtc >= fromUtc.Value);
+        }
+
+        if (toUtc.HasValue)
+        {
+            movementQuery = movementQuery.Where(x => x.MovementDateUtc <= toUtc.Value);
+        }
+
+        var movementRows = await movementQuery
+            .OrderBy(x => x.MovementDateUtc)
+            .ThenBy(x => x.Reference)
+            .ThenBy(x => x.Id)
+            .Select(x => new
+            {
+                x.Id,
+                x.JournalEntryId,
+                x.JournalEntryLineId,
+                x.MovementDateUtc,
+                x.Reference,
+                x.Description,
+                x.DebitAmount,
+                x.CreditAmount
+            })
+            .ToListAsync(cancellationToken);
+
+        var openingBalanceDebit = runningBalance > 0m ? runningBalance : 0m;
+        var openingBalanceCredit = runningBalance < 0m ? Math.Abs(runningBalance) : 0m;
+
+        var items = movementRows
+            .Select(row =>
+            {
+                runningBalance += selectedLedgerAccount.NormalBalance == AccountNature.Debit
+                    ? row.DebitAmount - row.CreditAmount
+                    : row.CreditAmount - row.DebitAmount;
+
+                return new
+                {
+                    row.Id,
+                    row.JournalEntryId,
+                    row.JournalEntryLineId,
+                    row.MovementDateUtc,
+                    row.Reference,
+                    row.Description,
+                    row.DebitAmount,
+                    row.CreditAmount,
+                    RunningBalanceDebit = runningBalance > 0m ? runningBalance : 0m,
+                    RunningBalanceCredit = runningBalance < 0m ? Math.Abs(runningBalance) : 0m
+                };
+            })
+            .ToList();
+
+        return Ok(new
+        {
+            TenantContextAvailable = tenantContext.IsAvailable,
+            TenantId = tenantContext.IsAvailable ? tenantContext.TenantId : (Guid?)null,
+            TenantKey = tenantContext.IsAvailable ? tenantContext.TenantKey : null,
+            FromUtc = fromUtc,
+            ToUtc = toUtc,
+            CashOrBankAccounts = cashAndBankAccounts,
+            SelectedLedgerAccount = new
+            {
+                selectedLedgerAccount.Id,
+                selectedLedgerAccount.Code,
+                selectedLedgerAccount.Name,
+                selectedLedgerAccount.Category,
+                selectedLedgerAccount.NormalBalance,
+                selectedLedgerAccount.IsHeader,
+                selectedLedgerAccount.IsPostingAllowed,
+                selectedLedgerAccount.IsActive,
+                selectedLedgerAccount.IsCashOrBankAccount
+            },
+            OpeningBalanceDebit = openingBalanceDebit,
+            OpeningBalanceCredit = openingBalanceCredit,
+            TotalDebit = movementRows.Sum(x => x.DebitAmount),
+            TotalCredit = movementRows.Sum(x => x.CreditAmount),
+            ClosingBalanceDebit = runningBalance > 0m ? runningBalance : 0m,
+            ClosingBalanceCredit = runningBalance < 0m ? Math.Abs(runningBalance) : 0m,
+            Count = items.Count,
+            Items = items
+        });
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
     [HttpGet("accounts/{ledgerAccountId:guid}/ledger")]
     public async Task<IActionResult> GetLedgerAccountStatement(
         Guid ledgerAccountId,
@@ -2126,7 +2336,8 @@ public sealed class FinanceController : ControllerBase
                 ledgerAccount.NormalBalance,
                 ledgerAccount.IsHeader,
                 ledgerAccount.IsPostingAllowed,
-                ledgerAccount.IsActive
+                ledgerAccount.IsActive,
+                ledgerAccount.IsCashOrBankAccount
             },
             FromUtc = fromUtc,
             ToUtc = toUtc,
@@ -2190,7 +2401,9 @@ public sealed class FinanceController : ControllerBase
         AccountNature NormalBalance,
         bool IsHeader,
         bool IsPostingAllowed,
-        Guid? ParentLedgerAccountId);
+        Guid? ParentLedgerAccountId,
+        string? Purpose,
+        bool IsCashOrBankAccount);
 
     public sealed record CreateJournalEntryRequest(
         DateTime EntryDateUtc,

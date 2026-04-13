@@ -64,30 +64,36 @@ function buildReportingPeriodText(fromDate: string, toDate: string) {
 type FormState = {
   code: string;
   name: string;
+  purpose: string;
   category: number;
   normalBalance: number;
   isHeader: boolean;
   isPostingAllowed: boolean;
+  isCashOrBankAccount: boolean;
   parentLedgerAccountId: string;
 };
 
 type UploadRow = {
   code: string;
   name: string;
+  purpose: string;
   category: number;
   normalBalance: number;
   isHeader: boolean;
   isPostingAllowed: boolean;
+  isCashOrBankAccount: boolean;
   parentCode: string;
 };
 
 const emptyForm: FormState = {
   code: '',
   name: '',
+  purpose: '',
   category: 1,
   normalBalance: 1,
   isHeader: false,
   isPostingAllowed: true,
+  isCashOrBankAccount: false,
   parentLedgerAccountId: '',
 };
 
@@ -161,20 +167,42 @@ function buildTemplateCsv() {
   const headers = [
     'Code',
     'Name',
+    'Purpose',
     'Category',
     'NormalBalance',
     'IsHeader',
     'IsPostingAllowed',
+    'IsCashOrBankAccount',
     'ParentCode',
   ];
 
   const rows = [
-    ['1000', 'Assets', 'Asset', 'Debit', 'true', 'false', ''],
-    ['1010', 'Cash and Cash Equivalents', 'Asset', 'Debit', 'false', 'true', '1000'],
-    ['2000', 'Liabilities', 'Liability', 'Credit', 'true', 'false', ''],
-    ['2010', 'Trade Payables', 'Liability', 'Credit', 'false', 'true', '2000'],
-    ['4000', 'Revenue', 'Income', 'Credit', 'false', 'true', ''],
-    ['5000', 'Operating Expenses', 'Expense', 'Debit', 'true', 'false', ''],
+    ['1000', 'Assets', 'Main asset control header for asset accounts', 'Asset', 'Debit', 'true', 'false', 'false', ''],
+    ['1010', 'Main Bank Account', 'Primary operating bank account used for treasury receipts and payments', 'Asset', 'Debit', 'false', 'true', 'true', '1000'],
+    ['1020', 'Cash on Hand', 'Petty cash and till balances used for treasury cash operations', 'Asset', 'Debit', 'false', 'true', 'true', '1000'],
+    ['1100', 'Trade Receivables', 'Receivables control account for posted sales invoices', 'Asset', 'Debit', 'false', 'true', 'false', '1000'],
+    ['1200', 'Prepayments and Deposits', 'Short-term prepayments and recoverable deposits', 'Asset', 'Debit', 'false', 'true', 'false', '1000'],
+    ['1300', 'Inventory Clearing', 'Placeholder inventory-related asset account for future stock integration', 'Asset', 'Debit', 'false', 'true', 'false', '1000'],
+    ['2000', 'Liabilities', 'Main liability control header for liability accounts', 'Liability', 'Credit', 'true', 'false', 'false', ''],
+    ['2010', 'Trade Payables', 'Payables control account for posted purchase invoices', 'Liability', 'Credit', 'false', 'true', 'false', '2000'],
+    ['2100', 'Accrued Expenses', 'Accrued obligations recognized before payment', 'Liability', 'Credit', 'false', 'true', 'false', '2000'],
+    ['2200', 'Taxes Payable', 'Tax obligations due to authorities', 'Liability', 'Credit', 'false', 'true', 'false', '2000'],
+    ['3000', 'Equity', 'Main equity header for capital and retained earnings', 'Equity', 'Credit', 'true', 'false', 'false', ''],
+    ['3010', 'Owner Capital', 'Owner investment or share capital', 'Equity', 'Credit', 'false', 'true', 'false', '3000'],
+    ['3020', 'Retained Earnings', 'Accumulated profits retained in the business', 'Equity', 'Credit', 'false', 'true', 'false', '3000'],
+    ['4000', 'Revenue', 'Main revenue header for operating income', 'Income', 'Credit', 'true', 'false', 'false', ''],
+    ['4010', 'Sales Revenue', 'Revenue from sale of goods', 'Income', 'Credit', 'false', 'true', 'false', '4000'],
+    ['4020', 'Service Revenue', 'Revenue from rendering services', 'Income', 'Credit', 'false', 'true', 'false', '4000'],
+    ['4030', 'Other Operating Income', 'Miscellaneous operating income earned', 'Income', 'Credit', 'false', 'true', 'false', '4000'],
+    ['5000', 'Operating Expenses', 'Main expense header for operating costs', 'Expense', 'Debit', 'true', 'false', 'false', ''],
+    ['5010', 'Cost of Sales / Direct Costs', 'Direct cost account for goods sold or direct service cost', 'Expense', 'Debit', 'false', 'true', 'false', '5000'],
+    ['5020', 'Salaries and Wages', 'Employee compensation expense', 'Expense', 'Debit', 'false', 'true', 'false', '5000'],
+    ['5030', 'Rent Expense', 'Office or facility rent cost', 'Expense', 'Debit', 'false', 'true', 'false', '5000'],
+    ['5040', 'Utilities Expense', 'Electricity, water, internet and similar utilities', 'Expense', 'Debit', 'false', 'true', 'false', '5000'],
+    ['5050', 'Office and Admin Expense', 'General administration and office running cost', 'Expense', 'Debit', 'false', 'true', 'false', '5000'],
+    ['5060', 'Transport and Logistics', 'Delivery, transport and logistics expense', 'Expense', 'Debit', 'false', 'true', 'false', '5000'],
+    ['5070', 'Repairs and Maintenance', 'Routine maintenance and repair expense', 'Expense', 'Debit', 'false', 'true', 'false', '5000'],
+    ['5080', 'Bank Charges', 'Bank fees and transaction charges', 'Expense', 'Debit', 'false', 'true', 'false', '5000'],
   ];
 
   return [headers, ...rows]
@@ -417,6 +445,7 @@ export function AccountsPage() {
       active: items.filter((x) => x.isActive).length,
       posting: items.filter((x) => x.isPostingAllowed && !x.isHeader).length,
       headers: items.filter((x) => x.isHeader).length,
+      cashOrBank: items.filter((x) => x.isCashOrBankAccount).length,
     };
   }, [data?.items]);
 
@@ -495,13 +524,20 @@ export function AccountsPage() {
       return;
     }
 
+    if (form.isHeader && form.isCashOrBankAccount) {
+      setErrorText('A header account cannot be marked as a cash or bank account.');
+      return;
+    }
+
     await createMut.mutateAsync({
       code: form.code.trim(),
       name: form.name.trim(),
+      purpose: form.purpose.trim() || null,
       category: form.category,
       normalBalance: form.normalBalance,
       isHeader: form.isHeader,
       isPostingAllowed: form.isPostingAllowed,
+      isCashOrBankAccount: form.isCashOrBankAccount,
       parentLedgerAccountId: form.parentLedgerAccountId ? form.parentLedgerAccountId : null,
     });
   }
@@ -570,7 +606,7 @@ export function AccountsPage() {
       }
 
       const header = splitCsvLine(lines[0]).map((x) => x.toLowerCase());
-      const expected = ['code', 'name', 'category', 'normalbalance', 'isheader', 'ispostingallowed', 'parentcode'];
+      const expected = ['code', 'name', 'purpose', 'category', 'normalbalance', 'isheader', 'ispostingallowed', 'iscashorbankaccount', 'parentcode'];
 
       if (expected.some((value, index) => header[index] !== value)) {
         throw new Error('The file format is not valid. Please use the provided template.');
@@ -579,12 +615,12 @@ export function AccountsPage() {
       const parsedRows: UploadRow[] = lines.slice(1).map((line, rowIndex) => {
         const cols = splitCsvLine(line);
 
-        if (cols.length < 7) {
+        if (cols.length < 9) {
           throw new Error(`Row ${rowIndex + 2}: incomplete data.`);
         }
 
-        const category = parseCategory(cols[2]);
-        const normalBalance = parseNormalBalance(cols[3]);
+        const category = parseCategory(cols[3]);
+        const normalBalance = parseNormalBalance(cols[4]);
 
         if (!category) {
           throw new Error(`Row ${rowIndex + 2}: invalid account category.`);
@@ -597,11 +633,13 @@ export function AccountsPage() {
         return {
           code: cols[0],
           name: cols[1],
+          purpose: cols[2],
           category,
           normalBalance,
-          isHeader: parseBoolean(cols[4]),
-          isPostingAllowed: parseBoolean(cols[5]),
-          parentCode: cols[6],
+          isHeader: parseBoolean(cols[5]),
+          isPostingAllowed: parseBoolean(cols[6]),
+          isCashOrBankAccount: parseBoolean(cols[7]),
+          parentCode: cols[8],
         };
       });
 
@@ -628,6 +666,11 @@ export function AccountsPage() {
             continue;
           }
 
+          if (row.isHeader && row.isCashOrBankAccount) {
+            failures.push(`${row.code}: a header account cannot be marked as a cash or bank account.`);
+            continue;
+          }
+
           const parentCode = row.parentCode.trim().toUpperCase();
           const parentLedgerAccountId =
             (parentCode ? pendingCreated.get(parentCode) : null) ||
@@ -642,10 +685,12 @@ export function AccountsPage() {
           const result = await createLedgerAccount({
             code: row.code.trim(),
             name: row.name.trim(),
+            purpose: row.purpose.trim() || null,
             category: row.category,
             normalBalance: row.normalBalance,
             isHeader: row.isHeader,
             isPostingAllowed: row.isPostingAllowed,
+            isCashOrBankAccount: row.isCashOrBankAccount,
             parentLedgerAccountId,
           });
 
@@ -738,6 +783,10 @@ export function AccountsPage() {
             <span>Header Accounts</span>
             <span>{accountSummary.headers}</span>
           </div>
+          <div className="kv-row">
+            <span>Cash / Bank Accounts</span>
+            <span>{accountSummary.cashOrBank}</span>
+          </div>
         </div>
 
         {!canManage ? (
@@ -771,10 +820,12 @@ export function AccountsPage() {
               <tr>
                 <th>Code</th>
                 <th>Account Name</th>
+                <th>Purpose</th>
                 <th>Category</th>
                 <th>Normal Balance</th>
                 <th>Type</th>
                 <th>Posting</th>
+                <th>Treasury</th>
                 <th>Parent Account</th>
                 <th style={{ width: 140 }}>Action</th>
               </tr>
@@ -784,10 +835,12 @@ export function AccountsPage() {
                 <tr key={item.id}>
                   <td>{item.code}</td>
                   <td>{item.name}</td>
+                  <td>{item.purpose || '—'}</td>
                   <td>{categoryLabel(item.category)}</td>
                   <td>{normalBalanceLabel(item.normalBalance)}</td>
                   <td>{formatStatus(item.isHeader, 'Header', 'Posting Account')}</td>
                   <td>{formatStatus(item.isPostingAllowed, 'Enabled', 'Not Enabled')}</td>
+                  <td>{formatStatus(item.isCashOrBankAccount, 'Cash/Bank', 'Standard')}</td>
                   <td>{item.parentCode ? `${item.parentCode} - ${item.parentName}` : '—'}</td>
                   <td>
                     <button
@@ -1021,6 +1074,16 @@ export function AccountsPage() {
                 />
               </div>
 
+              <div className="form-row" style={{ gridColumn: '1 / -1' }}>
+                <label>Purpose</label>
+                <input
+                  className="input"
+                  value={form.purpose}
+                  onChange={(e) => update('purpose', e.target.value)}
+                  placeholder="Enter the business purpose of this account"
+                />
+              </div>
+
               <div className="form-row">
                 <label>Category</label>
                 <select
@@ -1066,7 +1129,7 @@ export function AccountsPage() {
 
               <div className="form-row">
                 <label>Account Options</label>
-                <div className="inline-actions">
+                <div className="inline-actions" style={{ flexWrap: 'wrap' }}>
                   <label className="muted" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <input
                       type="checkbox"
@@ -1074,7 +1137,10 @@ export function AccountsPage() {
                       onChange={(e) => {
                         const isHeader = e.target.checked;
                         update('isHeader', isHeader);
-                        if (isHeader) update('isPostingAllowed', false);
+                        if (isHeader) {
+                          update('isPostingAllowed', false);
+                          update('isCashOrBankAccount', false);
+                        }
                       }}
                     />
                     Header account
@@ -1088,6 +1154,16 @@ export function AccountsPage() {
                       onChange={(e) => update('isPostingAllowed', e.target.checked)}
                     />
                     Allow posting
+                  </label>
+
+                  <label className="muted" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={form.isCashOrBankAccount}
+                      disabled={form.isHeader}
+                      onChange={(e) => update('isCashOrBankAccount', e.target.checked)}
+                    />
+                    Cash / Bank account
                   </label>
                 </div>
               </div>

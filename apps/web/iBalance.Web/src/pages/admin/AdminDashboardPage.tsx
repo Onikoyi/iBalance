@@ -129,6 +129,7 @@ export function AdminDashboardPage() {
             </div>
 
             <div className="inline-actions">
+              <Link to="/admin/subscription-applications" className="button primary">Subscription Applications</Link>
               {canManageUsers ? <Link to="/admin/users" className="button">User Management</Link> : null}
               {canManageCommercials ? <Link to="/admin/settings" className="button">Commercial Settings</Link> : null}
             </div>

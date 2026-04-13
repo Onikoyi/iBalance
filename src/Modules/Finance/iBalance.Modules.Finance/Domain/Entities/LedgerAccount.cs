@@ -21,7 +21,9 @@ public sealed class LedgerAccount : TenantOwnedEntity
         bool isHeader,
         bool isPostingAllowed,
         bool isActive,
-        Guid? parentLedgerAccountId = null) : base(tenantId)
+        Guid? parentLedgerAccountId = null,
+        string? purpose = null,
+        bool isCashOrBankAccount = false) : base(tenantId)
     {
         if (id == Guid.Empty)
         {
@@ -39,6 +41,7 @@ public sealed class LedgerAccount : TenantOwnedEntity
         }
 
         ValidatePostingRules(isHeader, isPostingAllowed);
+        ValidateCashAndBankClassification(isHeader, isCashOrBankAccount);
 
         Id = id;
         Code = code.Trim().ToUpperInvariant();
@@ -49,6 +52,8 @@ public sealed class LedgerAccount : TenantOwnedEntity
         IsPostingAllowed = isPostingAllowed;
         IsActive = isActive;
         ParentLedgerAccountId = parentLedgerAccountId;
+        Purpose = string.IsNullOrWhiteSpace(purpose) ? null : purpose.Trim();
+        IsCashOrBankAccount = isCashOrBankAccount;
     }
 
     public Guid Id { get; private set; }
@@ -56,6 +61,8 @@ public sealed class LedgerAccount : TenantOwnedEntity
     public string Code { get; private set; } = string.Empty;
 
     public string Name { get; private set; } = string.Empty;
+
+    public string? Purpose { get; private set; }
 
     public AccountCategory Category { get; private set; }
 
@@ -66,6 +73,8 @@ public sealed class LedgerAccount : TenantOwnedEntity
     public bool IsPostingAllowed { get; private set; }
 
     public bool IsActive { get; private set; }
+
+    public bool IsCashOrBankAccount { get; private set; }
 
     public Guid? ParentLedgerAccountId { get; private set; }
 
@@ -81,6 +90,17 @@ public sealed class LedgerAccount : TenantOwnedEntity
         }
 
         Name = name.Trim();
+    }
+
+    public void SetPurpose(string? purpose)
+    {
+        Purpose = string.IsNullOrWhiteSpace(purpose) ? null : purpose.Trim();
+    }
+
+    public void SetCashOrBankAccount(bool isCashOrBankAccount)
+    {
+        ValidateCashAndBankClassification(IsHeader, isCashOrBankAccount);
+        IsCashOrBankAccount = isCashOrBankAccount;
     }
 
     public void Activate()
@@ -112,6 +132,7 @@ public sealed class LedgerAccount : TenantOwnedEntity
     {
         IsHeader = true;
         IsPostingAllowed = false;
+        IsCashOrBankAccount = false;
     }
 
     public void MarkAsPosting()
@@ -129,6 +150,14 @@ public sealed class LedgerAccount : TenantOwnedEntity
         if (isHeader && isPostingAllowed)
         {
             throw new ArgumentException("Header accounts cannot allow posting.");
+        }
+    }
+
+    private static void ValidateCashAndBankClassification(bool isHeader, bool isCashOrBankAccount)
+    {
+        if (isHeader && isCashOrBankAccount)
+        {
+            throw new ArgumentException("Header accounts cannot be marked as cash or bank accounts.");
         }
     }
 }

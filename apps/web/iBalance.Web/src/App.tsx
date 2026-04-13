@@ -35,6 +35,7 @@ import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
 import { AdminUsersPage } from './pages/admin/AdminUsersPage';
 import { AdminTenantDetailPage } from './pages/admin/AdminTenantDetailPage';
+import { AdminSubscriptionApplicationsPage } from './pages/admin/AdminSubscriptionApplicationsPage';
 
 export default function App() {
   return (
@@ -247,6 +248,16 @@ export default function App() {
           <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin']}>
             <AdminShell>
               <AdminUsersPage />
+            </AdminShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/admin/subscription-applications"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin']}>
+            <AdminShell>
+              <AdminSubscriptionApplicationsPage />
             </AdminShell>
           </RequireAuth>
         }

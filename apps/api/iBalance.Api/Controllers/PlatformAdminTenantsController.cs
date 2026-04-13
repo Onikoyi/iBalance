@@ -1,4 +1,5 @@
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
+using iBalance.Modules.Platform.Domain.Entities;
 using iBalance.Modules.Platform.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -68,34 +69,8 @@ public sealed class PlatformAdminTenantsController : ControllerBase
             var viewers = tenantUsers.Count(x => x.Role == "Viewer");
             var platformAdmins = tenantUsers.Count(x => x.Role == "PlatformAdmin");
 
-            TenantLicenseStatus licenseStatus;
-            int? daysRemaining = null;
-
-            if (tenantLicense is null)
-            {
-                licenseStatus = TenantLicenseStatus.Expired;
-            }
-            else if (tenant.Status != TenantStatus.Active)
-            {
-                licenseStatus = TenantLicenseStatus.Suspended;
-                daysRemaining = tenantLicense.GetDaysRemaining(utcNow);
-            }
-            else
-            {
-                licenseStatus = tenantLicense.GetStatus(utcNow);
-                daysRemaining = tenantLicense.GetDaysRemaining(utcNow);
-            }
-
-            var renewalWarning = tenantLicense is null
-                ? "License record not configured."
-                : licenseStatus switch
-                {
-                    TenantLicenseStatus.Active => "Subscription is active.",
-                    TenantLicenseStatus.ExpiringSoon => "Subscription renewal is due soon.",
-                    TenantLicenseStatus.Expired => "Subscription has expired.",
-                    TenantLicenseStatus.Suspended => "Subscription is suspended or tenant access is not active.",
-                    _ => "Subscription status is unavailable."
-                };
+            var (licenseStatus, daysRemaining, renewalWarning) =
+                ComputeLicenseSummary(tenant.Status, tenantLicense, utcNow);
 
             return new
             {
@@ -138,4 +113,366 @@ public sealed class PlatformAdminTenantsController : ControllerBase
             Items = items
         });
     }
+
+    [HttpGet("{tenantId:guid}")]
+    public async Task<IActionResult> GetTenantDetail(
+        Guid tenantId,
+        [FromServices] ApplicationDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var tenant = await dbContext.Tenants
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == tenantId, cancellationToken);
+
+        if (tenant is null)
+        {
+            return NotFound(new
+            {
+                Message = "Tenant was not found.",
+                TenantId = tenantId
+            });
+        }
+
+        var license = await dbContext.TenantLicenses
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId)
+            .OrderByDescending(x => x.LicenseEndDateUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var userRows = await dbContext.UserAccounts
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId)
+            .OrderByDescending(x => x.IsActive)
+            .ThenBy(x => x.FirstName)
+            .ThenBy(x => x.LastName)
+            .ThenBy(x => x.Email)
+            .Select(x => new
+            {
+                x.Id,
+                x.Email,
+                x.FirstName,
+                x.LastName,
+                x.Role,
+                x.IsActive,
+                x.CreatedOnUtc,
+                x.LastModifiedOnUtc
+            })
+            .ToListAsync(cancellationToken);
+
+        var users = userRows
+            .Select(x => new
+            {
+                x.Id,
+                x.Email,
+                x.FirstName,
+                x.LastName,
+                DisplayName = $"{x.FirstName} {x.LastName}".Trim(),
+                x.Role,
+                x.IsActive,
+                x.CreatedOnUtc,
+                x.LastModifiedOnUtc
+            })
+            .ToList();
+
+        var (licenseStatus, daysRemaining, _) =
+            ComputeLicenseSummary(tenant.Status, license, DateTime.UtcNow);
+
+        return Ok(new
+        {
+            Tenant = new
+            {
+                Id = tenant.Id,
+                Name = tenant.Name,
+                Key = tenant.Key,
+                Status = tenant.Status
+            },
+            License = new
+            {
+                IsConfigured = license is not null,
+                PackageName = license?.PackageName,
+                AmountPaid = license?.AmountPaid,
+                CurrencyCode = license?.CurrencyCode,
+                LicenseStartDateUtc = license?.LicenseStartDateUtc,
+                LicenseEndDateUtc = license?.LicenseEndDateUtc,
+                LicenseStatus = licenseStatus,
+                DaysRemaining = daysRemaining
+            },
+            Users = new
+            {
+                Count = users.Count,
+                Items = users
+            }
+        });
+    }
+
+    [HttpPost("{tenantId:guid}/renew-license")]
+    public async Task<IActionResult> RenewLicense(
+        Guid tenantId,
+        [FromBody] RenewTenantLicenseRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.CurrencyCode))
+        {
+            return BadRequest(new { Message = "Currency code is required." });
+        }
+
+        if (request.NewEndDateUtc < request.NewStartDateUtc)
+        {
+            return BadRequest(new { Message = "The subscription end date must be later than the start date." });
+        }
+
+        if (request.AmountPaid < 0m)
+        {
+            return BadRequest(new { Message = "Amount paid cannot be negative." });
+        }
+
+        var tenant = await dbContext.Tenants
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(x => x.Id == tenantId, cancellationToken);
+
+        if (tenant is null)
+        {
+            return NotFound(new
+            {
+                Message = "Tenant was not found.",
+                TenantId = tenantId
+            });
+        }
+
+        var existingLicense = await dbContext.TenantLicenses
+            .IgnoreQueryFilters()
+            .Where(x => x.TenantId == tenantId)
+            .OrderByDescending(x => x.LicenseEndDateUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (existingLicense is null)
+        {
+            return NotFound(new
+            {
+                Message = "Tenant license was not found.",
+                TenantId = tenantId
+            });
+        }
+
+        existingLicense.Renew(
+            request.NewStartDateUtc,
+            request.NewEndDateUtc,
+            existingLicense.PackageName,
+            request.AmountPaid,
+            request.CurrencyCode.Trim().ToUpperInvariant());
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Tenant subscription renewed successfully.",
+            TenantId = tenant.Id,
+            PackageName = existingLicense.PackageName,
+            LicenseStartDateUtc = existingLicense.LicenseStartDateUtc,
+            LicenseEndDateUtc = existingLicense.LicenseEndDateUtc,
+            AmountPaid = existingLicense.AmountPaid,
+            CurrencyCode = existingLicense.CurrencyCode
+        });
+    }
+
+    [HttpPost("{tenantId:guid}/change-package")]
+    public async Task<IActionResult> ChangePackage(
+        Guid tenantId,
+        [FromBody] ChangeTenantPackageRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (request.SubscriptionPackageId == Guid.Empty)
+        {
+            return BadRequest(new { Message = "Subscription package is required." });
+        }
+
+        var tenant = await dbContext.Tenants
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(x => x.Id == tenantId, cancellationToken);
+
+        if (tenant is null)
+        {
+            return NotFound(new
+            {
+                Message = "Tenant was not found.",
+                TenantId = tenantId
+            });
+        }
+
+        var package = await dbContext.SubscriptionPackages
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == request.SubscriptionPackageId, cancellationToken);
+
+        if (package is null)
+        {
+            return NotFound(new
+            {
+                Message = "Subscription package was not found.",
+                SubscriptionPackageId = request.SubscriptionPackageId
+            });
+        }
+
+        var existingLicense = await dbContext.TenantLicenses
+            .IgnoreQueryFilters()
+            .Where(x => x.TenantId == tenantId)
+            .OrderByDescending(x => x.LicenseEndDateUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (existingLicense is null)
+        {
+            return NotFound(new
+            {
+                Message = "Tenant license was not found.",
+                TenantId = tenantId
+            });
+        }
+
+        existingLicense.Renew(
+            existingLicense.LicenseStartDateUtc,
+            existingLicense.LicenseEndDateUtc,
+            package.Name,
+            existingLicense.AmountPaid,
+            existingLicense.CurrencyCode);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Tenant subscription package updated successfully.",
+            TenantId = tenant.Id,
+            PackageName = existingLicense.PackageName,
+            LicenseStartDateUtc = existingLicense.LicenseStartDateUtc,
+            LicenseEndDateUtc = existingLicense.LicenseEndDateUtc,
+            AmountPaid = existingLicense.AmountPaid,
+            CurrencyCode = existingLicense.CurrencyCode
+        });
+    }
+
+    [HttpPost("{tenantId:guid}/suspend")]
+    public async Task<IActionResult> SuspendTenant(
+        Guid tenantId,
+        [FromServices] ApplicationDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var tenant = await dbContext.Tenants
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(x => x.Id == tenantId, cancellationToken);
+
+        if (tenant is null)
+        {
+            return NotFound(new
+            {
+                Message = "Tenant was not found.",
+                TenantId = tenantId
+            });
+        }
+
+        var license = await dbContext.TenantLicenses
+            .IgnoreQueryFilters()
+            .Where(x => x.TenantId == tenantId)
+            .OrderByDescending(x => x.LicenseEndDateUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        tenant.Suspend();
+        license?.Suspend();
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Tenant suspended successfully.",
+            TenantId = tenant.Id,
+            TenantStatus = tenant.Status
+        });
+    }
+
+    [HttpPost("{tenantId:guid}/reactivate")]
+    public async Task<IActionResult> ReactivateTenant(
+        Guid tenantId,
+        [FromServices] ApplicationDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var tenant = await dbContext.Tenants
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(x => x.Id == tenantId, cancellationToken);
+
+        if (tenant is null)
+        {
+            return NotFound(new
+            {
+                Message = "Tenant was not found.",
+                TenantId = tenantId
+            });
+        }
+
+        var license = await dbContext.TenantLicenses
+            .IgnoreQueryFilters()
+            .Where(x => x.TenantId == tenantId)
+            .OrderByDescending(x => x.LicenseEndDateUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        tenant.Activate();
+        license?.Unsuspend();
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Tenant reactivated successfully.",
+            TenantId = tenant.Id,
+            TenantStatus = tenant.Status
+        });
+    }
+
+    private static (TenantLicenseStatus LicenseStatus, int? DaysRemaining, string RenewalWarning) ComputeLicenseSummary(
+        TenantStatus tenantStatus,
+        TenantLicense? tenantLicense,
+        DateTime utcNow)
+    {
+        TenantLicenseStatus licenseStatus;
+        int? daysRemaining = null;
+
+        if (tenantLicense is null)
+        {
+            licenseStatus = TenantLicenseStatus.Expired;
+        }
+        else if (tenantStatus != TenantStatus.Active)
+        {
+            licenseStatus = TenantLicenseStatus.Suspended;
+            daysRemaining = tenantLicense.GetDaysRemaining(utcNow);
+        }
+        else
+        {
+            licenseStatus = tenantLicense.GetStatus(utcNow);
+            daysRemaining = tenantLicense.GetDaysRemaining(utcNow);
+        }
+
+        var renewalWarning = tenantLicense is null
+            ? "License record not configured."
+            : licenseStatus switch
+            {
+                TenantLicenseStatus.Active => "Subscription is active.",
+                TenantLicenseStatus.ExpiringSoon => "Subscription renewal is due soon.",
+                TenantLicenseStatus.Expired => "Subscription has expired.",
+                TenantLicenseStatus.Suspended => "Subscription is suspended or tenant access is not active.",
+                _ => "Subscription status is unavailable."
+            };
+
+        return (licenseStatus, daysRemaining, renewalWarning);
+    }
+
+    public sealed record RenewTenantLicenseRequest(
+        DateTime NewStartDateUtc,
+        DateTime NewEndDateUtc,
+        decimal AmountPaid,
+        string CurrencyCode);
+
+    public sealed record ChangeTenantPackageRequest(
+        Guid SubscriptionPackageId);
 }
