@@ -16,7 +16,8 @@ public sealed class CustomerReceipt
         DateTime receiptDateUtc,
         string receiptNumber,
         string description,
-        decimal amount)
+        decimal amount,
+        bool postingRequiresApproval = true)
     {
         if (id == Guid.Empty)
         {
@@ -61,6 +62,7 @@ public sealed class CustomerReceipt
         ReceiptNumber = receiptNumber.Trim().ToUpperInvariant();
         Description = description.Trim();
         Amount = amount;
+        PostingRequiresApproval = postingRequiresApproval;
         Status = CustomerReceiptStatus.Draft;
         CreatedOnUtc = DateTime.UtcNow;
     }
@@ -76,6 +78,17 @@ public sealed class CustomerReceipt
     public decimal Amount { get; private set; }
 
     public CustomerReceiptStatus Status { get; private set; }
+    public bool PostingRequiresApproval { get; private set; }
+
+    public string? SubmittedBy { get; private set; }
+    public DateTime? SubmittedOnUtc { get; private set; }
+
+    public string? ApprovedBy { get; private set; }
+    public DateTime? ApprovedOnUtc { get; private set; }
+
+    public string? RejectedBy { get; private set; }
+    public DateTime? RejectedOnUtc { get; private set; }
+    public string? RejectionReason { get; private set; }
 
     public Guid? JournalEntryId { get; private set; }
     public DateTime? PostedOnUtc { get; private set; }
@@ -95,7 +108,7 @@ public sealed class CustomerReceipt
         string description,
         decimal amount)
     {
-        EnsureDraft();
+        EnsureEditable();
 
         if (string.IsNullOrWhiteSpace(receiptNumber))
         {
@@ -120,13 +133,104 @@ public sealed class CustomerReceipt
         Touch();
     }
 
+    public void SubmitForApproval(string? submittedBy)
+    {
+        EnsureActiveForWorkflow();
+
+        if (Status != CustomerReceiptStatus.Draft && Status != CustomerReceiptStatus.Rejected)
+        {
+            throw new InvalidOperationException("Only draft or rejected customer receipts can be submitted for approval.");
+        }
+
+        if (string.IsNullOrWhiteSpace(submittedBy))
+        {
+            throw new InvalidOperationException("Submitted by user is required.");
+        }
+
+        SubmittedBy = submittedBy.Trim();
+        SubmittedOnUtc = DateTime.UtcNow;
+        ApprovedBy = null;
+        ApprovedOnUtc = null;
+        RejectedBy = null;
+        RejectedOnUtc = null;
+        RejectionReason = null;
+        Status = CustomerReceiptStatus.SubmittedForApproval;
+
+        Touch();
+    }
+
+    public void Approve(string? approvedBy)
+    {
+        EnsureActiveForWorkflow();
+
+        if (Status != CustomerReceiptStatus.SubmittedForApproval)
+        {
+            throw new InvalidOperationException("Only customer receipts submitted for approval can be approved.");
+        }
+
+        if (string.IsNullOrWhiteSpace(approvedBy))
+        {
+            throw new InvalidOperationException("Approved by user is required.");
+        }
+
+        ApprovedBy = approvedBy.Trim();
+        ApprovedOnUtc = DateTime.UtcNow;
+        RejectedBy = null;
+        RejectedOnUtc = null;
+        RejectionReason = null;
+        Status = CustomerReceiptStatus.Approved;
+
+        Touch();
+    }
+
+    public void Reject(string? rejectedBy, string rejectionReason)
+    {
+        EnsureActiveForWorkflow();
+
+        if (Status != CustomerReceiptStatus.SubmittedForApproval)
+        {
+            throw new InvalidOperationException("Only customer receipts submitted for approval can be rejected.");
+        }
+
+        if (string.IsNullOrWhiteSpace(rejectedBy))
+        {
+            throw new InvalidOperationException("Rejected by user is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(rejectionReason))
+        {
+            throw new ArgumentException("Rejection reason is required.", nameof(rejectionReason));
+        }
+
+        RejectedBy = rejectedBy.Trim();
+        RejectedOnUtc = DateTime.UtcNow;
+        RejectionReason = rejectionReason.Trim();
+        ApprovedBy = null;
+        ApprovedOnUtc = null;
+        Status = CustomerReceiptStatus.Rejected;
+
+        Touch();
+    }
+
     public void MarkPosted(Guid journalEntryId)
     {
-        EnsureDraft();
-
         if (journalEntryId == Guid.Empty)
         {
             throw new ArgumentException("Journal entry id is required.", nameof(journalEntryId));
+        }
+
+        EnsureActiveForWorkflow();
+
+        var postingReadyStatus = PostingRequiresApproval
+            ? CustomerReceiptStatus.Approved
+            : CustomerReceiptStatus.Draft;
+
+        if (Status != postingReadyStatus)
+        {
+            throw new InvalidOperationException(
+                PostingRequiresApproval
+                    ? "Only approved customer receipts can be posted."
+                    : "Only draft customer receipts can be posted.");
         }
 
         JournalEntryId = journalEntryId;
@@ -168,11 +272,24 @@ public sealed class CustomerReceipt
         }
     }
 
-    private void EnsureDraft()
+    private void EnsureEditable()
     {
-        if (Status != CustomerReceiptStatus.Draft)
+        if (Status != CustomerReceiptStatus.Draft && Status != CustomerReceiptStatus.Rejected)
         {
-            throw new InvalidOperationException("Only draft receipts can be changed.");
+            throw new InvalidOperationException("Only draft or rejected receipts can be changed.");
+        }
+    }
+
+    private void EnsureActiveForWorkflow()
+    {
+        if (Status == CustomerReceiptStatus.Cancelled)
+        {
+            throw new InvalidOperationException("Cancelled customer receipts cannot continue in workflow.");
+        }
+
+        if (Status == CustomerReceiptStatus.Posted)
+        {
+            throw new InvalidOperationException("Posted customer receipts cannot continue in workflow.");
         }
     }
 

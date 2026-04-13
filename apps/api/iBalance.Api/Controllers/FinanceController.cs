@@ -1,4 +1,5 @@
 using iBalance.Api.Security;
+using iBalance.BuildingBlocks.Application.Security;
 using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
 using iBalance.Modules.Finance.Domain.Entities;
@@ -139,7 +140,8 @@ public sealed class FinanceController : ControllerBase
                     x.LedgerAccountId,
                     x.Description,
                     x.DebitAmount,
-                    x.CreditAmount)));
+                    x.CreditAmount)),
+                postingRequiresApproval: false);
 
             var postedAtUtc = DateTime.UtcNow;
             openingJournal.MarkPosted(postedAtUtc);
@@ -173,6 +175,7 @@ public sealed class FinanceController : ControllerBase
                 openingJournal.Status,
                 openingJournal.Type,
                 openingJournal.PostedAtUtc,
+                openingJournal.PostingRequiresApproval,
                 FiscalPeriodId = postingPeriod.Id,
                 FiscalPeriodName = postingPeriod.Name,
                 openingJournal.TotalDebit,
@@ -387,11 +390,11 @@ public sealed class FinanceController : ControllerBase
             });
         }
 
-        if (journalEntry.Status != JournalEntryStatus.Draft)
+        if (journalEntry.Status != JournalEntryStatus.Draft && journalEntry.Status != JournalEntryStatus.Rejected)
         {
             return Conflict(new
             {
-                Message = "Only draft journal entries can be edited.",
+                Message = "Only draft or rejected journal entries can be edited.",
                 JournalEntryId = journalEntryId,
                 journalEntry.Status
             });
@@ -479,7 +482,8 @@ public sealed class FinanceController : ControllerBase
                 x.Description,
                 x.DebitAmount,
                 x.CreditAmount)),
-            journalEntry.ReversedJournalEntryId);
+            journalEntry.ReversedJournalEntryId,
+            journalEntry.PostingRequiresApproval);
 
         dbContext.JournalEntryLines.RemoveRange(journalEntry.Lines);
         dbContext.Entry(journalEntry).CurrentValues.SetValues(replacementJournal);
@@ -495,6 +499,7 @@ public sealed class FinanceController : ControllerBase
             replacementJournal.EntryDateUtc,
             replacementJournal.Status,
             replacementJournal.Type,
+            replacementJournal.PostingRequiresApproval,
             replacementJournal.TotalDebit,
             replacementJournal.TotalCredit,
             LineCount = replacementJournal.Lines.Count
@@ -986,6 +991,14 @@ public sealed class FinanceController : ControllerBase
                 journalEntry.Description,
                 journalEntry.Status,
                 journalEntry.Type,
+                journalEntry.PostingRequiresApproval,
+                journalEntry.SubmittedBy,
+                journalEntry.SubmittedOnUtc,
+                journalEntry.ApprovedBy,
+                journalEntry.ApprovedOnUtc,
+                journalEntry.RejectedBy,
+                journalEntry.RejectedOnUtc,
+                journalEntry.RejectionReason,
                 journalEntry.PostedAtUtc,
                 journalEntry.ReversedAtUtc,
                 journalEntry.ReversalJournalEntryId,
@@ -1027,6 +1040,14 @@ public sealed class FinanceController : ControllerBase
                 x.Description,
                 x.Status,
                 x.Type,
+                x.PostingRequiresApproval,
+                x.SubmittedBy,
+                x.SubmittedOnUtc,
+                x.ApprovedBy,
+                x.ApprovedOnUtc,
+                x.RejectedBy,
+                x.RejectedOnUtc,
+                x.RejectionReason,
                 x.PostedAtUtc,
                 x.ReversedAtUtc,
                 x.ReversalJournalEntryId,
@@ -1053,6 +1074,214 @@ public sealed class FinanceController : ControllerBase
             Count = items.Count,
             Items = items
         });
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceJournalsCreate)]
+    [HttpPost("journal-entries/{journalEntryId:guid}/submit")]
+    public async Task<IActionResult> SubmitJournalEntryForApproval(
+        Guid journalEntryId,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] ICurrentUserService currentUserService,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        var journalEntry = await dbContext.JournalEntries
+            .Include(x => x.Lines)
+            .FirstOrDefaultAsync(x => x.Id == journalEntryId, cancellationToken);
+
+        if (journalEntry is null)
+        {
+            return NotFound(new
+            {
+                Message = "Journal entry was not found for the current tenant.",
+                JournalEntryId = journalEntryId
+            });
+        }
+
+        try
+        {
+            journalEntry.SubmitForApproval(EnsureAuthenticatedUserId(currentUserService));
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return Ok(new
+            {
+                Message = "Journal entry submitted for approval successfully.",
+                journalEntry.Id,
+                journalEntry.Reference,
+                journalEntry.Status,
+                journalEntry.Type,
+                journalEntry.SubmittedBy,
+                journalEntry.SubmittedOnUtc
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new
+            {
+                Message = ex.Message,
+                JournalEntryId = journalEntryId,
+                journalEntry.Status
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new
+            {
+                Message = ex.Message
+            });
+        }
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceJournalsPost)]
+    [HttpPost("journal-entries/{journalEntryId:guid}/approve")]
+    public async Task<IActionResult> ApproveJournalEntry(
+        Guid journalEntryId,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] ICurrentUserService currentUserService,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        var journalEntry = await dbContext.JournalEntries
+            .Include(x => x.Lines)
+            .FirstOrDefaultAsync(x => x.Id == journalEntryId, cancellationToken);
+
+        if (journalEntry is null)
+        {
+            return NotFound(new
+            {
+                Message = "Journal entry was not found for the current tenant.",
+                JournalEntryId = journalEntryId
+            });
+        }
+
+        try
+        {
+            journalEntry.Approve(EnsureAuthenticatedUserId(currentUserService));
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return Ok(new
+            {
+                Message = "Journal entry approved successfully.",
+                journalEntry.Id,
+                journalEntry.Reference,
+                journalEntry.Status,
+                journalEntry.Type,
+                journalEntry.ApprovedBy,
+                journalEntry.ApprovedOnUtc
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new
+            {
+                Message = ex.Message,
+                JournalEntryId = journalEntryId,
+                journalEntry.Status
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new
+            {
+                Message = ex.Message
+            });
+        }
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceJournalsPost)]
+    [HttpPost("journal-entries/{journalEntryId:guid}/reject")]
+    public async Task<IActionResult> RejectJournalEntry(
+        Guid journalEntryId,
+        [FromBody] RejectJournalEntryRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] ICurrentUserService currentUserService,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            return BadRequest(new { Message = "Rejection reason is required." });
+        }
+
+        var journalEntry = await dbContext.JournalEntries
+            .Include(x => x.Lines)
+            .FirstOrDefaultAsync(x => x.Id == journalEntryId, cancellationToken);
+
+        if (journalEntry is null)
+        {
+            return NotFound(new
+            {
+                Message = "Journal entry was not found for the current tenant.",
+                JournalEntryId = journalEntryId
+            });
+        }
+
+        try
+        {
+            journalEntry.Reject(EnsureAuthenticatedUserId(currentUserService), request.Reason);
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return Ok(new
+            {
+                Message = "Journal entry rejected successfully.",
+                journalEntry.Id,
+                journalEntry.Reference,
+                journalEntry.Status,
+                journalEntry.Type,
+                journalEntry.RejectedBy,
+                journalEntry.RejectedOnUtc,
+                journalEntry.RejectionReason
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new
+            {
+                Message = ex.Message,
+                JournalEntryId = journalEntryId,
+                journalEntry.Status
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new
+            {
+                Message = ex.Message
+            });
+        }
     }
 
     [Authorize(Policy = AuthorizationPolicies.FinanceJournalsPost)]
@@ -1087,11 +1316,17 @@ public sealed class FinanceController : ControllerBase
             });
         }
 
-        if (journalEntry.Status != JournalEntryStatus.Draft)
+        var requiredPostingStatus = journalEntry.PostingRequiresApproval
+            ? JournalEntryStatus.Approved
+            : JournalEntryStatus.Draft;
+
+        if (journalEntry.Status != requiredPostingStatus)
         {
             return Conflict(new
             {
-                Message = "Only draft journal entries can be posted.",
+                Message = journalEntry.PostingRequiresApproval
+                    ? "Only approved journal entries can be posted."
+                    : "Only draft journal entries can be posted.",
                 JournalEntryId = journalEntryId,
                 journalEntry.Status
             });
@@ -1177,6 +1412,7 @@ public sealed class FinanceController : ControllerBase
             journalEntry.Status,
             journalEntry.Type,
             journalEntry.PostedAtUtc,
+            journalEntry.PostingRequiresApproval,
             FiscalPeriodId = postingPeriod.Id,
             FiscalPeriodName = postingPeriod.Name,
             MovementCount = movements.Count,
@@ -1217,11 +1453,11 @@ public sealed class FinanceController : ControllerBase
             });
         }
 
-        if (journalEntry.Status != JournalEntryStatus.Draft)
+        if (journalEntry.Status != JournalEntryStatus.Draft && journalEntry.Status != JournalEntryStatus.Rejected)
         {
             return Conflict(new
             {
-                Message = "Only draft journal entries can be voided.",
+                Message = "Only draft or rejected journal entries can be voided.",
                 JournalEntryId = journalEntryId,
                 journalEntry.Status
             });
@@ -1370,7 +1606,8 @@ public sealed class FinanceController : ControllerBase
                 $"Reversal - {line.Description}",
                 line.CreditAmount,
                 line.DebitAmount)),
-            journalEntry.Id);
+            journalEntry.Id,
+            postingRequiresApproval: false);
 
         var postedAtUtc = DateTime.UtcNow;
         reversalEntry.MarkPosted(postedAtUtc);
@@ -1918,6 +2155,16 @@ public sealed class FinanceController : ControllerBase
                 cancellationToken);
     }
 
+    private static string EnsureAuthenticatedUserId(ICurrentUserService currentUserService)
+    {
+        if (string.IsNullOrWhiteSpace(currentUserService.UserId))
+        {
+            throw new InvalidOperationException("Authenticated user context is required.");
+        }
+
+        return currentUserService.UserId.Trim();
+    }
+
     public sealed record CreateOpeningBalanceRequest(
         DateTime EntryDateUtc,
         string? Reference,
@@ -1967,4 +2214,7 @@ public sealed class FinanceController : ControllerBase
         DateTime ReversalDateUtc,
         string Reference,
         string Description);
+
+    public sealed record RejectJournalEntryRequest(
+        string Reason);
 }

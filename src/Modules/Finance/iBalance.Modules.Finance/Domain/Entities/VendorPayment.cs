@@ -17,8 +17,8 @@ public sealed class VendorPayment : TenantOwnedEntity
         DateTime paymentDateUtc,
         string paymentNumber,
         string description,
-        decimal amount)
-        
+        decimal amount,
+        bool postingRequiresApproval = true)
     {
         if (id == Guid.Empty)
         {
@@ -63,6 +63,7 @@ public sealed class VendorPayment : TenantOwnedEntity
         PaymentNumber = paymentNumber.Trim().ToUpperInvariant();
         Description = description.Trim();
         Amount = amount;
+        PostingRequiresApproval = postingRequiresApproval;
         Status = VendorPaymentStatus.Draft;
     }
 
@@ -86,6 +87,22 @@ public sealed class VendorPayment : TenantOwnedEntity
 
     public VendorPaymentStatus Status { get; private set; }
 
+    public bool PostingRequiresApproval { get; private set; }
+
+    public string? SubmittedBy { get; private set; }
+
+    public DateTime? SubmittedOnUtc { get; private set; }
+
+    public string? ApprovedBy { get; private set; }
+
+    public DateTime? ApprovedOnUtc { get; private set; }
+
+    public string? RejectedBy { get; private set; }
+
+    public DateTime? RejectedOnUtc { get; private set; }
+
+    public string? RejectionReason { get; private set; }
+
     public Guid? JournalEntryId { get; private set; }
 
     public DateTime? PostedOnUtc { get; private set; }
@@ -96,6 +113,79 @@ public sealed class VendorPayment : TenantOwnedEntity
         SetModified(lastModifiedBy);
     }
 
+    public void SubmitForApproval(string? submittedBy)
+    {
+        EnsureActiveForWorkflow();
+
+        if (Status != VendorPaymentStatus.Draft && Status != VendorPaymentStatus.Rejected)
+        {
+            throw new InvalidOperationException("Only draft or rejected vendor payments can be submitted for approval.");
+        }
+
+        if (string.IsNullOrWhiteSpace(submittedBy))
+        {
+            throw new InvalidOperationException("Submitted by user is required.");
+        }
+
+        SubmittedBy = submittedBy.Trim();
+        SubmittedOnUtc = DateTime.UtcNow;
+        ApprovedBy = null;
+        ApprovedOnUtc = null;
+        RejectedBy = null;
+        RejectedOnUtc = null;
+        RejectionReason = null;
+        Status = VendorPaymentStatus.SubmittedForApproval;
+    }
+
+    public void Approve(string? approvedBy)
+    {
+        EnsureActiveForWorkflow();
+
+        if (Status != VendorPaymentStatus.SubmittedForApproval)
+        {
+            throw new InvalidOperationException("Only vendor payments submitted for approval can be approved.");
+        }
+
+        if (string.IsNullOrWhiteSpace(approvedBy))
+        {
+            throw new InvalidOperationException("Approved by user is required.");
+        }
+
+        ApprovedBy = approvedBy.Trim();
+        ApprovedOnUtc = DateTime.UtcNow;
+        RejectedBy = null;
+        RejectedOnUtc = null;
+        RejectionReason = null;
+        Status = VendorPaymentStatus.Approved;
+    }
+
+    public void Reject(string? rejectedBy, string rejectionReason)
+    {
+        EnsureActiveForWorkflow();
+
+        if (Status != VendorPaymentStatus.SubmittedForApproval)
+        {
+            throw new InvalidOperationException("Only vendor payments submitted for approval can be rejected.");
+        }
+
+        if (string.IsNullOrWhiteSpace(rejectedBy))
+        {
+            throw new InvalidOperationException("Rejected by user is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(rejectionReason))
+        {
+            throw new ArgumentException("Rejection reason is required.", nameof(rejectionReason));
+        }
+
+        RejectedBy = rejectedBy.Trim();
+        RejectedOnUtc = DateTime.UtcNow;
+        RejectionReason = rejectionReason.Trim();
+        ApprovedBy = null;
+        ApprovedOnUtc = null;
+        Status = VendorPaymentStatus.Rejected;
+    }
+
     public void MarkPosted(Guid journalEntryId)
     {
         if (journalEntryId == Guid.Empty)
@@ -103,16 +193,24 @@ public sealed class VendorPayment : TenantOwnedEntity
             throw new ArgumentException("Journal entry id is required.", nameof(journalEntryId));
         }
 
-        if (Status != VendorPaymentStatus.Draft)
+        EnsureActiveForWorkflow();
+
+        var postingReadyStatus = PostingRequiresApproval
+            ? VendorPaymentStatus.Approved
+            : VendorPaymentStatus.Draft;
+
+        if (Status != postingReadyStatus)
         {
-            throw new InvalidOperationException("Only draft vendor payments can be posted.");
+            throw new InvalidOperationException(
+                PostingRequiresApproval
+                    ? "Only approved vendor payments can be posted."
+                    : "Only draft vendor payments can be posted.");
         }
 
         JournalEntryId = journalEntryId;
         PostedOnUtc = DateTime.UtcNow;
         Status = VendorPaymentStatus.Posted;
     }
-    
 
     public void MarkCancelled()
     {
@@ -122,5 +220,18 @@ public sealed class VendorPayment : TenantOwnedEntity
         }
 
         Status = VendorPaymentStatus.Cancelled;
+    }
+
+    private void EnsureActiveForWorkflow()
+    {
+        if (Status == VendorPaymentStatus.Cancelled)
+        {
+            throw new InvalidOperationException("Cancelled vendor payments cannot continue in workflow.");
+        }
+
+        if (Status == VendorPaymentStatus.Posted)
+        {
+            throw new InvalidOperationException("Posted vendor payments cannot continue in workflow.");
+        }
     }
 }

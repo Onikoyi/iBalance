@@ -125,254 +125,321 @@ public class ApplicationDbContext : DbContext
         });
 
         modelBuilder.Entity<CustomerReceipt>(entity =>
-{
-    entity.ToTable("CustomerReceipts");
+        {
+            entity.ToTable("CustomerReceipts", "finance");
 
-    entity.HasKey(x => x.Id);
+            entity.HasKey(x => x.Id);
 
-    entity.Property(x => x.ReceiptNumber)
-        .HasMaxLength(50)
-        .IsRequired();
+            entity.Property(x => x.ReceiptNumber)
+                .HasMaxLength(50)
+                .IsRequired();
 
-    entity.Property(x => x.Description)
-        .HasMaxLength(500)
-        .IsRequired();
+            entity.Property(x => x.Description)
+                .HasMaxLength(500)
+                .IsRequired();
 
-    entity.Property(x => x.Amount)
-        .HasPrecision(18, 2);
+            entity.Property(x => x.Amount)
+                .HasPrecision(18, 2);
 
-    entity.HasIndex(x => new { x.TenantId, x.ReceiptNumber })
-        .IsUnique();
+            entity.Property(x => x.PostingRequiresApproval)
+                .HasDefaultValue(true);
 
-    entity.HasOne(x => x.Customer)
-        .WithMany()
-        .HasForeignKey(x => x.CustomerId)
-        .OnDelete(DeleteBehavior.Restrict);
+            entity.Property(x => x.SubmittedBy)
+                .HasMaxLength(100);
 
-    entity.HasOne(x => x.SalesInvoice)
-        .WithMany()
-        .HasForeignKey(x => x.SalesInvoiceId)
-        .OnDelete(DeleteBehavior.Restrict);
+            entity.Property(x => x.ApprovedBy)
+                .HasMaxLength(100);
 
-    entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
-});
+            entity.Property(x => x.RejectedBy)
+                .HasMaxLength(100);
+
+            entity.Property(x => x.RejectionReason)
+                .HasMaxLength(1000);
+
+            entity.Property(x => x.CreatedBy)
+                .HasMaxLength(100);
+
+            entity.Property(x => x.LastModifiedBy)
+                .HasMaxLength(100);
+
+            entity.HasIndex(x => new { x.TenantId, x.ReceiptNumber })
+                .IsUnique();
+
+            entity.HasOne(x => x.Customer)
+                .WithMany()
+                .HasForeignKey(x => x.CustomerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.SalesInvoice)
+                .WithMany()
+                .HasForeignKey(x => x.SalesInvoiceId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
+        });
 
         modelBuilder.Entity<Customer>(entity =>
-{
-    entity.ToTable("Customers");
+        {
+            entity.ToTable("Customers", "finance");
 
-    entity.HasKey(x => x.Id);
+            entity.HasKey(x => x.Id);
 
-    entity.Property(x => x.CustomerCode)
-        .HasMaxLength(50)
-        .IsRequired();
+            entity.Property(x => x.CustomerCode)
+                .HasMaxLength(50)
+                .IsRequired();
 
-    entity.Property(x => x.CustomerName)
-        .HasMaxLength(200)
-        .IsRequired();
+            entity.Property(x => x.CustomerName)
+                .HasMaxLength(200)
+                .IsRequired();
 
-    entity.Property(x => x.Email)
-        .HasMaxLength(256);
+            entity.Property(x => x.Email)
+                .HasMaxLength(256);
 
-    entity.Property(x => x.PhoneNumber)
-        .HasMaxLength(50);
+            entity.Property(x => x.PhoneNumber)
+                .HasMaxLength(50);
 
-    entity.Property(x => x.BillingAddress)
-        .HasMaxLength(1000);
+            entity.Property(x => x.BillingAddress)
+                .HasMaxLength(1000);
 
-    entity.HasIndex(x => new { x.TenantId, x.CustomerCode })
-        .IsUnique();
+            entity.HasIndex(x => new { x.TenantId, x.CustomerCode })
+                .IsUnique();
 
-    entity.HasIndex(x => new { x.TenantId, x.CustomerName });
+            entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
+        });
 
-    entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
-});
+        modelBuilder.Entity<SalesInvoice>(entity =>
+        {
+            entity.ToTable("SalesInvoices", "finance");
 
-modelBuilder.Entity<SalesInvoice>(entity =>
-{
-    entity.ToTable("SalesInvoices");
+            entity.HasKey(x => x.Id);
 
-    entity.HasKey(x => x.Id);
+            entity.Property(x => x.InvoiceNumber)
+                .HasMaxLength(50)
+                .IsRequired();
 
-    entity.Property(x => x.InvoiceNumber)
-        .HasMaxLength(50)
-        .IsRequired();
+            entity.Property(x => x.Description)
+                .HasMaxLength(500)
+                .IsRequired();
 
-    entity.Property(x => x.Description)
-        .HasMaxLength(500)
-        .IsRequired();
+            entity.Property(x => x.TotalAmount)
+                .HasPrecision(18, 2);
 
-    entity.Property(x => x.TotalAmount)
-        .HasPrecision(18, 2);
+            entity.Property(x => x.AmountPaid)
+                .HasPrecision(18, 2);
 
-    entity.Property(x => x.AmountPaid)
-        .HasPrecision(18, 2);
+            entity.Property(x => x.BalanceAmount)
+                .HasPrecision(18, 2);
 
-    entity.Property(x => x.BalanceAmount)
-        .HasPrecision(18, 2);
+            entity.HasIndex(x => new { x.TenantId, x.InvoiceNumber })
+                .IsUnique();
 
-    entity.HasIndex(x => new { x.TenantId, x.InvoiceNumber })
-        .IsUnique();
+            entity.HasOne(x => x.Customer)
+                .WithMany(x => x.SalesInvoices)
+                .HasForeignKey(x => x.CustomerId)
+                .OnDelete(DeleteBehavior.Restrict);
 
-    entity.HasOne(x => x.Customer)
-        .WithMany(x => x.SalesInvoices)
-        .HasForeignKey(x => x.CustomerId)
-        .OnDelete(DeleteBehavior.Restrict);
+            entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
+        });
 
-    entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
-});
+        modelBuilder.Entity<SalesInvoiceLine>(entity =>
+        {
+            entity.ToTable("SalesInvoiceLines", "finance");
 
-modelBuilder.Entity<SalesInvoiceLine>(entity =>
-{
-    entity.ToTable("SalesInvoiceLines");
+            entity.HasKey(x => x.Id);
 
-    entity.HasKey(x => x.Id);
+            entity.Property(x => x.Description)
+                .HasMaxLength(500)
+                .IsRequired();
 
-    entity.Property(x => x.Description)
-        .HasMaxLength(500)
-        .IsRequired();
+            entity.Property(x => x.Quantity)
+                .HasPrecision(18, 2);
 
-    entity.Property(x => x.Quantity)
-        .HasPrecision(18, 2);
+            entity.Property(x => x.UnitPrice)
+                .HasPrecision(18, 2);
 
-    entity.Property(x => x.UnitPrice)
-        .HasPrecision(18, 2);
+            entity.Property(x => x.LineTotal)
+                .HasPrecision(18, 2);
 
-    entity.Property(x => x.LineTotal)
-        .HasPrecision(18, 2);
+            entity.HasOne(x => x.SalesInvoice)
+                .WithMany(x => x.Lines)
+                .HasForeignKey(x => x.SalesInvoiceId)
+                .OnDelete(DeleteBehavior.Cascade);
 
-    entity.HasOne(x => x.SalesInvoice)
-        .WithMany(x => x.Lines)
-        .HasForeignKey(x => x.SalesInvoiceId)
-        .OnDelete(DeleteBehavior.Cascade);
+            entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
+        });
 
-    entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
-});
+        modelBuilder.Entity<Vendor>(entity =>
+        {
+            entity.ToTable("Vendors", "finance");
 
-modelBuilder.Entity<Vendor>(entity =>
-{
-    entity.ToTable("Vendors");
+            entity.HasKey(x => x.Id);
 
-    entity.HasKey(x => x.Id);
+            entity.Property(x => x.VendorCode)
+                .HasMaxLength(50)
+                .IsRequired();
 
-    entity.Property(x => x.VendorCode)
-        .HasMaxLength(50)
-        .IsRequired();
+            entity.Property(x => x.VendorName)
+                .HasMaxLength(200)
+                .IsRequired();
 
-    entity.Property(x => x.VendorName)
-        .HasMaxLength(200)
-        .IsRequired();
+            entity.Property(x => x.Email)
+                .HasMaxLength(256);
 
-    entity.Property(x => x.Email)
-        .HasMaxLength(256);
+            entity.Property(x => x.PhoneNumber)
+                .HasMaxLength(50);
 
-    entity.Property(x => x.PhoneNumber)
-        .HasMaxLength(50);
+            entity.Property(x => x.BillingAddress)
+                .HasMaxLength(1000);
 
-    entity.Property(x => x.BillingAddress)
-        .HasMaxLength(1000);
+            entity.HasIndex(x => new { x.TenantId, x.VendorCode })
+                .IsUnique();
 
-    entity.HasIndex(x => new { x.TenantId, x.VendorCode })
-        .IsUnique();
+            entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
+        });
 
-    entity.HasIndex(x => new { x.TenantId, x.VendorName });
+        modelBuilder.Entity<PurchaseInvoice>(entity =>
+        {
+            entity.ToTable("PurchaseInvoices", "finance");
 
-    entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
-});
+            entity.HasKey(x => x.Id);
 
-modelBuilder.Entity<PurchaseInvoice>(entity =>
-{
-    entity.ToTable("PurchaseInvoices");
+            entity.Property(x => x.InvoiceNumber)
+                .HasMaxLength(50)
+                .IsRequired();
 
-    entity.HasKey(x => x.Id);
+            entity.Property(x => x.Description)
+                .HasMaxLength(500)
+                .IsRequired();
 
-    entity.Property(x => x.InvoiceNumber)
-        .HasMaxLength(50)
-        .IsRequired();
+            entity.Property(x => x.TotalAmount)
+                .HasPrecision(18, 2);
 
-    entity.Property(x => x.Description)
-        .HasMaxLength(500)
-        .IsRequired();
+            entity.Property(x => x.AmountPaid)
+                .HasPrecision(18, 2);
 
-    entity.Property(x => x.TotalAmount)
-        .HasPrecision(18, 2);
+            entity.Property(x => x.BalanceAmount)
+                .HasPrecision(18, 2);
 
-    entity.Property(x => x.AmountPaid)
-        .HasPrecision(18, 2);
+            entity.HasIndex(x => new { x.TenantId, x.InvoiceNumber })
+                .IsUnique();
 
-    entity.Property(x => x.BalanceAmount)
-        .HasPrecision(18, 2);
+            entity.HasOne(x => x.Vendor)
+                .WithMany(x => x.PurchaseInvoices)
+                .HasForeignKey(x => x.VendorId)
+                .OnDelete(DeleteBehavior.Restrict);
 
-    entity.HasIndex(x => new { x.TenantId, x.InvoiceNumber })
-        .IsUnique();
+            entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
+        });
 
-    entity.HasOne(x => x.Vendor)
-        .WithMany(x => x.PurchaseInvoices)
-        .HasForeignKey(x => x.VendorId)
-        .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<PurchaseInvoiceLine>(entity =>
+        {
+            entity.ToTable("PurchaseInvoiceLines", "finance");
 
-    entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
-});
+            entity.HasKey(x => x.Id);
 
-modelBuilder.Entity<PurchaseInvoiceLine>(entity =>
-{
-    entity.ToTable("PurchaseInvoiceLines");
+            entity.Property(x => x.Description)
+                .HasMaxLength(500)
+                .IsRequired();
 
-    entity.HasKey(x => x.Id);
+            entity.Property(x => x.Quantity)
+                .HasPrecision(18, 2);
 
-    entity.Property(x => x.Description)
-        .HasMaxLength(500)
-        .IsRequired();
+            entity.Property(x => x.UnitPrice)
+                .HasPrecision(18, 2);
 
-    entity.Property(x => x.Quantity)
-        .HasPrecision(18, 2);
+            entity.Property(x => x.LineTotal)
+                .HasPrecision(18, 2);
 
-    entity.Property(x => x.UnitPrice)
-        .HasPrecision(18, 2);
+            entity.HasOne(x => x.PurchaseInvoice)
+                .WithMany(x => x.Lines)
+                .HasForeignKey(x => x.PurchaseInvoiceId)
+                .OnDelete(DeleteBehavior.Cascade);
 
-    entity.Property(x => x.LineTotal)
-        .HasPrecision(18, 2);
+            entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
+        });
 
-    entity.HasOne(x => x.PurchaseInvoice)
-        .WithMany(x => x.Lines)
-        .HasForeignKey(x => x.PurchaseInvoiceId)
-        .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<VendorPayment>(entity =>
+        {
+            entity.ToTable("VendorPayments", "finance");
 
-    entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
-});
+            entity.HasKey(x => x.Id);
 
-modelBuilder.Entity<VendorPayment>(entity =>
-{
-    entity.ToTable("VendorPayments");
+            entity.Property(x => x.PaymentNumber)
+                .HasMaxLength(50)
+                .IsRequired();
 
-    entity.HasKey(x => x.Id);
+            entity.Property(x => x.Description)
+                .HasMaxLength(500)
+                .IsRequired();
 
-    entity.Property(x => x.PaymentNumber)
-        .HasMaxLength(50)
-        .IsRequired();
+            entity.Property(x => x.Amount)
+                .HasPrecision(18, 2);
 
-    entity.Property(x => x.Description)
-        .HasMaxLength(500)
-        .IsRequired();
+            entity.Property(x => x.PostingRequiresApproval)
+                .HasDefaultValue(true);
 
-    entity.Property(x => x.Amount)
-        .HasPrecision(18, 2);
+            entity.Property(x => x.SubmittedBy)
+                .HasMaxLength(100);
 
-    entity.HasIndex(x => new { x.TenantId, x.PaymentNumber })
-        .IsUnique();
+            entity.Property(x => x.ApprovedBy)
+                .HasMaxLength(100);
 
-    entity.HasOne(x => x.Vendor)
-        .WithMany()
-        .HasForeignKey(x => x.VendorId)
-        .OnDelete(DeleteBehavior.Restrict);
+            entity.Property(x => x.RejectedBy)
+                .HasMaxLength(100);
 
-    entity.HasOne(x => x.PurchaseInvoice)
-        .WithMany()
-        .HasForeignKey(x => x.PurchaseInvoiceId)
-        .OnDelete(DeleteBehavior.Restrict);
+            entity.Property(x => x.RejectionReason)
+                .HasMaxLength(1000);
 
-    entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
-});
+            entity.HasIndex(x => new { x.TenantId, x.PaymentNumber })
+                .IsUnique();
+
+            entity.HasOne(x => x.Vendor)
+                .WithMany()
+                .HasForeignKey(x => x.VendorId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.PurchaseInvoice)
+                .WithMany()
+                .HasForeignKey(x => x.PurchaseInvoiceId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
+        });
+
+        modelBuilder.Entity<JournalEntry>(entity =>
+        {
+            entity.ToTable("JournalEntries", "finance");
+
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Reference)
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(x => x.Description)
+                .HasMaxLength(1000)
+                .IsRequired();
+
+            entity.Property(x => x.PostingRequiresApproval)
+                .HasDefaultValue(true);
+
+            entity.Property(x => x.SubmittedBy)
+                .HasMaxLength(100);
+
+            entity.Property(x => x.ApprovedBy)
+                .HasMaxLength(100);
+
+            entity.Property(x => x.RejectedBy)
+                .HasMaxLength(100);
+
+            entity.Property(x => x.RejectionReason)
+                .HasMaxLength(1000);
+
+            entity.HasIndex(x => new { x.TenantId, x.Reference })
+                .IsUnique();
+
+            entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
+        });
 
         modelBuilder.Entity<UserAccount>()
             .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
@@ -446,28 +513,31 @@ modelBuilder.Entity<VendorPayment>(entity =>
 
     private void ApplyTenantOwnershipRules()
     {
-        var entries = ChangeTracker
-            .Entries<TenantOwnedEntity>()
-            .Where(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted);
-
-        foreach (var entry in entries)
+        foreach (var entry in ChangeTracker.Entries<TenantOwnedEntity>())
         {
-            if (!_tenantContextAccessor.Current.IsAvailable)
-            {
-                throw new InvalidOperationException("Tenant context is required for tenant-owned entities.");
-            }
-
-            var currentTenantId = _tenantContextAccessor.Current.TenantId;
-
             if (entry.State == EntityState.Added)
             {
-                entry.Entity.AssignTenant(currentTenantId);
-                continue;
+                if (!CurrentTenantId.HasValue)
+                {
+                    throw new InvalidOperationException("Cannot persist tenant-owned entities without an active tenant context.");
+                }
+
+                if (entry.Entity.TenantId == Guid.Empty)
+                {
+                    entry.Entity.AssignTenant(CurrentTenantId.Value);
+                }
+                else if (entry.Entity.TenantId != CurrentTenantId.Value)
+                {
+                    throw new InvalidOperationException("Tenant-owned entity tenant mismatch detected.");
+                }
             }
 
-            if (entry.Entity.TenantId != currentTenantId)
+            if (entry.State == EntityState.Modified || entry.State == EntityState.Deleted)
             {
-                throw new InvalidOperationException("Cross-tenant data access is not allowed.");
+                if (CurrentTenantId.HasValue && entry.Entity.TenantId != CurrentTenantId.Value)
+                {
+                    throw new InvalidOperationException("Attempted to modify a tenant-owned entity outside the active tenant context.");
+                }
             }
         }
     }

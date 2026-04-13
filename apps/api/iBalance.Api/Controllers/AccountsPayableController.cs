@@ -681,29 +681,60 @@ public sealed class AccountsPayableController : ControllerBase
             });
         }
 
-        var items = await dbContext.VendorPayments
+        var payments = await dbContext.VendorPayments
             .AsNoTracking()
             .Include(x => x.Vendor)
             .Include(x => x.PurchaseInvoice)
             .OrderByDescending(x => x.PaymentDateUtc)
             .ThenByDescending(x => x.CreatedOnUtc)
-            .Select(x => new
-            {
-                x.Id,
-                x.VendorId,
-                VendorCode = x.Vendor != null ? x.Vendor.VendorCode : string.Empty,
-                VendorName = x.Vendor != null ? x.Vendor.VendorName : string.Empty,
-                x.PurchaseInvoiceId,
-                InvoiceNumber = x.PurchaseInvoice != null ? x.PurchaseInvoice.InvoiceNumber : string.Empty,
-                x.PaymentDateUtc,
-                x.PaymentNumber,
-                x.Description,
-                x.Amount,
-                x.Status,
-                x.JournalEntryId,
-                x.PostedOnUtc
-            })
             .ToListAsync(cancellationToken);
+
+        var userNames = await GetUserDisplayNamesAsync(
+            dbContext,
+            payments.SelectMany(payment => new[]
+            {
+                payment.CreatedBy,
+                payment.LastModifiedBy,
+                payment.SubmittedBy,
+                payment.ApprovedBy,
+                payment.RejectedBy
+            }),
+            cancellationToken);
+
+        var items = payments.Select(x => new
+        {
+            x.Id,
+            x.VendorId,
+            VendorCode = x.Vendor != null ? x.Vendor.VendorCode : string.Empty,
+            VendorName = x.Vendor != null ? x.Vendor.VendorName : string.Empty,
+            x.PurchaseInvoiceId,
+            InvoiceNumber = x.PurchaseInvoice != null ? x.PurchaseInvoice.InvoiceNumber : string.Empty,
+            x.PaymentDateUtc,
+            x.PaymentNumber,
+            x.Description,
+            x.Amount,
+            x.Status,
+            x.PostingRequiresApproval,
+            x.SubmittedBy,
+            SubmittedByDisplayName = ResolveUserDisplayName(x.SubmittedBy, userNames),
+            x.SubmittedOnUtc,
+            x.ApprovedBy,
+            ApprovedByDisplayName = ResolveUserDisplayName(x.ApprovedBy, userNames),
+            x.ApprovedOnUtc,
+            x.RejectedBy,
+            RejectedByDisplayName = ResolveUserDisplayName(x.RejectedBy, userNames),
+            x.RejectedOnUtc,
+            x.RejectionReason,
+            x.CreatedOnUtc,
+            x.CreatedBy,
+            CreatedByDisplayName = ResolveUserDisplayName(x.CreatedBy, userNames),
+            PreparedByDisplayName = ResolveUserDisplayName(x.CreatedBy, userNames),
+            x.LastModifiedOnUtc,
+            x.LastModifiedBy,
+            LastModifiedByDisplayName = ResolveUserDisplayName(x.LastModifiedBy, userNames),
+            x.JournalEntryId,
+            x.PostedOnUtc
+        }).ToList();
 
         return Ok(new
         {
@@ -749,27 +780,23 @@ public sealed class AccountsPayableController : ControllerBase
             });
         }
 
-        var auditUserIds = new List<Guid>();
-
-        if (TryParseUserId(payment.CreatedBy, out var createdByUserId))
-        {
-            auditUserIds.Add(createdByUserId);
-        }
-
-        if (TryParseUserId(payment.LastModifiedBy, out var lastModifiedByUserId))
-        {
-            auditUserIds.Add(lastModifiedByUserId);
-        }
-
-        var userNames = auditUserIds.Count == 0
-            ? new Dictionary<Guid, string>()
-            : await dbContext.UserAccounts
-                .AsNoTracking()
-                .Where(x => auditUserIds.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, x => x.FullName, cancellationToken);
+        var userNames = await GetUserDisplayNamesAsync(
+            dbContext,
+            new[]
+            {
+                payment.CreatedBy,
+                payment.LastModifiedBy,
+                payment.SubmittedBy,
+                payment.ApprovedBy,
+                payment.RejectedBy
+            },
+            cancellationToken);
 
         var createdByDisplayName = ResolveUserDisplayName(payment.CreatedBy, userNames);
         var lastModifiedByDisplayName = ResolveUserDisplayName(payment.LastModifiedBy, userNames);
+        var submittedByDisplayName = ResolveUserDisplayName(payment.SubmittedBy, userNames);
+        var approvedByDisplayName = ResolveUserDisplayName(payment.ApprovedBy, userNames);
+        var rejectedByDisplayName = ResolveUserDisplayName(payment.RejectedBy, userNames);
 
         return Ok(new
         {
@@ -797,6 +824,17 @@ public sealed class AccountsPayableController : ControllerBase
                 payment.Description,
                 payment.Amount,
                 payment.Status,
+                payment.PostingRequiresApproval,
+                payment.SubmittedBy,
+                SubmittedByDisplayName = submittedByDisplayName,
+                payment.SubmittedOnUtc,
+                payment.ApprovedBy,
+                ApprovedByDisplayName = approvedByDisplayName,
+                payment.ApprovedOnUtc,
+                payment.RejectedBy,
+                RejectedByDisplayName = rejectedByDisplayName,
+                payment.RejectedOnUtc,
+                payment.RejectionReason,
                 payment.JournalEntryId,
                 payment.PostedOnUtc,
                 payment.CreatedOnUtc,
@@ -806,12 +844,10 @@ public sealed class AccountsPayableController : ControllerBase
                 payment.LastModifiedOnUtc,
                 payment.LastModifiedBy,
                 LastModifiedByDisplayName = lastModifiedByDisplayName,
-                ApprovedByDisplayName = (string?)null,
-                ApprovedOnUtc = (DateTime?)null,
-                InvoiceLines = (payment.PurchaseInvoice != null
+                InvoiceLines = payment.PurchaseInvoice != null
                     ? payment.PurchaseInvoice.Lines
                         .OrderBy(x => x.CreatedOnUtc)
-                        .Select(x => new
+                        .Select(x => (object)new
                         {
                             x.Id,
                             x.Description,
@@ -819,16 +855,8 @@ public sealed class AccountsPayableController : ControllerBase
                             x.UnitPrice,
                             x.LineTotal
                         })
-                    : Enumerable.Empty<object>()
-                        .Select(_ => new
-                        {
-                            Id = Guid.Empty,
-                            Description = string.Empty,
-                            Quantity = 0m,
-                            UnitPrice = 0m,
-                            LineTotal = 0m
-                        }))
-                    .ToList()
+                        .ToList()
+                    : new List<object>()
             }
         });
     }
@@ -944,13 +972,218 @@ public sealed class AccountsPayableController : ControllerBase
                 payment.Description,
                 payment.PaymentDateUtc,
                 payment.Amount,
+                payment.Status,
+                payment.PostingRequiresApproval
+            }
+        });
+    }
+
+    [HttpPost("vendor-payments/{vendorPaymentId:guid}/submit")]
+    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    public async Task<IActionResult> SubmitVendorPaymentForApproval(
+        Guid vendorPaymentId,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] ICurrentUserService currentUserService,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        var payment = await dbContext.VendorPayments
+            .FirstOrDefaultAsync(x => x.Id == vendorPaymentId, cancellationToken);
+
+        if (payment is null)
+        {
+            return NotFound(new
+            {
+                Message = "Vendor payment was not found for the current tenant.",
+                VendorPaymentId = vendorPaymentId
+            });
+        }
+
+        var submittedByUserId = EnsureAuthenticatedUserId(currentUserService);
+
+        try
+        {
+            payment.SubmitForApproval(submittedByUserId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new
+            {
+                Message = ex.Message,
+                VendorPaymentId = vendorPaymentId,
                 payment.Status
+            });
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Vendor payment submitted for approval successfully.",
+            Payment = new
+            {
+                payment.Id,
+                payment.PaymentNumber,
+                payment.Status,
+                payment.SubmittedBy,
+                payment.SubmittedOnUtc,
+                payment.PostingRequiresApproval
+            }
+        });
+    }
+
+    [HttpPost("vendor-payments/{vendorPaymentId:guid}/approve")]
+    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
+    public async Task<IActionResult> ApproveVendorPayment(
+        Guid vendorPaymentId,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] ICurrentUserService currentUserService,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        var payment = await dbContext.VendorPayments
+            .FirstOrDefaultAsync(x => x.Id == vendorPaymentId, cancellationToken);
+
+        if (payment is null)
+        {
+            return NotFound(new
+            {
+                Message = "Vendor payment was not found for the current tenant.",
+                VendorPaymentId = vendorPaymentId
+            });
+        }
+
+        var approvedByUserId = EnsureAuthenticatedUserId(currentUserService);
+
+        try
+        {
+            payment.Approve(approvedByUserId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new
+            {
+                Message = ex.Message,
+                VendorPaymentId = vendorPaymentId,
+                payment.Status
+            });
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Vendor payment approved successfully.",
+            Payment = new
+            {
+                payment.Id,
+                payment.PaymentNumber,
+                payment.Status,
+                payment.ApprovedBy,
+                payment.ApprovedOnUtc
+            }
+        });
+    }
+
+    [HttpPost("vendor-payments/{vendorPaymentId:guid}/reject")]
+    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
+    public async Task<IActionResult> RejectVendorPayment(
+        Guid vendorPaymentId,
+        [FromBody] RejectVendorPaymentRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] ICurrentUserService currentUserService,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            return BadRequest(new { Message = "Rejection reason is required." });
+        }
+
+        var payment = await dbContext.VendorPayments
+            .FirstOrDefaultAsync(x => x.Id == vendorPaymentId, cancellationToken);
+
+        if (payment is null)
+        {
+            return NotFound(new
+            {
+                Message = "Vendor payment was not found for the current tenant.",
+                VendorPaymentId = vendorPaymentId
+            });
+        }
+
+        var rejectedByUserId = EnsureAuthenticatedUserId(currentUserService);
+
+        try
+        {
+            payment.Reject(rejectedByUserId, request.Reason);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new
+            {
+                Message = ex.Message,
+                VendorPaymentId = vendorPaymentId,
+                payment.Status
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Vendor payment rejected successfully.",
+            Payment = new
+            {
+                payment.Id,
+                payment.PaymentNumber,
+                payment.Status,
+                payment.RejectedBy,
+                payment.RejectedOnUtc,
+                payment.RejectionReason
             }
         });
     }
 
     [HttpPost("vendor-payments/{vendorPaymentId:guid}/post")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
     public async Task<IActionResult> PostVendorPayment(
         Guid vendorPaymentId,
         [FromBody] PostVendorPaymentRequest request,
@@ -993,11 +1226,17 @@ public sealed class AccountsPayableController : ControllerBase
             });
         }
 
-        if (payment.Status != VendorPaymentStatus.Draft)
+        var requiredPostingStatus = payment.PostingRequiresApproval
+            ? VendorPaymentStatus.Approved
+            : VendorPaymentStatus.Draft;
+
+        if (payment.Status != requiredPostingStatus)
         {
             return Conflict(new
             {
-                Message = "Only draft vendor payments can be posted.",
+                Message = payment.PostingRequiresApproval
+                    ? "Only approved vendor payments can be posted."
+                    : "Only draft vendor payments can be posted.",
                 VendorPaymentId = vendorPaymentId,
                 payment.Status
             });
@@ -1211,9 +1450,26 @@ public sealed class AccountsPayableController : ControllerBase
                 cancellationToken);
     }
 
-    private static bool TryParseUserId(string? rawUserId, out Guid userId)
+    private static async Task<Dictionary<Guid, string>> GetUserDisplayNamesAsync(
+        ApplicationDbContext dbContext,
+        IEnumerable<string?> rawUserIds,
+        CancellationToken cancellationToken)
     {
-        return Guid.TryParse(rawUserId, out userId);
+        var userIds = rawUserIds
+            .Where(value => !string.IsNullOrWhiteSpace(value) && Guid.TryParse(value, out _))
+            .Select(value => Guid.Parse(value!))
+            .Distinct()
+            .ToList();
+
+        if (userIds.Count == 0)
+        {
+            return new Dictionary<Guid, string>();
+        }
+
+        return await dbContext.UserAccounts
+            .AsNoTracking()
+            .Where(x => userIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, x => x.FullName, cancellationToken);
     }
 
     private static string? ResolveUserDisplayName(
@@ -1228,6 +1484,16 @@ public sealed class AccountsPayableController : ControllerBase
         return userNames.TryGetValue(userId, out var displayName)
             ? displayName
             : rawUserId;
+    }
+
+    private static string EnsureAuthenticatedUserId(ICurrentUserService currentUserService)
+    {
+        if (string.IsNullOrWhiteSpace(currentUserService.UserId))
+        {
+            throw new InvalidOperationException("Authenticated user context is required.");
+        }
+
+        return currentUserService.UserId.Trim();
     }
 
     public sealed record CreateVendorRequest(
@@ -1265,4 +1531,7 @@ public sealed class AccountsPayableController : ControllerBase
     public sealed record PostVendorPaymentRequest(
         Guid CashOrBankLedgerAccountId,
         Guid PayableLedgerAccountId);
+
+    public sealed record RejectVendorPaymentRequest(
+        string Reason);
 }

@@ -193,6 +193,14 @@ export type JournalEntryDto = {
   description: string;
   status: number;
   type: number;
+  postingRequiresApproval?: boolean;
+  submittedBy?: string | null;
+  submittedOnUtc?: string | null;
+  approvedBy?: string | null;
+  approvedOnUtc?: string | null;
+  rejectedBy?: string | null;
+  rejectedOnUtc?: string | null;
+  rejectionReason?: string | null;
   postedAtUtc: string | null;
   reversedAtUtc: string | null;
   reversalJournalEntryId: string | null;
@@ -571,6 +579,24 @@ export type CustomerReceiptDto = {
   description: string;
   amount: number;
   status: number;
+  postingRequiresApproval?: boolean;
+  submittedBy?: string | null;
+  submittedByDisplayName?: string | null;
+  submittedOnUtc?: string | null;
+  approvedBy?: string | null;
+  approvedByDisplayName?: string | null;
+  approvedOnUtc?: string | null;
+  rejectedBy?: string | null;
+  rejectedByDisplayName?: string | null;
+  rejectedOnUtc?: string | null;
+  rejectionReason?: string | null;
+  createdOnUtc?: string;
+  createdBy?: string | null;
+  createdByDisplayName?: string | null;
+  preparedByDisplayName?: string | null;
+  lastModifiedOnUtc?: string | null;
+  lastModifiedBy?: string | null;
+  lastModifiedByDisplayName?: string | null;
   journalEntryId?: string | null;
   postedOnUtc?: string | null;
 };
@@ -607,6 +633,17 @@ export type CustomerReceiptDetailResponse = {
     description: string;
     amount: number;
     status: number;
+    postingRequiresApproval?: boolean;
+    submittedBy?: string | null;
+    submittedByDisplayName?: string | null;
+    submittedOnUtc?: string | null;
+    approvedBy?: string | null;
+    approvedByDisplayName?: string | null;
+    approvedOnUtc?: string | null;
+    rejectedBy?: string | null;
+    rejectedByDisplayName?: string | null;
+    rejectedOnUtc?: string | null;
+    rejectionReason?: string | null;
     journalEntryId?: string | null;
     postedOnUtc?: string | null;
     createdOnUtc: string;
@@ -616,8 +653,6 @@ export type CustomerReceiptDetailResponse = {
     lastModifiedOnUtc?: string | null;
     lastModifiedBy?: string | null;
     lastModifiedByDisplayName?: string | null;
-    approvedByDisplayName?: string | null;
-    approvedOnUtc?: string | null;
     invoiceLines: {
       id: string;
       description: string;
@@ -675,6 +710,10 @@ export type CreateCustomerReceiptRequest = {
 export type PostCustomerReceiptRequest = {
   cashOrBankLedgerAccountId: string;
   receivableLedgerAccountId: string;
+};
+
+export type RejectCustomerReceiptRequest = {
+  reason: string;
 };
 
 export type VendorDto = {
@@ -761,6 +800,24 @@ export type VendorPaymentDto = {
   description: string;
   amount: number;
   status: number;
+  postingRequiresApproval?: boolean;
+  submittedBy?: string | null;
+  submittedByDisplayName?: string | null;
+  submittedOnUtc?: string | null;
+  approvedBy?: string | null;
+  approvedByDisplayName?: string | null;
+  approvedOnUtc?: string | null;
+  rejectedBy?: string | null;
+  rejectedByDisplayName?: string | null;
+  rejectedOnUtc?: string | null;
+  rejectionReason?: string | null;
+  createdOnUtc?: string;
+  createdBy?: string | null;
+  createdByDisplayName?: string | null;
+  preparedByDisplayName?: string | null;
+  lastModifiedOnUtc?: string | null;
+  lastModifiedBy?: string | null;
+  lastModifiedByDisplayName?: string | null;
   journalEntryId?: string | null;
   postedOnUtc?: string | null;
 };
@@ -797,6 +854,17 @@ export type VendorPaymentDetailResponse = {
     description: string;
     amount: number;
     status: number;
+    postingRequiresApproval?: boolean;
+    submittedBy?: string | null;
+    submittedByDisplayName?: string | null;
+    submittedOnUtc?: string | null;
+    approvedBy?: string | null;
+    approvedByDisplayName?: string | null;
+    approvedOnUtc?: string | null;
+    rejectedBy?: string | null;
+    rejectedByDisplayName?: string | null;
+    rejectedOnUtc?: string | null;
+    rejectionReason?: string | null;
     journalEntryId?: string | null;
     postedOnUtc?: string | null;
     createdOnUtc: string;
@@ -806,8 +874,6 @@ export type VendorPaymentDetailResponse = {
     lastModifiedOnUtc?: string | null;
     lastModifiedBy?: string | null;
     lastModifiedByDisplayName?: string | null;
-    approvedByDisplayName?: string | null;
-    approvedOnUtc?: string | null;
     invoiceLines: {
       id: string;
       description: string;
@@ -830,6 +896,14 @@ export type CreateVendorPaymentRequest = {
 export type PostVendorPaymentRequest = {
   cashOrBankLedgerAccountId: string;
   payableLedgerAccountId: string;
+};
+
+export type RejectVendorPaymentRequest = {
+  reason: string;
+};
+
+export type RejectJournalEntryRequest = {
+  reason: string;
 };
 
 export async function getVendors() {
@@ -892,6 +966,30 @@ export async function getVendorStatement(
 
 export async function createVendorPayment(payload: CreateVendorPaymentRequest) {
   const response = await api.post('/api/finance/ap/vendor-payments', payload);
+  return response.data;
+}
+
+export async function submitVendorPaymentForApproval(vendorPaymentId: string) {
+  const response = await api.post(
+    `/api/finance/ap/vendor-payments/${encodeURIComponent(vendorPaymentId)}/submit`,
+    {}
+  );
+  return response.data;
+}
+
+export async function approveVendorPayment(vendorPaymentId: string) {
+  const response = await api.post(
+    `/api/finance/ap/vendor-payments/${encodeURIComponent(vendorPaymentId)}/approve`,
+    {}
+  );
+  return response.data;
+}
+
+export async function rejectVendorPayment(vendorPaymentId: string, payload: RejectVendorPaymentRequest) {
+  const response = await api.post(
+    `/api/finance/ap/vendor-payments/${encodeURIComponent(vendorPaymentId)}/reject`,
+    payload
+  );
   return response.data;
 }
 
@@ -1145,6 +1243,30 @@ export async function createCustomerReceipt(payload: CreateCustomerReceiptReques
   return response.data;
 }
 
+export async function submitCustomerReceiptForApproval(customerReceiptId: string) {
+  const response = await api.post(
+    `/api/finance/ar/customer-receipts/${encodeURIComponent(customerReceiptId)}/submit`,
+    {}
+  );
+  return response.data;
+}
+
+export async function approveCustomerReceipt(customerReceiptId: string) {
+  const response = await api.post(
+    `/api/finance/ar/customer-receipts/${encodeURIComponent(customerReceiptId)}/approve`,
+    {}
+  );
+  return response.data;
+}
+
+export async function rejectCustomerReceipt(customerReceiptId: string, payload: RejectCustomerReceiptRequest) {
+  const response = await api.post(
+    `/api/finance/ar/customer-receipts/${encodeURIComponent(customerReceiptId)}/reject`,
+    payload
+  );
+  return response.data;
+}
+
 export async function postCustomerReceipt(customerReceiptId: string, payload: PostCustomerReceiptRequest) {
   const response = await api.post(
     `/api/finance/ar/customer-receipts/${encodeURIComponent(customerReceiptId)}/post`,
@@ -1241,6 +1363,24 @@ export type CreateJournalEntryRequest = {
 
 export async function createJournalEntry(payload: CreateJournalEntryRequest) {
   const response = await api.post('/api/finance/journal-entries', payload);
+  return response.data;
+}
+
+export async function submitJournalEntryForApproval(journalEntryId: string) {
+  const response = await api.post(`/api/finance/journal-entries/${encodeURIComponent(journalEntryId)}/submit`, {});
+  return response.data;
+}
+
+export async function approveJournalEntry(journalEntryId: string) {
+  const response = await api.post(`/api/finance/journal-entries/${encodeURIComponent(journalEntryId)}/approve`, {});
+  return response.data;
+}
+
+export async function rejectJournalEntry(journalEntryId: string, payload: RejectJournalEntryRequest) {
+  const response = await api.post(
+    `/api/finance/journal-entries/${encodeURIComponent(journalEntryId)}/reject`,
+    payload
+  );
   return response.data;
 }
 

@@ -20,7 +20,8 @@ public sealed class JournalEntry : TenantOwnedEntity
         JournalEntryStatus status,
         JournalEntryType type,
         IEnumerable<JournalEntryLine> lines,
-        Guid? reversedJournalEntryId = null) : base(tenantId)
+        Guid? reversedJournalEntryId = null,
+        bool postingRequiresApproval = true) : base(tenantId)
     {
         if (id == Guid.Empty)
         {
@@ -48,6 +49,7 @@ public sealed class JournalEntry : TenantOwnedEntity
         Status = status;
         Type = type;
         ReversedJournalEntryId = reversedJournalEntryId;
+        PostingRequiresApproval = postingRequiresApproval;
         _lines.AddRange(lineList);
     }
 
@@ -63,6 +65,22 @@ public sealed class JournalEntry : TenantOwnedEntity
 
     public JournalEntryType Type { get; private set; }
 
+    public bool PostingRequiresApproval { get; private set; }
+
+    public string? SubmittedBy { get; private set; }
+
+    public DateTime? SubmittedOnUtc { get; private set; }
+
+    public string? ApprovedBy { get; private set; }
+
+    public DateTime? ApprovedOnUtc { get; private set; }
+
+    public string? RejectedBy { get; private set; }
+
+    public DateTime? RejectedOnUtc { get; private set; }
+
+    public string? RejectionReason { get; private set; }
+
     public DateTime? PostedAtUtc { get; private set; }
 
     public DateTime? ReversedAtUtc { get; private set; }
@@ -77,11 +95,90 @@ public sealed class JournalEntry : TenantOwnedEntity
 
     public decimal TotalCredit => _lines.Sum(x => x.CreditAmount);
 
+    public void SubmitForApproval(string submittedBy)
+    {
+        if (string.IsNullOrWhiteSpace(submittedBy))
+        {
+            throw new ArgumentException("Submitted by user is required.", nameof(submittedBy));
+        }
+
+        if (Status != JournalEntryStatus.Draft && Status != JournalEntryStatus.Rejected)
+        {
+            throw new InvalidOperationException("Only draft or rejected journal entries can be submitted for approval.");
+        }
+
+        if (Type == JournalEntryType.Reversal)
+        {
+            throw new InvalidOperationException("Reversal journals cannot be submitted through the standard approval workflow.");
+        }
+
+        SubmittedBy = submittedBy.Trim();
+        SubmittedOnUtc = DateTime.UtcNow;
+        ApprovedBy = null;
+        ApprovedOnUtc = null;
+        RejectedBy = null;
+        RejectedOnUtc = null;
+        RejectionReason = null;
+        Status = JournalEntryStatus.SubmittedForApproval;
+    }
+
+    public void Approve(string approvedBy)
+    {
+        if (string.IsNullOrWhiteSpace(approvedBy))
+        {
+            throw new ArgumentException("Approved by user is required.", nameof(approvedBy));
+        }
+
+        if (Status != JournalEntryStatus.SubmittedForApproval)
+        {
+            throw new InvalidOperationException("Only submitted journal entries can be approved.");
+        }
+
+        ApprovedBy = approvedBy.Trim();
+        ApprovedOnUtc = DateTime.UtcNow;
+        RejectedBy = null;
+        RejectedOnUtc = null;
+        RejectionReason = null;
+        Status = JournalEntryStatus.Approved;
+    }
+
+    public void Reject(string rejectedBy, string rejectionReason)
+    {
+        if (string.IsNullOrWhiteSpace(rejectedBy))
+        {
+            throw new ArgumentException("Rejected by user is required.", nameof(rejectedBy));
+        }
+
+        if (string.IsNullOrWhiteSpace(rejectionReason))
+        {
+            throw new ArgumentException("Rejection reason is required.", nameof(rejectionReason));
+        }
+
+        if (Status != JournalEntryStatus.SubmittedForApproval)
+        {
+            throw new InvalidOperationException("Only submitted journal entries can be rejected.");
+        }
+
+        RejectedBy = rejectedBy.Trim();
+        RejectedOnUtc = DateTime.UtcNow;
+        RejectionReason = rejectionReason.Trim();
+        ApprovedBy = null;
+        ApprovedOnUtc = null;
+        Status = JournalEntryStatus.Rejected;
+    }
+
     public void MarkPosted(DateTime postedAtUtc)
     {
-        if (Status != JournalEntryStatus.Draft)
+        var requiredStatus = PostingRequiresApproval
+            ? JournalEntryStatus.Approved
+            : JournalEntryStatus.Draft;
+
+        if (Status != requiredStatus)
         {
-            throw new InvalidOperationException("Only draft journal entries can be posted.");
+            throw new InvalidOperationException(
+                PostingRequiresApproval
+                    ? "Only approved journal entries can be posted."
+                    : "Only draft journal entries can be posted.");
         }
 
         PostedAtUtc = postedAtUtc;
@@ -90,9 +187,9 @@ public sealed class JournalEntry : TenantOwnedEntity
 
     public void MarkVoided()
     {
-        if (Status != JournalEntryStatus.Draft)
+        if (Status != JournalEntryStatus.Draft && Status != JournalEntryStatus.Rejected)
         {
-            throw new InvalidOperationException("Only draft journal entries can be voided.");
+            throw new InvalidOperationException("Only draft or rejected journal entries can be voided.");
         }
 
         Status = JournalEntryStatus.Voided;

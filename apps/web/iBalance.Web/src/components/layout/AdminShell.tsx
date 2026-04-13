@@ -1,4 +1,4 @@
-import { PropsWithChildren } from 'react';
+import type { PropsWithChildren } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { getTenantKey, getTenantLogoDataUrl, getCompanyLogoDataUrl } from '../../lib/api';
 import { getSession, isPlatformAdmin, logout } from '../../lib/auth';

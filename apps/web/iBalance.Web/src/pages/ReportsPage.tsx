@@ -92,8 +92,11 @@ function purchaseInvoiceStatusLabel(value: number) {
 function vendorPaymentStatusLabel(value: number) {
   switch (value) {
     case 1: return 'Draft';
-    case 2: return 'Posted';
-    case 3: return 'Cancelled';
+    case 2: return 'Submitted for Approval';
+    case 3: return 'Approved';
+    case 4: return 'Rejected';
+    case 5: return 'Posted';
+    case 6: return 'Cancelled';
     default: return 'Unknown';
   }
 }
@@ -381,9 +384,6 @@ export function ReportsPage() {
 
   const fromUtc = isPeriodRangeValid ? toUtcStart(fromDate) : undefined;
   const toUtc = isPeriodRangeValid ? toUtcEnd(toDate) : undefined;
-  const balanceSheetAsAtUtc = balanceSheetAsAtDate
-    ? new Date(`${balanceSheetAsAtDate}T23:59:59`).toISOString()
-    : undefined;
 
   const trialBalance = useQuery({
     queryKey: ['trial-balance', fromUtc ?? null, toUtc ?? null],
@@ -392,9 +392,9 @@ export function ReportsPage() {
   });
 
   const balanceSheet = useQuery({
-    queryKey: ['balance-sheet', balanceSheetAsAtUtc ?? null],
-    queryFn: () => getBalanceSheet(balanceSheetAsAtUtc),
-    enabled: canView && !!balanceSheetAsAtUtc,
+    queryKey: ['balance-sheet'],
+    queryFn: () => getBalanceSheet(),
+    enabled: canView,
   });
 
   const incomeStatement = useQuery({
@@ -518,8 +518,11 @@ export function ReportsPage() {
       totalPayments: payments.length,
       totalPaymentAmount: payments.reduce((sum, item) => sum + Number(item.amount || 0), 0),
       draftPaymentCount: payments.filter((item) => item.status === 1).length,
-      postedPaymentCount: payments.filter((item) => item.status === 2).length,
-      cancelledPaymentCount: payments.filter((item) => item.status === 3).length,
+      submittedPaymentCount: payments.filter((item) => item.status === 2).length,
+      approvedPaymentCount: payments.filter((item) => item.status === 3).length,
+      rejectedPaymentCount: payments.filter((item) => item.status === 4).length,
+      postedPaymentCount: payments.filter((item) => item.status === 5).length,
+      cancelledPaymentCount: payments.filter((item) => item.status === 6).length,
     };
   }, [filteredPurchaseInvoices, filteredVendorPayments]);
 
@@ -882,6 +885,9 @@ export function ReportsPage() {
         <div class="kv-row"><span>Total Payments</span><span>${apSummary.totalPayments}</span></div>
         <div class="kv-row"><span>Total Payment Amount</span><span>${formatAmount(apSummary.totalPaymentAmount)}</span></div>
         <div class="kv-row"><span>Draft Payments</span><span>${apSummary.draftPaymentCount}</span></div>
+        <div class="kv-row"><span>Submitted for Approval</span><span>${apSummary.submittedPaymentCount}</span></div>
+        <div class="kv-row"><span>Approved Payments</span><span>${apSummary.approvedPaymentCount}</span></div>
+        <div class="kv-row"><span>Rejected Payments</span><span>${apSummary.rejectedPaymentCount}</span></div>
         <div class="kv-row"><span>Posted Payments</span><span>${apSummary.postedPaymentCount}</span></div>
         <div class="kv-row"><span>Cancelled Payments</span><span>${apSummary.cancelledPaymentCount}</span></div>
       </div>
@@ -1502,6 +1508,18 @@ export function ReportsPage() {
           <div className="kv-row">
             <span>Draft Payments</span>
             <span>{apSummary.draftPaymentCount}</span>
+          </div>
+          <div className="kv-row">
+            <span>Submitted for Approval</span>
+            <span>{apSummary.submittedPaymentCount}</span>
+          </div>
+          <div className="kv-row">
+            <span>Approved Payments</span>
+            <span>{apSummary.approvedPaymentCount}</span>
+          </div>
+          <div className="kv-row">
+            <span>Rejected Payments</span>
+            <span>{apSummary.rejectedPaymentCount}</span>
           </div>
           <div className="kv-row">
             <span>Posted Payments</span>

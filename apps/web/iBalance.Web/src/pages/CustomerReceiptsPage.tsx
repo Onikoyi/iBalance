@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  approveCustomerReceipt,
   createCustomerReceipt,
   getAccounts,
   getCustomerReceipts,
@@ -9,9 +10,11 @@ import {
   getSalesInvoices,
   getTenantReadableError,
   postCustomerReceipt,
+  rejectCustomerReceipt,
+  submitCustomerReceiptForApproval,
   type CreateCustomerReceiptRequest,
 } from '../lib/api';
-import { canCreateJournals, canViewFinance } from '../lib/auth';
+import { canApproveWorkflows, canCreateJournals, canViewFinance } from '../lib/auth';
 
 type ReceiptFormState = {
   customerId: string;
@@ -50,8 +53,14 @@ function receiptStatusLabel(value: number) {
     case 1:
       return 'Draft';
     case 2:
-      return 'Posted';
+      return 'Submitted for Approval';
     case 3:
+      return 'Approved';
+    case 4:
+      return 'Rejected';
+    case 5:
+      return 'Posted';
+    case 6:
       return 'Cancelled';
     default:
       return 'Unknown';
@@ -84,6 +93,7 @@ export function CustomerReceiptsPage() {
   const qc = useQueryClient();
   const canView = canViewFinance();
   const canCreate = canCreateJournals();
+  const canApprove = canApproveWorkflows();
 
   const [form, setForm] = useState<ReceiptFormState>(emptyForm);
   const [message, setMessage] = useState('');
@@ -91,6 +101,8 @@ export function CustomerReceiptsPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | string>('all');
   const [cashOrBankLedgerAccountId, setCashOrBankLedgerAccountId] = useState('');
   const [receivableLedgerAccountId, setReceivableLedgerAccountId] = useState('');
+  const [selectedReceiptId, setSelectedReceiptId] = useState('');
+  const [rejectReason, setRejectReason] = useState('');
 
   const customersQ = useQuery({
     queryKey: ['ar-customers'],
@@ -166,15 +178,68 @@ export function CustomerReceiptsPage() {
     return (invoicesQ.data?.items || []).find((x) => x.id === form.salesInvoiceId) || null;
   }, [invoicesQ.data?.items, form.salesInvoiceId]);
 
+  const refreshAll = async () => {
+    await qc.invalidateQueries({ queryKey: ['ar-customer-receipts'] });
+    await qc.invalidateQueries({ queryKey: ['ar-sales-invoices'] });
+    await qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
+    await qc.invalidateQueries({ queryKey: ['journal-entries'] });
+    await qc.invalidateQueries({ queryKey: ['trial-balance'] });
+    await qc.invalidateQueries({ queryKey: ['balance-sheet'] });
+    await qc.invalidateQueries({ queryKey: ['income-statement'] });
+  };
+
   const createMut = useMutation({
     mutationFn: (payload: CreateCustomerReceiptRequest) => createCustomerReceipt(payload),
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ['ar-customer-receipts'] });
-      setMessage('Customer receipt created successfully.');
+      await refreshAll();
+      setMessage('Customer receipt created successfully as draft.');
       setForm(emptyForm);
     },
     onError: (error) => {
       setMessage(getTenantReadableError(error, 'Unable to create customer receipt.'));
+    },
+  });
+
+  const submitMut = useMutation({
+    mutationFn: (customerReceiptId: string) => submitCustomerReceiptForApproval(customerReceiptId),
+    onSuccess: async () => {
+      await refreshAll();
+      setMessage('Customer receipt submitted for approval successfully.');
+      setSelectedReceiptId('');
+    },
+    onError: (error) => {
+      setMessage(getTenantReadableError(error, 'Unable to submit customer receipt for approval.'));
+    },
+  });
+
+  const approveMut = useMutation({
+    mutationFn: (customerReceiptId: string) => approveCustomerReceipt(customerReceiptId),
+    onSuccess: async () => {
+      await refreshAll();
+      setMessage('Customer receipt approved successfully.');
+      setSelectedReceiptId('');
+    },
+    onError: (error) => {
+      setMessage(getTenantReadableError(error, 'Unable to approve customer receipt.'));
+    },
+  });
+
+  const rejectMut = useMutation({
+    mutationFn: ({
+      customerReceiptId,
+      reason,
+    }: {
+      customerReceiptId: string;
+      reason: string;
+    }) => rejectCustomerReceipt(customerReceiptId, { reason }),
+    onSuccess: async () => {
+      await refreshAll();
+      setMessage('Customer receipt rejected successfully.');
+      setSelectedReceiptId('');
+      setRejectReason('');
+    },
+    onError: (error) => {
+      setMessage(getTenantReadableError(error, 'Unable to reject customer receipt.'));
     },
   });
 
@@ -193,14 +258,9 @@ export function CustomerReceiptsPage() {
         receivableLedgerAccountId: receivableLedgerId,
       }),
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ['ar-customer-receipts'] });
-      await qc.invalidateQueries({ queryKey: ['ar-sales-invoices'] });
-      await qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
-      await qc.invalidateQueries({ queryKey: ['journal-entries'] });
-      await qc.invalidateQueries({ queryKey: ['trial-balance'] });
-      await qc.invalidateQueries({ queryKey: ['balance-sheet'] });
-      await qc.invalidateQueries({ queryKey: ['income-statement'] });
+      await refreshAll();
       setMessage('Customer receipt posted successfully.');
+      setSelectedReceiptId('');
     },
     onError: (error) => {
       setMessage(getTenantReadableError(error, 'Unable to post customer receipt.'));
@@ -261,10 +321,54 @@ export function CustomerReceiptsPage() {
     });
   }
 
-  function submitPosting(customerReceiptId: string) {
+  function submitForApproval(customerReceiptId: string) {
     setMessage('');
 
     if (!canCreate) {
+      setMessage('You do not have permission to submit customer receipts for approval.');
+      return;
+    }
+
+    setSelectedReceiptId(customerReceiptId);
+    submitMut.mutate(customerReceiptId);
+  }
+
+  function approve(customerReceiptId: string) {
+    setMessage('');
+
+    if (!canApprove) {
+      setMessage('You do not have permission to approve customer receipts.');
+      return;
+    }
+
+    setSelectedReceiptId(customerReceiptId);
+    approveMut.mutate(customerReceiptId);
+  }
+
+  function reject(customerReceiptId: string) {
+    setMessage('');
+
+    if (!canApprove) {
+      setMessage('You do not have permission to reject customer receipts.');
+      return;
+    }
+
+    if (!rejectReason.trim()) {
+      setMessage('Rejection reason is required before rejecting a receipt.');
+      return;
+    }
+
+    setSelectedReceiptId(customerReceiptId);
+    rejectMut.mutate({
+      customerReceiptId,
+      reason: rejectReason.trim(),
+    });
+  }
+
+  function submitPosting(customerReceiptId: string) {
+    setMessage('');
+
+    if (!canApprove) {
       setMessage('You do not have permission to post customer receipts.');
       return;
     }
@@ -279,6 +383,7 @@ export function CustomerReceiptsPage() {
       return;
     }
 
+    setSelectedReceiptId(customerReceiptId);
     postMut.mutate({
       customerReceiptId,
       cashLedgerId: cashOrBankLedgerAccountId,
@@ -345,8 +450,11 @@ export function CustomerReceiptsPage() {
             >
               <option value="all">All Receipts</option>
               <option value="1">Draft</option>
-              <option value="2">Posted</option>
-              <option value="3">Cancelled</option>
+              <option value="2">Submitted for Approval</option>
+              <option value="3">Approved</option>
+              <option value="4">Rejected</option>
+              <option value="5">Posted</option>
+              <option value="6">Cancelled</option>
             </select>
           </div>
         </div>
@@ -356,6 +464,10 @@ export function CustomerReceiptsPage() {
         <div className="section-heading">
           <h2>Create Customer Receipt</h2>
           <span className="muted">Capture customer payment against a posted invoice</span>
+        </div>
+
+        <div className="panel" style={{ marginBottom: 16 }}>
+          <div className="muted">New customer receipts are created as draft, then submitted, approved, and finally posted.</div>
         </div>
 
         <div className="form-grid two">
@@ -508,12 +620,23 @@ export function CustomerReceiptsPage() {
             </select>
           </div>
         </div>
+
+        <div className="form-row" style={{ marginTop: 16 }}>
+          <label>Rejection Reason</label>
+          <textarea
+            className="input"
+            rows={3}
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            placeholder="Enter reason only when rejecting a submitted receipt"
+          />
+        </div>
       </section>
 
       <section className="panel">
         <div className="section-heading">
           <h2>Receipt Register</h2>
-          <span className="muted">Receipt status, invoice linkage, and collection visibility</span>
+          <span className="muted">Receipt status, workflow, invoice linkage, and collection visibility</span>
         </div>
 
         <div className="detail-stack">
@@ -553,19 +676,66 @@ export function CustomerReceiptsPage() {
                   <span>{receiptStatusLabel(receipt.status)}</span>
                 </div>
                 <div className="kv-row">
+                  <span>Prepared By</span>
+                  <span>{receipt.preparedByDisplayName || receipt.createdByDisplayName || receipt.createdBy || '—'}</span>
+                </div>
+                <div className="kv-row">
+                  <span>Submitted On</span>
+                  <span>{formatUtcDate(receipt.submittedOnUtc)}</span>
+                </div>
+                <div className="kv-row">
+                  <span>Approved On</span>
+                  <span>{formatUtcDate(receipt.approvedOnUtc)}</span>
+                </div>
+                <div className="kv-row">
                   <span>Posted On</span>
                   <span>{formatUtcDate(receipt.postedOnUtc)}</span>
                 </div>
+                {receipt.status === 4 && receipt.rejectionReason ? (
+                  <div className="kv-row">
+                    <span>Rejection Reason</span>
+                    <span>{receipt.rejectionReason}</span>
+                  </div>
+                ) : null}
 
                 <div className="inline-actions" style={{ marginTop: 12, justifyContent: 'space-between' }}>
                   <div className="inline-actions">
-                    {receipt.status === 1 ? (
+                    {(receipt.status === 1 || receipt.status === 4) ? (
+                      <button
+                        className="button"
+                        onClick={() => submitForApproval(receipt.id)}
+                        disabled={submitMut.isPending || !canCreate}
+                      >
+                        {submitMut.isPending && selectedReceiptId === receipt.id ? 'Submitting…' : 'Submit'}
+                      </button>
+                    ) : null}
+
+                    {receipt.status === 2 ? (
+                      <>
+                        <button
+                          className="button"
+                          onClick={() => approve(receipt.id)}
+                          disabled={approveMut.isPending || !canApprove}
+                        >
+                          {approveMut.isPending && selectedReceiptId === receipt.id ? 'Approving…' : 'Approve'}
+                        </button>
+                        <button
+                          className="button"
+                          onClick={() => reject(receipt.id)}
+                          disabled={rejectMut.isPending || !canApprove}
+                        >
+                          {rejectMut.isPending && selectedReceiptId === receipt.id ? 'Rejecting…' : 'Reject'}
+                        </button>
+                      </>
+                    ) : null}
+
+                    {receipt.status === 3 ? (
                       <button
                         className="button primary"
                         onClick={() => submitPosting(receipt.id)}
-                        disabled={postMut.isPending || !canCreate}
+                        disabled={postMut.isPending || !canApprove}
                       >
-                        {postMut.isPending ? 'Posting…' : 'Post Receipt'}
+                        {postMut.isPending && selectedReceiptId === receipt.id ? 'Posting…' : 'Post Receipt'}
                       </button>
                     ) : null}
 

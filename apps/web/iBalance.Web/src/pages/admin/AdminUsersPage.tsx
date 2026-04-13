@@ -82,11 +82,6 @@ export function AdminUsersPage() {
     return roles.filter((role) => canEditUserRole(role as any));
   }, [rolesQ.data?.items]);
 
-  const selectedUser = useMemo(
-    () => usersQ.data?.items.find((x) => x.id === selectedUserId) || null,
-    [usersQ.data?.items, selectedUserId]
-  );
-
   const filteredUsers = useMemo(() => {
     const items = usersQ.data?.items || [];
     const searchText = search.trim().toLowerCase();

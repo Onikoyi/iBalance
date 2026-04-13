@@ -1,4 +1,5 @@
-import { PropsWithChildren, useMemo, useState } from 'react';
+import type { PropsWithChildren } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Sidebar } from './Sidebar';

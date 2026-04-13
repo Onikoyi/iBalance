@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  approveVendorPayment,
   createVendorPayment,
   getAccounts,
   getPurchaseInvoices,
@@ -9,9 +10,11 @@ import {
   getVendorPayments,
   getVendors,
   postVendorPayment,
+  rejectVendorPayment,
+  submitVendorPaymentForApproval,
   type CreateVendorPaymentRequest,
 } from '../lib/api';
-import { canManageFinanceSetup, canViewFinance } from '../lib/auth';
+import { canApproveWorkflows, canManageFinanceSetup, canViewFinance } from '../lib/auth';
 
 const emptyForm: CreateVendorPaymentRequest = {
   vendorId: '',
@@ -39,8 +42,11 @@ function formatAmount(value: number) {
 function vendorPaymentStatusLabel(value: number) {
   switch (value) {
     case 1: return 'Draft';
-    case 2: return 'Posted';
-    case 3: return 'Cancelled';
+    case 2: return 'Submitted for Approval';
+    case 3: return 'Approved';
+    case 4: return 'Rejected';
+    case 5: return 'Posted';
+    case 6: return 'Cancelled';
     default: return 'Unknown';
   }
 }
@@ -49,9 +55,11 @@ export function VendorPaymentsPage() {
   const qc = useQueryClient();
   const canView = canViewFinance();
   const canManage = canManageFinanceSetup();
+  const canApprove = canApproveWorkflows();
 
   const [showCreate, setShowCreate] = useState(false);
   const [showPost, setShowPost] = useState(false);
+  const [showReject, setShowReject] = useState(false);
   const [selectedPaymentId, setSelectedPaymentId] = useState('');
   const [form, setForm] = useState<CreateVendorPaymentRequest>({
     ...emptyForm,
@@ -61,6 +69,7 @@ export function VendorPaymentsPage() {
     cashOrBankLedgerAccountId: '',
     payableLedgerAccountId: '',
   });
+  const [rejectReason, setRejectReason] = useState('');
   const [errorText, setErrorText] = useState('');
   const [infoText, setInfoText] = useState('');
 
@@ -88,17 +97,25 @@ export function VendorPaymentsPage() {
     enabled: canView,
   });
 
+  async function refreshAfterWorkflow() {
+    await qc.invalidateQueries({ queryKey: ['ap-vendor-payments'] });
+    await qc.invalidateQueries({ queryKey: ['ap-purchase-invoices'] });
+    await qc.invalidateQueries({ queryKey: ['accounts'] });
+    await qc.invalidateQueries({ queryKey: ['journal-entries'] });
+    await qc.invalidateQueries({ queryKey: ['ap-vendor-payment-detail'] });
+  }
+
   const createMut = useMutation({
     mutationFn: createVendorPayment,
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ['ap-vendor-payments'] });
+      await refreshAfterWorkflow();
       setShowCreate(false);
       setForm({
         ...emptyForm,
         paymentDateUtc: new Date().toISOString(),
       });
       setErrorText('');
-      setInfoText('Vendor payment created successfully.');
+      setInfoText('Vendor payment created successfully and saved as draft.');
     },
     onError: (e) => {
       setErrorText(getTenantReadableError(e, 'We could not create the vendor payment at this time.'));
@@ -106,13 +123,54 @@ export function VendorPaymentsPage() {
     },
   });
 
+  const submitMut = useMutation({
+    mutationFn: (vendorPaymentId: string) => submitVendorPaymentForApproval(vendorPaymentId),
+    onSuccess: async () => {
+      await refreshAfterWorkflow();
+      setSelectedPaymentId('');
+      setErrorText('');
+      setInfoText('Vendor payment submitted for approval successfully.');
+    },
+    onError: (e) => {
+      setErrorText(getTenantReadableError(e, 'We could not submit the vendor payment for approval at this time.'));
+      setInfoText('');
+    },
+  });
+
+  const approveMut = useMutation({
+    mutationFn: (vendorPaymentId: string) => approveVendorPayment(vendorPaymentId),
+    onSuccess: async () => {
+      await refreshAfterWorkflow();
+      setSelectedPaymentId('');
+      setErrorText('');
+      setInfoText('Vendor payment approved successfully.');
+    },
+    onError: (e) => {
+      setErrorText(getTenantReadableError(e, 'We could not approve the vendor payment at this time.'));
+      setInfoText('');
+    },
+  });
+
+  const rejectMut = useMutation({
+    mutationFn: () => rejectVendorPayment(selectedPaymentId, { reason: rejectReason.trim() }),
+    onSuccess: async () => {
+      await refreshAfterWorkflow();
+      setShowReject(false);
+      setSelectedPaymentId('');
+      setRejectReason('');
+      setErrorText('');
+      setInfoText('Vendor payment rejected successfully.');
+    },
+    onError: (e) => {
+      setErrorText(getTenantReadableError(e, 'We could not reject the vendor payment at this time.'));
+      setInfoText('');
+    },
+  });
+
   const postMut = useMutation({
     mutationFn: () => postVendorPayment(selectedPaymentId, postForm),
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ['ap-vendor-payments'] });
-      await qc.invalidateQueries({ queryKey: ['ap-purchase-invoices'] });
-      await qc.invalidateQueries({ queryKey: ['accounts'] });
-      await qc.invalidateQueries({ queryKey: ['journal-entries'] });
+      await refreshAfterWorkflow();
       setShowPost(false);
       setSelectedPaymentId('');
       setPostForm({
@@ -134,8 +192,11 @@ export function VendorPaymentsPage() {
       total: items.length,
       totalAmount: items.reduce((sum, x) => sum + x.amount, 0),
       drafts: items.filter((x) => x.status === 1).length,
-      posted: items.filter((x) => x.status === 2).length,
-      cancelled: items.filter((x) => x.status === 3).length,
+      submitted: items.filter((x) => x.status === 2).length,
+      approved: items.filter((x) => x.status === 3).length,
+      rejected: items.filter((x) => x.status === 4).length,
+      posted: items.filter((x) => x.status === 5).length,
+      cancelled: items.filter((x) => x.status === 6).length,
     };
   }, [paymentsQ.data?.items]);
 
@@ -182,8 +243,8 @@ export function VendorPaymentsPage() {
   }
 
   function openPostModal(paymentId: string) {
-    if (!canManage) {
-      setErrorText('You currently have read-only access on this page.');
+    if (!canApprove) {
+      setErrorText('You do not have permission to post approved vendor payments.');
       setInfoText('');
       return;
     }
@@ -204,6 +265,55 @@ export function VendorPaymentsPage() {
       setSelectedPaymentId('');
       setErrorText('');
     }
+  }
+
+  function openRejectModal(paymentId: string) {
+    if (!canApprove) {
+      setErrorText('You do not have permission to reject vendor payments.');
+      setInfoText('');
+      return;
+    }
+
+    setSelectedPaymentId(paymentId);
+    setRejectReason('');
+    setErrorText('');
+    setInfoText('');
+    setShowReject(true);
+  }
+
+  function closeRejectModal() {
+    if (!rejectMut.isPending) {
+      setShowReject(false);
+      setSelectedPaymentId('');
+      setRejectReason('');
+      setErrorText('');
+    }
+  }
+
+  async function handleSubmitForApproval(paymentId: string) {
+    setErrorText('');
+    setInfoText('');
+    setSelectedPaymentId(paymentId);
+
+    if (!canManage) {
+      setErrorText('You do not have permission to submit vendor payments for approval.');
+      return;
+    }
+
+    await submitMut.mutateAsync(paymentId);
+  }
+
+  async function handleApprove(paymentId: string) {
+    setErrorText('');
+    setInfoText('');
+    setSelectedPaymentId(paymentId);
+
+    if (!canApprove) {
+      setErrorText('You do not have permission to approve vendor payments.');
+      return;
+    }
+
+    await approveMut.mutateAsync(paymentId);
   }
 
   async function submitCreate() {
@@ -255,9 +365,31 @@ export function VendorPaymentsPage() {
     });
   }
 
+  async function submitReject() {
+    setErrorText('');
+    setInfoText('');
+
+    if (!canApprove) {
+      setErrorText('You do not have permission to reject vendor payments.');
+      return;
+    }
+
+    if (!rejectReason.trim()) {
+      setErrorText('Rejection reason is required.');
+      return;
+    }
+
+    await rejectMut.mutateAsync();
+  }
+
   async function submitPost() {
     setErrorText('');
     setInfoText('');
+
+    if (!canApprove) {
+      setErrorText('You do not have permission to post approved vendor payments.');
+      return;
+    }
 
     if (!postForm.cashOrBankLedgerAccountId) {
       setErrorText('Cash or bank ledger account is required.');
@@ -299,7 +431,7 @@ export function VendorPaymentsPage() {
         <div className="section-heading">
           <div>
             <h2>Vendor Payments</h2>
-            <div className="muted">Capture and post supplier payments against outstanding payable balances.</div>
+            <div className="muted">Capture supplier payments, route them through approval, and post only after approval.</div>
           </div>
 
           {canManage ? (
@@ -313,6 +445,9 @@ export function VendorPaymentsPage() {
           <div className="kv-row"><span>Total Vendor Payments</span><span>{summary.total}</span></div>
           <div className="kv-row"><span>Total Amount</span><span>{formatAmount(summary.totalAmount)}</span></div>
           <div className="kv-row"><span>Draft</span><span>{summary.drafts}</span></div>
+          <div className="kv-row"><span>Submitted for Approval</span><span>{summary.submitted}</span></div>
+          <div className="kv-row"><span>Approved</span><span>{summary.approved}</span></div>
+          <div className="kv-row"><span>Rejected</span><span>{summary.rejected}</span></div>
           <div className="kv-row"><span>Posted</span><span>{summary.posted}</span></div>
           <div className="kv-row"><span>Cancelled</span><span>{summary.cancelled}</span></div>
         </div>
@@ -346,15 +481,18 @@ export function VendorPaymentsPage() {
                 <th>Description</th>
                 <th>Payment Date</th>
                 <th>Status</th>
-                <th style={{ textAlign: 'right' }}>Amount</th>
+                <th>Prepared By</th>
+                <th>Submitted On</th>
+                <th>Approved On</th>
                 <th>Posted On</th>
-                <th style={{ width: 220 }}>Action</th>
+                <th style={{ textAlign: 'right' }}>Amount</th>
+                <th style={{ width: 320 }}>Action</th>
               </tr>
             </thead>
             <tbody>
               {paymentsQ.data.items.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="muted">
+                  <td colSpan={12} className="muted">
                     No vendor payments have been created yet.
                   </td>
                 </tr>
@@ -364,14 +502,53 @@ export function VendorPaymentsPage() {
                     <td>{item.paymentNumber}</td>
                     <td>{item.vendorCode} - {item.vendorName}</td>
                     <td>{item.invoiceNumber}</td>
-                    <td>{item.description}</td>
+                    <td>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <span>{item.description}</span>
+                        {item.status === 4 && item.rejectionReason ? (
+                          <span className="muted">Rejected: {item.rejectionReason}</span>
+                        ) : null}
+                      </div>
+                    </td>
                     <td>{formatDateTime(item.paymentDateUtc)}</td>
                     <td>{vendorPaymentStatusLabel(item.status)}</td>
-                    <td style={{ textAlign: 'right' }}>{formatAmount(item.amount)}</td>
+                    <td>{item.preparedByDisplayName || item.createdByDisplayName || item.createdBy || '—'}</td>
+                    <td>{formatDateTime(item.submittedOnUtc)}</td>
+                    <td>{formatDateTime(item.approvedOnUtc)}</td>
                     <td>{formatDateTime(item.postedOnUtc)}</td>
+                    <td style={{ textAlign: 'right' }}>{formatAmount(item.amount)}</td>
                     <td>
                       <div className="inline-actions">
-                        {item.status === 1 && canManage ? (
+                        {(item.status === 1 || item.status === 4) && canManage ? (
+                          <button
+                            className="button"
+                            onClick={() => handleSubmitForApproval(item.id)}
+                            disabled={submitMut.isPending}
+                          >
+                            {submitMut.isPending && selectedPaymentId === item.id ? 'Submitting…' : 'Submit'}
+                          </button>
+                        ) : null}
+
+                        {item.status === 2 && canApprove ? (
+                          <>
+                            <button
+                              className="button"
+                              onClick={() => handleApprove(item.id)}
+                              disabled={approveMut.isPending}
+                            >
+                              {approveMut.isPending && selectedPaymentId === item.id ? 'Approving…' : 'Approve'}
+                            </button>
+                            <button
+                              className="button"
+                              onClick={() => openRejectModal(item.id)}
+                              disabled={rejectMut.isPending}
+                            >
+                              Reject
+                            </button>
+                          </>
+                        ) : null}
+
+                        {item.status === 3 && canApprove ? (
                           <button className="button" onClick={() => openPostModal(item.id)}>
                             Post
                           </button>
@@ -402,6 +579,10 @@ export function VendorPaymentsPage() {
             </div>
 
             {errorText ? <div className="error-panel">{errorText}</div> : null}
+
+            <div className="panel" style={{ marginBottom: 16 }}>
+              <div className="muted">This document will be created as Draft and must be submitted, approved, and then posted.</div>
+            </div>
 
             <div className="form-grid two">
               <div className="form-row">
@@ -491,6 +672,37 @@ export function VendorPaymentsPage() {
         </div>
       ) : null}
 
+      {showReject ? (
+        <div className="modal-backdrop" onMouseDown={closeRejectModal}>
+          <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Reject Vendor Payment</h2>
+              <button className="button ghost" onClick={closeRejectModal} aria-label="Close">✕</button>
+            </div>
+
+            {errorText ? <div className="error-panel">{errorText}</div> : null}
+
+            <div className="form-row">
+              <label>Rejection Reason</label>
+              <textarea
+                className="input"
+                rows={4}
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Enter the reason for rejection"
+              />
+            </div>
+
+            <div className="modal-footer">
+              <button className="button" onClick={closeRejectModal} disabled={rejectMut.isPending}>Cancel</button>
+              <button className="button primary" onClick={submitReject} disabled={rejectMut.isPending}>
+                {rejectMut.isPending ? 'Rejecting…' : 'Reject Vendor Payment'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {showPost ? (
         <div className="modal-backdrop" onMouseDown={closePostModal}>
           <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
@@ -500,6 +712,10 @@ export function VendorPaymentsPage() {
             </div>
 
             {errorText ? <div className="error-panel">{errorText}</div> : null}
+
+            <div className="panel" style={{ marginBottom: 16 }}>
+              <div className="muted">Only approved vendor payments can be posted. Posting clears payables and affects cash or bank under accrual accounting.</div>
+            </div>
 
             <div className="form-grid two">
               <div className="form-row">

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  approveJournalEntry,
   createJournalEntry,
   createOpeningBalance,
   getAccounts,
@@ -8,7 +9,9 @@ import {
   getJournalEntries,
   getTenantReadableError,
   postJournalEntry,
+  rejectJournalEntry,
   reverseJournalEntry,
+  submitJournalEntryForApproval,
   voidJournalEntry,
   type LedgerAccountDto,
   type JournalEntryDto,
@@ -23,9 +26,12 @@ import {
 function statusLabel(value: number) {
   switch (value) {
     case 1: return 'Draft';
-    case 2: return 'Posted';
-    case 3: return 'Voided';
-    case 4: return 'Reversed';
+    case 2: return 'Submitted for Approval';
+    case 3: return 'Approved';
+    case 4: return 'Rejected';
+    case 5: return 'Posted';
+    case 6: return 'Voided';
+    case 7: return 'Reversed';
     default: return 'Unavailable';
   }
 }
@@ -39,7 +45,8 @@ function typeLabel(value: number) {
   }
 }
 
-function formatDateTime(value: string) {
+function formatDateTime(value?: string | null) {
+  if (!value) return 'Not available';
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return 'Not available';
   return parsed.toLocaleString();
@@ -107,6 +114,8 @@ export function JournalsPage() {
   const [journalForm, setJournalForm] = useState<JournalForm>(emptyJournalForm);
   const [reverseForm, setReverseForm] = useState<ReverseForm>(emptyReverseForm);
   const [reverseTargetId, setReverseTargetId] = useState('');
+  const [selectedJournalId, setSelectedJournalId] = useState('');
+  const [rejectReason, setRejectReason] = useState('');
 
   const canView = canViewFinance();
   const canCreate = canCreateJournals();
@@ -142,20 +151,32 @@ export function JournalsPage() {
     return {
       total: items.length,
       drafts: items.filter((x: JournalEntryDto) => x.status === 1).length,
-      posted: items.filter((x: JournalEntryDto) => x.status === 2).length,
-      reversed: items.filter((x: JournalEntryDto) => x.status === 4).length,
+      submitted: items.filter((x: JournalEntryDto) => x.status === 2).length,
+      approved: items.filter((x: JournalEntryDto) => x.status === 3).length,
+      rejected: items.filter((x: JournalEntryDto) => x.status === 4).length,
+      posted: items.filter((x: JournalEntryDto) => x.status === 5).length,
+      voided: items.filter((x: JournalEntryDto) => x.status === 6).length,
+      reversed: items.filter((x: JournalEntryDto) => x.status === 7).length,
     };
   }, [journalsQ.data?.items]);
+
+  const refreshAll = async () => {
+    await qc.invalidateQueries({ queryKey: ['journal-entries'] });
+    await qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
+    await qc.invalidateQueries({ queryKey: ['trial-balance'] });
+    await qc.invalidateQueries({ queryKey: ['balance-sheet'] });
+    await qc.invalidateQueries({ queryKey: ['income-statement'] });
+    await qc.invalidateQueries({ queryKey: ['ledger-movements'] });
+  };
 
   const createJournalMut = useMutation({
     mutationFn: createJournalEntry,
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ['journal-entries'] });
-      await qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      await refreshAll();
       setModal(null);
       setJournalForm(emptyJournalForm);
       setErrorText('');
-      setInfoText('The journal entry has been created successfully.');
+      setInfoText('The journal entry has been created successfully as draft.');
     },
     onError: (e) => {
       setErrorText(getTenantReadableError(e, 'We could not create the journal entry at this time.'));
@@ -166,8 +187,7 @@ export function JournalsPage() {
   const createOpeningMut = useMutation({
     mutationFn: createOpeningBalance,
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ['journal-entries'] });
-      await qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      await refreshAll();
       setModal(null);
       setJournalForm(emptyJournalForm);
       setErrorText('');
@@ -179,11 +199,55 @@ export function JournalsPage() {
     },
   });
 
+  const submitMut = useMutation({
+    mutationFn: submitJournalEntryForApproval,
+    onSuccess: async () => {
+      await refreshAll();
+      setSelectedJournalId('');
+      setInfoText('The journal entry has been submitted for approval successfully.');
+      setErrorText('');
+    },
+    onError: (e) => {
+      setErrorText(getTenantReadableError(e, 'We could not submit the journal entry for approval at this time.'));
+      setInfoText('');
+    },
+  });
+
+  const approveMut = useMutation({
+    mutationFn: approveJournalEntry,
+    onSuccess: async () => {
+      await refreshAll();
+      setSelectedJournalId('');
+      setInfoText('The journal entry has been approved successfully.');
+      setErrorText('');
+    },
+    onError: (e) => {
+      setErrorText(getTenantReadableError(e, 'We could not approve the journal entry at this time.'));
+      setInfoText('');
+    },
+  });
+
+  const rejectMut = useMutation({
+    mutationFn: async (payload: { id: string; reason: string }) =>
+      rejectJournalEntry(payload.id, { reason: payload.reason }),
+    onSuccess: async () => {
+      await refreshAll();
+      setSelectedJournalId('');
+      setRejectReason('');
+      setInfoText('The journal entry has been rejected successfully.');
+      setErrorText('');
+    },
+    onError: (e) => {
+      setErrorText(getTenantReadableError(e, 'We could not reject the journal entry at this time.'));
+      setInfoText('');
+    },
+  });
+
   const postMut = useMutation({
     mutationFn: postJournalEntry,
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ['journal-entries'] });
-      await qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      await refreshAll();
+      setSelectedJournalId('');
       setInfoText('The journal entry has been posted successfully.');
       setErrorText('');
     },
@@ -196,13 +260,13 @@ export function JournalsPage() {
   const voidMut = useMutation({
     mutationFn: voidJournalEntry,
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ['journal-entries'] });
-      await qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
-      setInfoText('The draft journal has been voided successfully.');
+      await refreshAll();
+      setSelectedJournalId('');
+      setInfoText('The journal has been voided successfully.');
       setErrorText('');
     },
     onError: (e) => {
-      setErrorText(getTenantReadableError(e, 'We could not void the draft journal at this time.'));
+      setErrorText(getTenantReadableError(e, 'We could not void the journal at this time.'));
       setInfoText('');
     },
   });
@@ -215,8 +279,7 @@ export function JournalsPage() {
         description: payload.description,
       }),
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ['journal-entries'] });
-      await qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      await refreshAll();
       setModal(null);
       setReverseForm(emptyReverseForm);
       setReverseTargetId('');
@@ -254,7 +317,11 @@ export function JournalsPage() {
   }
 
   function closeModal() {
-    const busy = createJournalMut.isPending || createOpeningMut.isPending || reverseMut.isPending;
+    const busy =
+      createJournalMut.isPending ||
+      createOpeningMut.isPending ||
+      reverseMut.isPending;
+
     if (!busy) {
       setModal(null);
       setErrorText('');
@@ -433,6 +500,50 @@ export function JournalsPage() {
     });
   }
 
+  async function submitForApproval(journalEntryId: string) {
+    setErrorText('');
+    setInfoText('');
+    setSelectedJournalId(journalEntryId);
+    await submitMut.mutateAsync(journalEntryId);
+  }
+
+  async function approve(journalEntryId: string) {
+    setErrorText('');
+    setInfoText('');
+    setSelectedJournalId(journalEntryId);
+    await approveMut.mutateAsync(journalEntryId);
+  }
+
+  async function reject(journalEntryId: string) {
+    setErrorText('');
+    setInfoText('');
+
+    if (!rejectReason.trim()) {
+      setErrorText('Please enter a rejection reason before rejecting the journal.');
+      return;
+    }
+
+    setSelectedJournalId(journalEntryId);
+    await rejectMut.mutateAsync({
+      id: journalEntryId,
+      reason: rejectReason.trim(),
+    });
+  }
+
+  async function post(journalEntryId: string) {
+    setErrorText('');
+    setInfoText('');
+    setSelectedJournalId(journalEntryId);
+    await postMut.mutateAsync(journalEntryId);
+  }
+
+  async function voidEntry(journalEntryId: string) {
+    setErrorText('');
+    setInfoText('');
+    setSelectedJournalId(journalEntryId);
+    await voidMut.mutateAsync(journalEntryId);
+  }
+
   if (!canView) {
     return <div className="panel error-panel">You do not have access to view journal activity.</div>;
   }
@@ -451,7 +562,7 @@ export function JournalsPage() {
         <div className="section-heading">
           <div>
             <h2>Journal overview</h2>
-            <div className="muted">Manage journal activity, posting readiness, and balanced entries.</div>
+            <div className="muted">Manage journal workflow, posting readiness, approvals, and balanced entries.</div>
           </div>
         </div>
 
@@ -465,8 +576,24 @@ export function JournalsPage() {
             <span>{journalSummary.drafts}</span>
           </div>
           <div className="kv-row">
+            <span>Submitted for Approval</span>
+            <span>{journalSummary.submitted}</span>
+          </div>
+          <div className="kv-row">
+            <span>Approved Journals</span>
+            <span>{journalSummary.approved}</span>
+          </div>
+          <div className="kv-row">
+            <span>Rejected Journals</span>
+            <span>{journalSummary.rejected}</span>
+          </div>
+          <div className="kv-row">
             <span>Posted Journals</span>
             <span>{journalSummary.posted}</span>
+          </div>
+          <div className="kv-row">
+            <span>Voided Journals</span>
+            <span>{journalSummary.voided}</span>
           </div>
           <div className="kv-row">
             <span>Reversed Journals</span>
@@ -512,6 +639,24 @@ export function JournalsPage() {
 
       <section className="panel">
         <div className="section-heading">
+          <h2>Journal workflow controls</h2>
+          <span className="muted">Use rejection reason only when declining a submitted journal.</span>
+        </div>
+
+        <div className="form-row">
+          <label>Rejection Reason</label>
+          <textarea
+            className="input"
+            rows={3}
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            placeholder="Enter rejection reason for submitted journals"
+          />
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="section-heading">
           <h2>Journal register</h2>
           <span className="muted">{journalsQ.data.count} journal(s)</span>
         </div>
@@ -527,7 +672,7 @@ export function JournalsPage() {
                 <th>Status</th>
                 <th style={{ textAlign: 'right' }}>Debit</th>
                 <th style={{ textAlign: 'right' }}>Credit</th>
-                <th style={{ width: 320 }}>Actions</th>
+                <th style={{ width: 420 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -535,26 +680,76 @@ export function JournalsPage() {
                 <tr key={item.id}>
                   <td>{formatDateTime(item.entryDateUtc)}</td>
                   <td>{item.reference}</td>
-                  <td>{item.description}</td>
+                  <td>
+                    <div>{item.description}</div>
+                    <div className="muted" style={{ marginTop: 4 }}>
+                      {item.submittedOnUtc ? `Submitted: ${formatDateTime(item.submittedOnUtc)}` : ''}
+                      {item.approvedOnUtc ? ` • Approved: ${formatDateTime(item.approvedOnUtc)}` : ''}
+                      {item.postedAtUtc ? ` • Posted: ${formatDateTime(item.postedAtUtc)}` : ''}
+                    </div>
+                    {item.rejectionReason ? (
+                      <div className="muted" style={{ marginTop: 4 }}>
+                        Rejection Reason: {item.rejectionReason}
+                      </div>
+                    ) : null}
+                  </td>
                   <td>{typeLabel(item.type)}</td>
                   <td>{statusLabel(item.status)}</td>
                   <td style={{ textAlign: 'right' }}>{formatAmount(Number(item.totalDebit))}</td>
                   <td style={{ textAlign: 'right' }}>{formatAmount(Number(item.totalCredit))}</td>
                   <td>
-                    <div className="inline-actions">
-                      {item.status === 1 && canPostReverse ? (
-                        <button className="button" onClick={() => postMut.mutate(item.id)} disabled={postMut.isPending}>
-                          Post
-                        </button>
-                      ) : null}
-
-                      {item.status === 1 && canCreate ? (
-                        <button className="button danger" onClick={() => voidMut.mutate(item.id)} disabled={voidMut.isPending}>
-                          Void
+                    <div className="inline-actions" style={{ flexWrap: 'wrap' }}>
+                      {(item.status === 1 || item.status === 4) && item.type !== 3 && canCreate ? (
+                        <button
+                          className="button"
+                          onClick={() => submitForApproval(item.id)}
+                          disabled={submitMut.isPending}
+                        >
+                          {submitMut.isPending && selectedJournalId === item.id ? 'Submitting…' : 'Submit'}
                         </button>
                       ) : null}
 
                       {item.status === 2 && canPostReverse ? (
+                        <>
+                          <button
+                            className="button"
+                            onClick={() => approve(item.id)}
+                            disabled={approveMut.isPending}
+                          >
+                            {approveMut.isPending && selectedJournalId === item.id ? 'Approving…' : 'Approve'}
+                          </button>
+
+                          <button
+                            className="button danger"
+                            onClick={() => reject(item.id)}
+                            disabled={rejectMut.isPending}
+                          >
+                            {rejectMut.isPending && selectedJournalId === item.id ? 'Rejecting…' : 'Reject'}
+                          </button>
+                        </>
+                      ) : null}
+
+                      {item.status === 3 && canPostReverse ? (
+                        <button
+                          className="button primary"
+                          onClick={() => post(item.id)}
+                          disabled={postMut.isPending}
+                        >
+                          {postMut.isPending && selectedJournalId === item.id ? 'Posting…' : 'Post'}
+                        </button>
+                      ) : null}
+
+                      {(item.status === 1 || item.status === 4) && canCreate ? (
+                        <button
+                          className="button danger"
+                          onClick={() => voidEntry(item.id)}
+                          disabled={voidMut.isPending}
+                        >
+                          {voidMut.isPending && selectedJournalId === item.id ? 'Voiding…' : 'Void'}
+                        </button>
+                      ) : null}
+
+                      {item.status === 5 && canPostReverse ? (
                         <button className="button" onClick={() => openReverse(item.id)}>
                           Reverse
                         </button>
@@ -579,6 +774,14 @@ export function JournalsPage() {
             </div>
 
             {errorText ? <div className="panel error-panel" style={{ marginBottom: 12 }}>{errorText}</div> : null}
+
+            <div className="panel" style={{ marginBottom: 12 }}>
+              <div className="muted">
+                {modal === 'opening'
+                  ? 'Opening balances post immediately and are not routed through maker/checker.'
+                  : 'Normal journals are created as draft, then submitted, approved, and posted.'}
+              </div>
+            </div>
 
             <div className="form-grid two">
               <div className="form-row">

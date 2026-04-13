@@ -44,14 +44,23 @@ function formatDateTime(value?: string | null) {
   return parsed.toLocaleString();
 }
 
-function formatMoney(amount?: number | null, currencyCode?: string | null) {
+function formatMoney(amount?: number | string | null, currencyCode?: string | null) {
   if (amount === null || amount === undefined) return 'Not available';
+
+  const numericAmount =
+    typeof amount === 'number'
+      ? amount
+      : Number(amount);
+
+  if (Number.isNaN(numericAmount)) {
+    return 'Not available';
+  }
 
   return new Intl.NumberFormat('en-NG', {
     style: 'currency',
     currency: currencyCode || 'NGN',
     maximumFractionDigits: 0,
-  }).format(amount);
+  }).format(numericAmount);
 }
 
 function toUtcIsoFromDateInput(value: string, endOfDay = false) {

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using iBalance.BuildingBlocks.Infrastructure.Persistence;
 namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260412201742_VendorPaymentMakerChecker")]
+    partial class VendorPaymentMakerChecker
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -74,7 +77,7 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "CustomerCode")
                         .IsUnique();
 
-                    b.ToTable("Customers", "finance");
+                    b.ToTable("Customers", "public");
                 });
 
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.CustomerReceipt", b =>
@@ -87,19 +90,11 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
-                    b.Property<string>("ApprovedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime?>("ApprovedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<DateTime?>("CancelledOnUtc")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("CreatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedOnUtc")
                         .HasColumnType("timestamp with time zone");
@@ -116,19 +111,13 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("LastModifiedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("text");
 
                     b.Property<DateTime?>("LastModifiedOnUtc")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("PostedOnUtc")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("PostingRequiresApproval")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
 
                     b.Property<DateTime>("ReceiptDateUtc")
                         .HasColumnType("timestamp with time zone");
@@ -138,29 +127,11 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
-                    b.Property<string>("RejectedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime?>("RejectedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("RejectionReason")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
                     b.Property<Guid>("SalesInvoiceId")
                         .HasColumnType("uuid");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
-
-                    b.Property<string>("SubmittedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime?>("SubmittedOnUtc")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -174,7 +145,7 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "ReceiptNumber")
                         .IsUnique();
 
-                    b.ToTable("CustomerReceipts", "finance");
+                    b.ToTable("CustomerReceipts", "public");
                 });
 
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.FiscalPeriod", b =>
@@ -228,13 +199,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("ApprovedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime?>("ApprovedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<string>("CreatedBy")
                         .HasColumnType("text");
 
@@ -243,8 +207,8 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<DateTime>("EntryDateUtc")
                         .HasColumnType("timestamp with time zone");
@@ -258,26 +222,10 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("PostedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<bool>("PostingRequiresApproval")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
-
                     b.Property<string>("Reference")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("RejectedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime?>("RejectedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("RejectionReason")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<Guid?>("ReversalJournalEntryId")
                         .HasColumnType("uuid");
@@ -290,13 +238,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
-
-                    b.Property<string>("SubmittedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime?>("SubmittedOnUtc")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -314,8 +255,7 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Type");
 
-                    b.HasIndex("TenantId", "Reference")
-                        .IsUnique();
+                    b.HasIndex("TenantId", "Reference");
 
                     b.ToTable("JournalEntries", "finance");
                 });
@@ -592,7 +532,7 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "InvoiceNumber")
                         .IsUnique();
 
-                    b.ToTable("PurchaseInvoices", "finance");
+                    b.ToTable("PurchaseInvoices", "public");
                 });
 
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PurchaseInvoiceLine", b =>
@@ -640,7 +580,7 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("PurchaseInvoiceId");
 
-                    b.ToTable("PurchaseInvoiceLines", "finance");
+                    b.ToTable("PurchaseInvoiceLines", "public");
                 });
 
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.SalesInvoice", b =>
@@ -711,7 +651,7 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "InvoiceNumber")
                         .IsUnique();
 
-                    b.ToTable("SalesInvoices", "finance");
+                    b.ToTable("SalesInvoices", "public");
                 });
 
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.SalesInvoiceLine", b =>
@@ -759,7 +699,7 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("SalesInvoiceId");
 
-                    b.ToTable("SalesInvoiceLines", "finance");
+                    b.ToTable("SalesInvoiceLines", "public");
                 });
 
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.Vendor", b =>
@@ -813,7 +753,7 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "VendorCode")
                         .IsUnique();
 
-                    b.ToTable("Vendors", "finance");
+                    b.ToTable("Vendors", "public");
                 });
 
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.VendorPayment", b =>
@@ -908,7 +848,7 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "PaymentNumber")
                         .IsUnique();
 
-                    b.ToTable("VendorPayments", "finance");
+                    b.ToTable("VendorPayments", "public");
                 });
 
             modelBuilder.Entity("iBalance.Modules.Platform.Domain.Entities.BillingSettings", b =>

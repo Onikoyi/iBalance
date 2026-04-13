@@ -533,29 +533,60 @@ public sealed class AccountsReceivableController : ControllerBase
             });
         }
 
-        var items = await dbContext.CustomerReceipts
+        var receipts = await dbContext.CustomerReceipts
             .AsNoTracking()
             .Include(x => x.Customer)
             .Include(x => x.SalesInvoice)
             .OrderByDescending(x => x.ReceiptDateUtc)
             .ThenByDescending(x => x.CreatedOnUtc)
-            .Select(x => new
-            {
-                x.Id,
-                x.CustomerId,
-                CustomerCode = x.Customer != null ? x.Customer.CustomerCode : string.Empty,
-                CustomerName = x.Customer != null ? x.Customer.CustomerName : string.Empty,
-                x.SalesInvoiceId,
-                InvoiceNumber = x.SalesInvoice != null ? x.SalesInvoice.InvoiceNumber : string.Empty,
-                x.ReceiptDateUtc,
-                x.ReceiptNumber,
-                x.Description,
-                x.Amount,
-                x.Status,
-                x.JournalEntryId,
-                x.PostedOnUtc
-            })
             .ToListAsync(cancellationToken);
+
+        var userNames = await GetUserDisplayNamesAsync(
+            dbContext,
+            receipts.SelectMany(receipt => new[]
+            {
+                receipt.CreatedBy,
+                receipt.LastModifiedBy,
+                receipt.SubmittedBy,
+                receipt.ApprovedBy,
+                receipt.RejectedBy
+            }),
+            cancellationToken);
+
+        var items = receipts.Select(x => new
+        {
+            x.Id,
+            x.CustomerId,
+            CustomerCode = x.Customer != null ? x.Customer.CustomerCode : string.Empty,
+            CustomerName = x.Customer != null ? x.Customer.CustomerName : string.Empty,
+            x.SalesInvoiceId,
+            InvoiceNumber = x.SalesInvoice != null ? x.SalesInvoice.InvoiceNumber : string.Empty,
+            x.ReceiptDateUtc,
+            x.ReceiptNumber,
+            x.Description,
+            x.Amount,
+            x.Status,
+            x.PostingRequiresApproval,
+            x.SubmittedBy,
+            SubmittedByDisplayName = ResolveUserDisplayName(x.SubmittedBy, userNames),
+            x.SubmittedOnUtc,
+            x.ApprovedBy,
+            ApprovedByDisplayName = ResolveUserDisplayName(x.ApprovedBy, userNames),
+            x.ApprovedOnUtc,
+            x.RejectedBy,
+            RejectedByDisplayName = ResolveUserDisplayName(x.RejectedBy, userNames),
+            x.RejectedOnUtc,
+            x.RejectionReason,
+            x.CreatedOnUtc,
+            x.CreatedBy,
+            CreatedByDisplayName = ResolveUserDisplayName(x.CreatedBy, userNames),
+            PreparedByDisplayName = ResolveUserDisplayName(x.CreatedBy, userNames),
+            x.LastModifiedOnUtc,
+            x.LastModifiedBy,
+            LastModifiedByDisplayName = ResolveUserDisplayName(x.LastModifiedBy, userNames),
+            x.JournalEntryId,
+            x.PostedOnUtc
+        }).ToList();
 
         return Ok(new
         {
@@ -605,27 +636,23 @@ public sealed class AccountsReceivableController : ControllerBase
             .Include(x => x.Lines)
             .FirstOrDefaultAsync(x => x.Id == receipt.SalesInvoiceId, cancellationToken);
 
-                    var auditUserIds = new List<Guid>();
-
-        if (TryParseUserId(receipt.CreatedBy, out var createdByUserId))
-        {
-            auditUserIds.Add(createdByUserId);
-        }
-
-        if (TryParseUserId(receipt.LastModifiedBy, out var lastModifiedByUserId))
-        {
-            auditUserIds.Add(lastModifiedByUserId);
-        }
-
-        var userNames = auditUserIds.Count == 0
-            ? new Dictionary<Guid, string>()
-            : await dbContext.UserAccounts
-                .AsNoTracking()
-                .Where(x => auditUserIds.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, x => x.FullName, cancellationToken);
+        var userNames = await GetUserDisplayNamesAsync(
+            dbContext,
+            new[]
+            {
+                receipt.CreatedBy,
+                receipt.LastModifiedBy,
+                receipt.SubmittedBy,
+                receipt.ApprovedBy,
+                receipt.RejectedBy
+            },
+            cancellationToken);
 
         var createdByDisplayName = ResolveUserDisplayName(receipt.CreatedBy, userNames);
         var lastModifiedByDisplayName = ResolveUserDisplayName(receipt.LastModifiedBy, userNames);
+        var submittedByDisplayName = ResolveUserDisplayName(receipt.SubmittedBy, userNames);
+        var approvedByDisplayName = ResolveUserDisplayName(receipt.ApprovedBy, userNames);
+        var rejectedByDisplayName = ResolveUserDisplayName(receipt.RejectedBy, userNames);
 
         return Ok(new
         {
@@ -653,6 +680,17 @@ public sealed class AccountsReceivableController : ControllerBase
                 receipt.Description,
                 receipt.Amount,
                 receipt.Status,
+                receipt.PostingRequiresApproval,
+                receipt.SubmittedBy,
+                SubmittedByDisplayName = submittedByDisplayName,
+                receipt.SubmittedOnUtc,
+                receipt.ApprovedBy,
+                ApprovedByDisplayName = approvedByDisplayName,
+                receipt.ApprovedOnUtc,
+                receipt.RejectedBy,
+                RejectedByDisplayName = rejectedByDisplayName,
+                receipt.RejectedOnUtc,
+                receipt.RejectionReason,
                 receipt.JournalEntryId,
                 receipt.PostedOnUtc,
                 receipt.CreatedOnUtc,
@@ -662,19 +700,17 @@ public sealed class AccountsReceivableController : ControllerBase
                 receipt.LastModifiedOnUtc,
                 receipt.LastModifiedBy,
                 LastModifiedByDisplayName = lastModifiedByDisplayName,
-                ApprovedByDisplayName = (string?)null,
-                ApprovedOnUtc = (DateTime?)null,
                 InvoiceLines = (invoice?.Lines ?? Enumerable.Empty<SalesInvoiceLine>())
-                .OrderBy(x => x.CreatedOnUtc)
-                .Select(x => new
-                {
-                    x.Id,
-                    x.Description,
-                    x.Quantity,
-                    x.UnitPrice,
-                    x.LineTotal
-                })
-                .ToList()
+                    .OrderBy(x => x.CreatedOnUtc)
+                    .Select(x => (object)new
+                    {
+                        x.Id,
+                        x.Description,
+                        x.Quantity,
+                        x.UnitPrice,
+                        x.LineTotal
+                    })
+                    .ToList()
             }
         });
     }
@@ -790,18 +826,227 @@ public sealed class AccountsReceivableController : ControllerBase
                 receipt.Description,
                 receipt.ReceiptDateUtc,
                 receipt.Amount,
+                receipt.Status,
+                receipt.PostingRequiresApproval
+            }
+        });
+    }
+
+    [HttpPost("customer-receipts/{customerReceiptId:guid}/submit")]
+    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    public async Task<IActionResult> SubmitCustomerReceiptForApproval(
+        Guid customerReceiptId,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] ICurrentUserService currentUserService,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        var receipt = await dbContext.CustomerReceipts
+            .FirstOrDefaultAsync(x => x.Id == customerReceiptId, cancellationToken);
+
+        if (receipt is null)
+        {
+            return NotFound(new
+            {
+                Message = "Customer receipt was not found for the current tenant.",
+                CustomerReceiptId = customerReceiptId
+            });
+        }
+
+        var submittedByUserId = EnsureAuthenticatedUserId(currentUserService);
+
+        try
+        {
+            receipt.SubmitForApproval(submittedByUserId);
+            receipt.SetAudit(receipt.CreatedBy, submittedByUserId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new
+            {
+                Message = ex.Message,
+                CustomerReceiptId = customerReceiptId,
                 receipt.Status
+            });
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Customer receipt submitted for approval successfully.",
+            Receipt = new
+            {
+                receipt.Id,
+                receipt.ReceiptNumber,
+                receipt.Status,
+                receipt.SubmittedBy,
+                receipt.SubmittedOnUtc,
+                receipt.PostingRequiresApproval
+            }
+        });
+    }
+
+    [HttpPost("customer-receipts/{customerReceiptId:guid}/approve")]
+    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
+    public async Task<IActionResult> ApproveCustomerReceipt(
+        Guid customerReceiptId,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] ICurrentUserService currentUserService,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        var receipt = await dbContext.CustomerReceipts
+            .FirstOrDefaultAsync(x => x.Id == customerReceiptId, cancellationToken);
+
+        if (receipt is null)
+        {
+            return NotFound(new
+            {
+                Message = "Customer receipt was not found for the current tenant.",
+                CustomerReceiptId = customerReceiptId
+            });
+        }
+
+        var approvedByUserId = EnsureAuthenticatedUserId(currentUserService);
+
+        try
+        {
+            receipt.Approve(approvedByUserId);
+            receipt.SetAudit(receipt.CreatedBy, approvedByUserId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new
+            {
+                Message = ex.Message,
+                CustomerReceiptId = customerReceiptId,
+                receipt.Status
+            });
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Customer receipt approved successfully.",
+            Receipt = new
+            {
+                receipt.Id,
+                receipt.ReceiptNumber,
+                receipt.Status,
+                receipt.ApprovedBy,
+                receipt.ApprovedOnUtc
+            }
+        });
+    }
+
+    [HttpPost("customer-receipts/{customerReceiptId:guid}/reject")]
+    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
+    public async Task<IActionResult> RejectCustomerReceipt(
+        Guid customerReceiptId,
+        [FromBody] RejectCustomerReceiptRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] ICurrentUserService currentUserService,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            return BadRequest(new { Message = "Rejection reason is required." });
+        }
+
+        var receipt = await dbContext.CustomerReceipts
+            .FirstOrDefaultAsync(x => x.Id == customerReceiptId, cancellationToken);
+
+        if (receipt is null)
+        {
+            return NotFound(new
+            {
+                Message = "Customer receipt was not found for the current tenant.",
+                CustomerReceiptId = customerReceiptId
+            });
+        }
+
+        var rejectedByUserId = EnsureAuthenticatedUserId(currentUserService);
+
+        try
+        {
+            receipt.Reject(rejectedByUserId, request.Reason);
+            receipt.SetAudit(receipt.CreatedBy, rejectedByUserId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new
+            {
+                Message = ex.Message,
+                CustomerReceiptId = customerReceiptId,
+                receipt.Status
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Customer receipt rejected successfully.",
+            Receipt = new
+            {
+                receipt.Id,
+                receipt.ReceiptNumber,
+                receipt.Status,
+                receipt.RejectedBy,
+                receipt.RejectedOnUtc,
+                receipt.RejectionReason
             }
         });
     }
 
     [HttpPost("customer-receipts/{customerReceiptId:guid}/post")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
     public async Task<IActionResult> PostCustomerReceipt(
         Guid customerReceiptId,
         [FromBody] PostCustomerReceiptRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] ICurrentUserService currentUserService,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -839,11 +1084,17 @@ public sealed class AccountsReceivableController : ControllerBase
             });
         }
 
-        if (receipt.Status != CustomerReceiptStatus.Draft)
+        var requiredPostingStatus = receipt.PostingRequiresApproval
+            ? CustomerReceiptStatus.Approved
+            : CustomerReceiptStatus.Draft;
+
+        if (receipt.Status != requiredPostingStatus)
         {
             return Conflict(new
             {
-                Message = "Only draft customer receipts can be posted.",
+                Message = receipt.PostingRequiresApproval
+                    ? "Only approved customer receipts can be posted."
+                    : "Only draft customer receipts can be posted.",
                 CustomerReceiptId = customerReceiptId,
                 receipt.Status
             });
@@ -992,6 +1243,7 @@ public sealed class AccountsReceivableController : ControllerBase
             .ToList();
 
         receipt.MarkPosted(journalEntry.Id);
+        receipt.SetAudit(receipt.CreatedBy, currentUserService.UserId);
         invoice.ApplyPayment(receipt.Amount);
 
         dbContext.JournalEntries.Add(journalEntry);
@@ -1057,9 +1309,26 @@ public sealed class AccountsReceivableController : ControllerBase
                 cancellationToken);
     }
 
-        private static bool TryParseUserId(string? rawUserId, out Guid userId)
+    private static async Task<Dictionary<Guid, string>> GetUserDisplayNamesAsync(
+        ApplicationDbContext dbContext,
+        IEnumerable<string?> rawUserIds,
+        CancellationToken cancellationToken)
     {
-        return Guid.TryParse(rawUserId, out userId);
+        var userIds = rawUserIds
+            .Where(value => !string.IsNullOrWhiteSpace(value) && Guid.TryParse(value, out _))
+            .Select(value => Guid.Parse(value!))
+            .Distinct()
+            .ToList();
+
+        if (userIds.Count == 0)
+        {
+            return new Dictionary<Guid, string>();
+        }
+
+        return await dbContext.UserAccounts
+            .AsNoTracking()
+            .Where(x => userIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, x => x.FullName, cancellationToken);
     }
 
     private static string? ResolveUserDisplayName(
@@ -1074,6 +1343,16 @@ public sealed class AccountsReceivableController : ControllerBase
         return userNames.TryGetValue(userId, out var displayName)
             ? displayName
             : rawUserId;
+    }
+
+    private static string EnsureAuthenticatedUserId(ICurrentUserService currentUserService)
+    {
+        if (string.IsNullOrWhiteSpace(currentUserService.UserId))
+        {
+            throw new InvalidOperationException("Authenticated user context is required.");
+        }
+
+        return currentUserService.UserId.Trim();
     }
 
     public sealed record CreateCustomerRequest(
@@ -1111,4 +1390,7 @@ public sealed class AccountsReceivableController : ControllerBase
     public sealed record PostCustomerReceiptRequest(
         Guid CashOrBankLedgerAccountId,
         Guid ReceivableLedgerAccountId);
+
+    public sealed record RejectCustomerReceiptRequest(
+        string Reason);
 }

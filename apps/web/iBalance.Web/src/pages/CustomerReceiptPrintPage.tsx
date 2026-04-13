@@ -27,8 +27,14 @@ function receiptStatusLabel(value: number) {
     case 1:
       return 'Draft';
     case 2:
-      return 'Posted';
+      return 'Submitted for Approval';
     case 3:
+      return 'Approved';
+    case 4:
+      return 'Rejected';
+    case 5:
+      return 'Posted';
+    case 6:
       return 'Cancelled';
     default:
       return 'Unknown';
@@ -45,6 +51,17 @@ function buildReceiptHtml(args: {
     status: number;
     amount: number;
     description: string;
+    postingRequiresApproval?: boolean;
+    submittedBy?: string | null;
+    submittedByDisplayName?: string | null;
+    submittedOnUtc?: string | null;
+    approvedBy?: string | null;
+    approvedByDisplayName?: string | null;
+    approvedOnUtc?: string | null;
+    rejectedBy?: string | null;
+    rejectedByDisplayName?: string | null;
+    rejectedOnUtc?: string | null;
+    rejectionReason?: string | null;
     postedOnUtc?: string | null;
     customerCode: string;
     customerName: string;
@@ -64,8 +81,6 @@ function buildReceiptHtml(args: {
     lastModifiedOnUtc?: string | null;
     lastModifiedBy?: string | null;
     lastModifiedByDisplayName?: string | null;
-    approvedByDisplayName?: string | null;
-    approvedOnUtc?: string | null;
     invoiceLines: {
       id: string;
       description: string;
@@ -251,7 +266,7 @@ function buildReceiptHtml(args: {
 
     <div class="title-block">
       <h1>Official Customer Receipt</h1>
-      <div class="subtitle">Receipt acknowledgement for posted customer payment</div>
+      <div class="subtitle">Controlled receipt document for receivable settlement under accrual accounting</div>
     </div>
 
     <div class="section">
@@ -262,6 +277,7 @@ function buildReceiptHtml(args: {
         <div class="kv-row"><span>Status</span><span>${receiptStatusLabel(receipt.status)}</span></div>
         <div class="kv-row"><span>Amount Received</span><span>${formatAmount(receipt.amount)}</span></div>
         <div class="kv-row"><span>Description</span><span>${receipt.description}</span></div>
+        <div class="kv-row"><span>Approval Required</span><span>${receipt.postingRequiresApproval ? 'Yes' : 'No'}</span></div>
         <div class="kv-row"><span>Posted On</span><span>${formatUtcDate(receipt.postedOnUtc)}</span></div>
       </div>
     </div>
@@ -299,10 +315,15 @@ function buildReceiptHtml(args: {
       <div class="kv">
         <div class="kv-row"><span>Prepared On</span><span>${formatUtcDate(receipt.createdOnUtc)}</span></div>
         <div class="kv-row"><span>Prepared By</span><span>${receipt.preparedByDisplayName || receipt.createdByDisplayName || receipt.createdBy || 'Not available'}</span></div>
+        <div class="kv-row"><span>Submitted On</span><span>${formatUtcDate(receipt.submittedOnUtc)}</span></div>
+        <div class="kv-row"><span>Submitted By</span><span>${receipt.submittedByDisplayName || receipt.submittedBy || '—'}</span></div>
+        <div class="kv-row"><span>Approved On</span><span>${formatUtcDate(receipt.approvedOnUtc)}</span></div>
+        <div class="kv-row"><span>Approved By</span><span>${receipt.approvedByDisplayName || receipt.approvedBy || '—'}</span></div>
+        <div class="kv-row"><span>Rejected On</span><span>${formatUtcDate(receipt.rejectedOnUtc)}</span></div>
+        <div class="kv-row"><span>Rejected By</span><span>${receipt.rejectedByDisplayName || receipt.rejectedBy || '—'}</span></div>
+        <div class="kv-row"><span>Rejection Reason</span><span>${receipt.rejectionReason || '—'}</span></div>
         <div class="kv-row"><span>Last Modified On</span><span>${formatUtcDate(receipt.lastModifiedOnUtc)}</span></div>
         <div class="kv-row"><span>Last Modified By</span><span>${receipt.lastModifiedByDisplayName || receipt.lastModifiedBy || 'Not available'}</span></div>
-        <div class="kv-row"><span>Approved On</span><span>${formatUtcDate(receipt.approvedOnUtc)}</span></div>
-        <div class="kv-row"><span>Approved By</span><span>${receipt.approvedByDisplayName || 'Pending workflow approval'}</span></div>
       </div>
     </div>
 
@@ -311,6 +332,7 @@ function buildReceiptHtml(args: {
       <div>Amount Received: ${formatAmount(receipt.amount)}</div>
       <div>Customer: ${receipt.customerName}</div>
       <div>Invoice: ${receipt.invoiceNumber}</div>
+      <div>Status: ${receiptStatusLabel(receipt.status)}</div>
     </div>
   </div>
 </body>
@@ -392,7 +414,7 @@ export function CustomerReceiptPrintPage() {
         <div className="section-heading">
           <div>
             <h2>Customer Receipt</h2>
-            <div className="muted">Printable customer acknowledgement and receipt detail</div>
+            <div className="muted">Printable customer acknowledgement and controlled receipt detail</div>
           </div>
 
           <div className="inline-actions">
@@ -432,6 +454,10 @@ export function CustomerReceiptPrintPage() {
           <div className="kv-row">
             <span>Status</span>
             <span>{receiptStatusLabel(receipt.status)}</span>
+          </div>
+          <div className="kv-row">
+            <span>Approval Required</span>
+            <span>{receipt.postingRequiresApproval ? 'Yes' : 'No'}</span>
           </div>
           <div className="kv-row">
             <span>Posted On</span>
@@ -544,12 +570,12 @@ export function CustomerReceiptPrintPage() {
               <span>{receipt.preparedByDisplayName || receipt.createdByDisplayName || receipt.createdBy || 'Not available'}</span>
             </div>
             <div className="kv-row">
-              <span>Last Modified On</span>
-              <span>{formatUtcDate(receipt.lastModifiedOnUtc)}</span>
+              <span>Submitted On</span>
+              <span>{formatUtcDate(receipt.submittedOnUtc)}</span>
             </div>
             <div className="kv-row">
-              <span>Last Modified By</span>
-              <span>{receipt.lastModifiedByDisplayName || receipt.lastModifiedBy || 'Not available'}</span>
+              <span>Submitted By</span>
+              <span>{receipt.submittedByDisplayName || receipt.submittedBy || '—'}</span>
             </div>
             <div className="kv-row">
               <span>Approved On</span>
@@ -557,7 +583,27 @@ export function CustomerReceiptPrintPage() {
             </div>
             <div className="kv-row">
               <span>Approved By</span>
-              <span>{receipt.approvedByDisplayName || 'Pending workflow approval'}</span>
+              <span>{receipt.approvedByDisplayName || receipt.approvedBy || '—'}</span>
+            </div>
+            <div className="kv-row">
+              <span>Rejected On</span>
+              <span>{formatUtcDate(receipt.rejectedOnUtc)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Rejected By</span>
+              <span>{receipt.rejectedByDisplayName || receipt.rejectedBy || '—'}</span>
+            </div>
+            <div className="kv-row">
+              <span>Rejection Reason</span>
+              <span>{receipt.rejectionReason || '—'}</span>
+            </div>
+            <div className="kv-row">
+              <span>Last Modified On</span>
+              <span>{formatUtcDate(receipt.lastModifiedOnUtc)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Last Modified By</span>
+              <span>{receipt.lastModifiedByDisplayName || receipt.lastModifiedBy || 'Not available'}</span>
             </div>
           </div>
         </div>
@@ -567,6 +613,7 @@ export function CustomerReceiptPrintPage() {
           <div>Amount Received: {formatAmount(receipt.amount)}</div>
           <div>Customer: {receipt.customerName}</div>
           <div>Invoice: {receipt.invoiceNumber}</div>
+          <div>Status: {receiptStatusLabel(receipt.status)}</div>
         </div>
       </section>
     </div>
