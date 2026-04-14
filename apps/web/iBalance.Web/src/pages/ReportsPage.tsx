@@ -197,6 +197,14 @@ function statementSourceTypeLabel(value: number) {
   }
 }
 
+function callOverReadinessLabel(score: number) {
+  if (score >= 100) return 'Fully Aligned';
+  if (score >= 75) return 'Mostly Ready';
+  if (score >= 50) return 'Partially Ready';
+  if (score >= 25) return 'Started';
+  return 'Not Ready';
+}
+
 function LogoSlot({
   dataUrl,
   fallbackText,
@@ -455,6 +463,245 @@ function buildStandaloneHtml(args: {
     </div>
 
     ${args.bodyHtml}
+  </div>
+</body>
+</html>`;
+}
+
+
+function buildReconciliationReportHtml(args: {
+  tenantKey: string;
+  tenantLogo: string;
+  companyLogo: string;
+  reconciliation: {
+    id: string;
+    ledgerAccountCode?: string | null;
+    ledgerAccountName?: string | null;
+    statementFromUtc: string;
+    statementToUtc: string;
+    statementClosingBalance: number;
+    bookClosingBalance: number;
+    differenceAmount: number;
+    status: number;
+    notes?: string | null;
+    completedOnUtc?: string | null;
+    cancelledOnUtc?: string | null;
+  };
+  metrics: {
+    totalLines: number;
+    reconciledLines: number;
+    unreconciledLines: number;
+    reconciledAmount: number;
+    unreconciledAmount: number;
+    reconciledLinePercentage: number;
+    reconciledAmountPercentage: number;
+  };
+  items: Array<{
+    id: string;
+    movementDateUtc: string;
+    reference: string;
+    description: string;
+    debitAmount: number;
+    creditAmount: number;
+    isReconciled: boolean;
+    notes?: string | null;
+  }>;
+}) {
+  const {
+    tenantKey,
+    tenantLogo,
+    companyLogo,
+    reconciliation,
+    metrics,
+    items,
+  } = args;
+
+  const logoOrFallback = (src: string, fallback: string) =>
+    src
+      ? `<img src="${src}" alt="${fallback}" style="height:42px;max-width:180px;object-fit:contain;" />`
+      : `<div style="min-width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:rgba(75,29,115,0.12);font-weight:700;">${fallback}</div>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Bank Reconciliation Report</title>
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      color: #111827;
+      margin: 0;
+      padding: 24px;
+      background: #ffffff;
+    }
+    .page {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .brand-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+    .brand-block {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .brand-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .brand-meta strong {
+      font-size: 15px;
+    }
+    .brand-meta span {
+      font-size: 12px;
+      color: #6b7280;
+    }
+    .title-block {
+      margin-bottom: 18px;
+      border-bottom: 2px solid #e5e7eb;
+      padding-bottom: 12px;
+    }
+    .title-block h1 {
+      margin: 0 0 8px 0;
+      font-size: 26px;
+    }
+    .muted {
+      color: #6b7280;
+      font-size: 14px;
+    }
+    .kv {
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    .kv-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 10px 14px;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .kv-row:last-child {
+      border-bottom: none;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+    th, td {
+      padding: 8px;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 13px;
+      vertical-align: top;
+    }
+    th {
+      text-align: left;
+      border-bottom: 1px solid #d1d5db;
+    }
+    .right {
+      text-align: right;
+    }
+    .yes {
+      color: #065f46;
+      font-weight: 600;
+    }
+    .no {
+      color: #92400e;
+      font-weight: 600;
+    }
+    @media print {
+      body {
+        padding: 0;
+      }
+      .page {
+        max-width: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="brand-row">
+      <div class="brand-block">
+        ${logoOrFallback(companyLogo, 'iBalance')}
+        <div class="brand-meta">
+          <strong>Nikosoft Technologies</strong>
+          <span>iBalance Accounting Cloud</span>
+        </div>
+      </div>
+      <div class="brand-block">
+        ${logoOrFallback(tenantLogo, 'Org')}
+        <div class="brand-meta">
+          <strong>${tenantKey || 'Organization'}</strong>
+          <span>Client Workspace</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="title-block">
+      <h1>Bank Reconciliation Report</h1>
+      <div class="muted">${reconciliation.ledgerAccountCode || ''} - ${reconciliation.ledgerAccountName || ''}</div>
+      <div class="muted">
+        Statement Period: ${new Date(reconciliation.statementFromUtc).toLocaleString()} to ${new Date(reconciliation.statementToUtc).toLocaleString()}
+      </div>
+    </div>
+
+    <div class="kv">
+      <div class="kv-row"><span>Status</span><span>${reconciliationStatusLabel(reconciliation.status)}</span></div>
+      <div class="kv-row"><span>Statement Closing Balance</span><span>${formatAmount(reconciliation.statementClosingBalance)}</span></div>
+      <div class="kv-row"><span>Book Closing Balance</span><span>${formatAmount(reconciliation.bookClosingBalance)}</span></div>
+      <div class="kv-row"><span>Difference</span><span>${formatAmount(reconciliation.differenceAmount)}</span></div>
+      <div class="kv-row"><span>Notes</span><span>${reconciliation.notes || '—'}</span></div>
+      <div class="kv-row"><span>Completed On</span><span>${formatDateTime(reconciliation.completedOnUtc || null)}</span></div>
+      <div class="kv-row"><span>Cancelled On</span><span>${formatDateTime(reconciliation.cancelledOnUtc || null)}</span></div>
+    </div>
+
+    <div class="kv">
+      <div class="kv-row"><span>Total Lines</span><span>${metrics.totalLines}</span></div>
+      <div class="kv-row"><span>Reconciled Lines</span><span>${metrics.reconciledLines}</span></div>
+      <div class="kv-row"><span>Unreconciled Lines</span><span>${metrics.unreconciledLines}</span></div>
+      <div class="kv-row"><span>Reconciled Amount</span><span>${formatAmount(metrics.reconciledAmount)}</span></div>
+      <div class="kv-row"><span>Unreconciled Amount</span><span>${formatAmount(metrics.unreconciledAmount)}</span></div>
+      <div class="kv-row"><span>Reconciled Lines %</span><span>${formatPercentage(metrics.reconciledLinePercentage)}</span></div>
+      <div class="kv-row"><span>Reconciled Amount %</span><span>${formatPercentage(metrics.reconciledAmountPercentage)}</span></div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Reference</th>
+          <th>Description</th>
+          <th class="right">Debit</th>
+          <th class="right">Credit</th>
+          <th>Reconciled</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${items.length === 0
+          ? `<tr><td colspan="7" class="muted">No reconciliation lines available.</td></tr>`
+          : items.map((item) => `
+            <tr>
+              <td>${formatDateTime(item.movementDateUtc)}</td>
+              <td>${item.reference}</td>
+              <td>${item.description}</td>
+              <td class="right">${formatAmount(item.debitAmount)}</td>
+              <td class="right">${formatAmount(item.creditAmount)}</td>
+              <td class="${item.isReconciled ? 'yes' : 'no'}">${item.isReconciled ? 'Yes' : 'No'}</td>
+              <td>${item.notes || '—'}</td>
+            </tr>
+          `).join('')}
+      </tbody>
+    </table>
   </div>
 </body>
 </html>`;
@@ -887,6 +1134,67 @@ export function ReportsPage() {
   }, [bankReconciliationDetailQ.data, reconciliationLineFilter, callOverBookSearch]);
 
 
+  const callOverReadiness = useMemo(() => {
+    const statementDetail = bankStatementImportDetailQ.data;
+    const reconciliationDetail = bankReconciliationDetailQ.data;
+
+    const statementAccountId = statementDetail?.bankStatementImport.ledgerAccountId || null;
+    const reconciliationAccountId = reconciliationDetail?.reconciliation.ledgerAccountId || null;
+
+    const statementFrom = statementDetail?.bankStatementImport.statementFromUtc || null;
+    const statementTo = statementDetail?.bankStatementImport.statementToUtc || null;
+
+    const reconciliationFrom = reconciliationDetail?.reconciliation.statementFromUtc || null;
+    const reconciliationTo = reconciliationDetail?.reconciliation.statementToUtc || null;
+
+    const accountAligned =
+      !!statementAccountId &&
+      !!reconciliationAccountId &&
+      statementAccountId === reconciliationAccountId;
+
+    const periodAligned =
+      !!statementFrom &&
+      !!statementTo &&
+      !!reconciliationFrom &&
+      !!reconciliationTo &&
+      statementFrom === reconciliationFrom &&
+      statementTo === reconciliationTo;
+
+    const statementLineCount = statementDetail?.count ?? 0;
+    const bookLineCount = reconciliationDetail?.count ?? 0;
+    const reconciledCount = reconciliationDetail?.reconciledCount ?? 0;
+    const unreconciledCount = reconciliationDetail?.unreconciledCount ?? 0;
+
+    const statementNetAmount = statementDetail
+      ? Math.abs((statementDetail.totalCredit || 0) - (statementDetail.totalDebit || 0))
+      : 0;
+
+    const bookDifferenceAmount = reconciliationDetail
+      ? Math.abs(reconciliationDetail.reconciliation.differenceAmount || 0)
+      : 0;
+
+    const readinessScore =
+      (statementDetail ? 25 : 0) +
+      (reconciliationDetail ? 25 : 0) +
+      (accountAligned ? 25 : 0) +
+      (periodAligned ? 25 : 0);
+
+    return {
+      hasStatement: !!statementDetail,
+      hasReconciliation: !!reconciliationDetail,
+      accountAligned,
+      periodAligned,
+      statementLineCount,
+      bookLineCount,
+      reconciledCount,
+      unreconciledCount,
+      statementNetAmount,
+      bookDifferenceAmount,
+      readinessScore,
+    };
+  }, [bankStatementImportDetailQ.data, bankReconciliationDetailQ.data]);
+
+
   function openStandalonePrint(html: string) {
     const printWindow = window.open('', '_blank', 'width=1200,height=900');
     if (!printWindow) return;
@@ -1047,6 +1355,24 @@ export function ReportsPage() {
       sourceReference: apiPlaceholderReference.trim(),
       notes: statementImportNotes.trim() || null,
     });
+  }
+
+
+  function printReconciliationReport() {
+    if (!bankReconciliationDetailQ.data) {
+      return;
+    }
+
+    const html = buildReconciliationReportHtml({
+      tenantKey: getTenantKey(),
+      tenantLogo: getTenantLogoDataUrl(),
+      companyLogo: getCompanyLogoDataUrl(),
+      reconciliation: bankReconciliationDetailQ.data.reconciliation,
+      metrics: reconciliationMetrics,
+      items: bankReconciliationDetailQ.data.items,
+    });
+
+    openStandalonePrint(html);
   }
 
 
@@ -2228,6 +2554,7 @@ export function ReportsPage() {
                 onClick={() => {
                   setSelectedReconciliationId(item.id);
                   setReconciliationLineFilter('all');
+                  setCallOverBookSearch('');
                 }}
               >
                 Open
@@ -2292,6 +2619,13 @@ export function ReportsPage() {
         }
       >
         {cancelReconciliationMut.isPending ? 'Cancelling…' : 'Cancel Reconciliation'}
+      </button>
+
+      <button
+        className="button"
+        onClick={printReconciliationReport}
+      >
+        Print Reconciliation Report
       </button>
     </div>
 
@@ -2381,6 +2715,12 @@ export function ReportsPage() {
         {' '}({formatPercentage(reconciliationMetrics.reconciledAmountPercentage)}).
       </div>
     </div>
+
+    <div className="panel" style={{ marginBottom: 16 }}>
+    <div className="muted">
+      Use “Print Reconciliation Report” to generate a formal report of the current reconciliation, including balances, status, metrics, and line-by-line review results.
+    </div>
+  </div>
 
     <div className="form-grid two" style={{ marginBottom: 16 }}>
     <div className="form-row">
@@ -2630,12 +2970,15 @@ export function ReportsPage() {
               <td>{item.lineCount}</td>
               <td>{formatDateTime(item.importedOnUtc)}</td>
               <td>
-                <button
-                  className="button"
-                  onClick={() => setSelectedStatementImportId(item.id)}
-                >
-                  Open
-                </button>
+              <button
+              className="button"
+              onClick={() => {
+                setSelectedStatementImportId(item.id);
+                setCallOverStatementSearch('');
+              }}
+            >
+              Open
+            </button>
               </td>
             </tr>
           ))
@@ -2643,6 +2986,63 @@ export function ReportsPage() {
       </tbody>
     </table>
   </div>
+
+
+  <div className="kv" style={{ marginBottom: 16 }}>
+  <div className="kv-row">
+    <span>Call-over Readiness</span>
+    <span>{callOverReadinessLabel(callOverReadiness.readinessScore)}</span>
+  </div>
+  <div className="kv-row">
+    <span>Readiness Score</span>
+    <span>{callOverReadiness.readinessScore}%</span>
+  </div>
+  <div className="kv-row">
+    <span>Statement Loaded</span>
+    <span>{callOverReadiness.hasStatement ? 'Yes' : 'No'}</span>
+  </div>
+  <div className="kv-row">
+    <span>Reconciliation Loaded</span>
+    <span>{callOverReadiness.hasReconciliation ? 'Yes' : 'No'}</span>
+  </div>
+  <div className="kv-row">
+    <span>Account Alignment</span>
+    <span>{callOverReadiness.accountAligned ? 'Aligned' : 'Not Aligned'}</span>
+  </div>
+  <div className="kv-row">
+    <span>Period Alignment</span>
+    <span>{callOverReadiness.periodAligned ? 'Aligned' : 'Not Aligned'}</span>
+  </div>
+  <div className="kv-row">
+    <span>Statement Line Count</span>
+    <span>{callOverReadiness.statementLineCount}</span>
+  </div>
+  <div className="kv-row">
+    <span>Book Line Count</span>
+    <span>{callOverReadiness.bookLineCount}</span>
+  </div>
+  <div className="kv-row">
+    <span>Reconciled / Unreconciled</span>
+    <span>{callOverReadiness.reconciledCount} / {callOverReadiness.unreconciledCount}</span>
+  </div>
+  <div className="kv-row">
+    <span>Statement Net Activity</span>
+    <span>{formatAmount(callOverReadiness.statementNetAmount)}</span>
+  </div>
+  <div className="kv-row">
+    <span>Outstanding Difference</span>
+    <span>{formatAmount(callOverReadiness.bookDifferenceAmount)}</span>
+  </div>
+</div>
+
+<div className="panel" style={{ marginBottom: 16 }}>
+<div className="muted">
+  Best Call-over flow: load a treasury account, import or open a bank statement batch, open the matching reconciliation for the same account and period, then review both sides together.
+</div>
+<div className="muted" style={{ marginTop: 8 }}>
+  The workspace is strongest when the statement import and reconciliation are aligned on the same treasury account and statement period.
+</div>
+</div>
 
   <div
     style={{
@@ -2732,8 +3132,13 @@ export function ReportsPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredStatementLines.map((item) => (
-                    <tr key={item.id}>
+                  filteredStatementLines.map((item, index) => (
+                    <tr
+                      key={item.id}
+                      style={{
+                        background: index % 2 === 0 ? 'rgba(59, 130, 246, 0.04)' : 'transparent',
+                      }}
+                    >
                       <td>{formatDateTime(item.transactionDateUtc)}</td>
                       <td>{formatDateTime(item.valueDateUtc || null)}</td>
                       <td>{item.reference}</td>
@@ -2841,8 +3246,17 @@ export function ReportsPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredBookLines.map((item) => (
-                    <tr key={item.id}>
+                  filteredBookLines.map((item, index) => (
+                    <tr
+                      key={item.id}
+                      style={{
+                        background: item.isReconciled
+                          ? 'rgba(16, 185, 129, 0.10)'
+                          : index % 2 === 0
+                            ? 'rgba(245, 158, 11, 0.06)'
+                            : 'transparent',
+                      }}
+                    >
                       <td>{formatDateTime(item.movementDateUtc)}</td>
                       <td>{item.reference}</td>
                       <td>{item.description}</td>
