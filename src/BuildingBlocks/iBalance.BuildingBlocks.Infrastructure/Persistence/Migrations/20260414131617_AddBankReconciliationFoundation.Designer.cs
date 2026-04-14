@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using iBalance.BuildingBlocks.Infrastructure.Persistence;
 namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260414131617_AddBankReconciliationFoundation")]
+    partial class AddBankReconciliationFoundation
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -113,101 +116,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("bank_reconciliation_lines", "public");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.BankStatementImport", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CreatedBy")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("FileName")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("ImportedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("LastModifiedBy")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("LastModifiedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("LedgerAccountId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Notes")
-                        .HasColumnType("text");
-
-                    b.Property<string>("SourceReference")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("SourceType")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("StatementFromUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("StatementToUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("LedgerAccountId");
-
-                    b.ToTable("BankStatementImports", "public");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.BankStatementImportLine", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal?>("Balance")
-                        .HasColumnType("numeric");
-
-                    b.Property<Guid>("BankStatementImportId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("CreditAmount")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal>("DebitAmount")
-                        .HasColumnType("numeric");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("ExternalReference")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Reference")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("TransactionDateUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("ValueDateUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BankStatementImportId");
-
-                    b.ToTable("BankStatementImportLines", "public");
                 });
 
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.Customer", b =>
@@ -1515,28 +1423,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.Navigation("LedgerMovement");
                 });
 
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.BankStatementImport", b =>
-                {
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.LedgerAccount", "LedgerAccount")
-                        .WithMany()
-                        .HasForeignKey("LedgerAccountId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("LedgerAccount");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.BankStatementImportLine", b =>
-                {
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.BankStatementImport", "BankStatementImport")
-                        .WithMany("Lines")
-                        .HasForeignKey("BankStatementImportId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("BankStatementImport");
-                });
-
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.CustomerReceipt", b =>
                 {
                     b.HasOne("iBalance.Modules.Finance.Domain.Entities.Customer", "Customer")
@@ -1698,11 +1584,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.BankReconciliation", b =>
-                {
-                    b.Navigation("Lines");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.BankStatementImport", b =>
                 {
                     b.Navigation("Lines");
                 });

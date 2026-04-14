@@ -1,8 +1,17 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  cancelBankReconciliation,
+  completeBankReconciliation,
+  createApiPlaceholderBankStatementImport,
+  createBankReconciliation,
   getBalanceSheet,
+  getBankReconciliationDetail,
+  getBankReconciliations,
+  getBankStatementImportDetail,
+  getBankStatementImports,
   getCashbook,
+  getCashbookSummary,
   getCompanyLogoDataUrl,
   getCustomerReceipts,
   getIncomeStatement,
@@ -12,6 +21,8 @@ import {
   getTenantLogoDataUrl,
   getTrialBalance,
   getVendorPayments,
+  setBankReconciliationLineReconciledState,
+  uploadBankStatementImport,
 } from '../lib/api';
 import { canViewReports } from '../lib/auth';
 
@@ -30,7 +41,12 @@ function formatAmount(value: number) {
   }).format(value);
 }
 
-function formatDateTime(value: string) {
+function formatPercentage(value: number) {
+  return `${value.toFixed(1)}%`;
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return 'Not available';
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return 'Not available';
   return parsed.toLocaleString();
@@ -57,6 +73,68 @@ function buildReportingPeriodText(fromDate: string, toDate: string) {
 
 function buildAsAtText(asAtDate: string) {
   return `As At: ${formatDisplayDate(`${asAtDate}T00:00:00`)}`;
+}
+
+function buildBankStatementTemplateCsv() {
+  const headers = [
+    'TransactionDate',
+    'ValueDate',
+    'Reference',
+    'Description',
+    'DebitAmount',
+    'CreditAmount',
+    'Balance',
+    'ExternalReference',
+  ];
+
+  const rows = [
+    ['2026-01-02T00:00:00.000Z', '2026-01-02T00:00:00.000Z', 'BNK-0001', 'Opening balance carried forward', '0', '0', '150000.00', 'EXT-001'],
+    ['2026-01-03T00:00:00.000Z', '2026-01-03T00:00:00.000Z', 'BNK-0002', 'Customer transfer received', '0', '25000.00', '175000.00', 'EXT-002'],
+    ['2026-01-04T00:00:00.000Z', '2026-01-04T00:00:00.000Z', 'BNK-0003', 'Supplier payment issued', '10000.00', '0', '165000.00', 'EXT-003'],
+  ];
+
+  return [headers, ...rows]
+    .map((row) => row.map((cell) => {
+      const value = String(cell);
+      if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+        return `"${value.replaceAll('"', '""')}"`;
+      }
+      return value;
+    }).join(','))
+    .join('\n');
+}
+
+function splitCsvLine(line: string) {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i];
+    const next = line[i + 1];
+
+    if (ch === '"' && inQuotes && next === '"') {
+      current += '"';
+      i += 1;
+      continue;
+    }
+
+    if (ch === '"') {
+      inQuotes = !inQuotes;
+      continue;
+    }
+
+    if (ch === ',' && !inQuotes) {
+      result.push(current);
+      current = '';
+      continue;
+    }
+
+    current += ch;
+  }
+
+  result.push(current);
+  return result.map((x) => x.trim());
 }
 
 function invoiceStatusLabel(value: number) {
@@ -98,6 +176,23 @@ function vendorPaymentStatusLabel(value: number) {
     case 4: return 'Rejected';
     case 5: return 'Posted';
     case 6: return 'Cancelled';
+    default: return 'Unknown';
+  }
+}
+
+function reconciliationStatusLabel(value: number) {
+  switch (value) {
+    case 1: return 'Draft';
+    case 2: return 'Completed';
+    case 3: return 'Cancelled';
+    default: return 'Unknown';
+  }
+}
+
+function statementSourceTypeLabel(value: number) {
+  switch (value) {
+    case 1: return 'Upload';
+    case 2: return 'API Feed';
     default: return 'Unknown';
   }
 }
@@ -378,6 +473,20 @@ export function ReportsPage() {
   const [balanceSheetAsAtDate, setBalanceSheetAsAtDate] = useState(defaultToDate);
   const [cashbookLedgerAccountId, setCashbookLedgerAccountId] = useState('');
 
+  const [reconciliationLedgerAccountId, setReconciliationLedgerAccountId] = useState('');
+  const [statementClosingBalance, setStatementClosingBalance] = useState('');
+  const [reconciliationNotes, setReconciliationNotes] = useState('');
+  const [selectedReconciliationId, setSelectedReconciliationId] = useState('');
+  const [reconciliationLineFilter, setReconciliationLineFilter] = useState('all');
+  const [statementImportLedgerAccountId, setStatementImportLedgerAccountId] = useState('');
+  const [statementSourceReference, setStatementSourceReference] = useState('');
+  const [statementImportNotes, setStatementImportNotes] = useState('');
+  const [selectedStatementImportId, setSelectedStatementImportId] = useState('');
+  const [callOverStatementSearch, setCallOverStatementSearch] = useState('');
+  const [callOverBookSearch, setCallOverBookSearch] = useState('');
+  const [apiPlaceholderReference, setApiPlaceholderReference] = useState('');
+  const qc = useQueryClient();
+
   const canView = canViewReports();
 
   const isPeriodRangeValid = !!fromDate && !!toDate;
@@ -410,6 +519,132 @@ export function ReportsPage() {
     queryFn: () => getCashbook(cashbookLedgerAccountId || null, fromUtc, toUtc),
     enabled: canView && isPeriodRangeValid,
   });
+
+  const cashbookSummary = useQuery({
+    queryKey: ['cashbook-summary', fromUtc ?? null, toUtc ?? null],
+    queryFn: () => getCashbookSummary(fromUtc, toUtc),
+    enabled: canView && isPeriodRangeValid,
+  });
+
+  const bankReconciliationsQ = useQuery({
+    queryKey: ['bank-reconciliations', reconciliationLedgerAccountId || null],
+    queryFn: () => getBankReconciliations(reconciliationLedgerAccountId || null),
+    enabled: canView,
+  });
+
+  const bankReconciliationDetailQ = useQuery({
+    queryKey: ['bank-reconciliation-detail', selectedReconciliationId || null],
+    queryFn: () => getBankReconciliationDetail(selectedReconciliationId),
+    enabled: canView && !!selectedReconciliationId,
+  });
+
+
+  const bankStatementImportsQ = useQuery({
+    queryKey: ['bank-statement-imports', statementImportLedgerAccountId || null],
+    queryFn: () => getBankStatementImports(statementImportLedgerAccountId || null),
+    enabled: canView,
+  });
+
+  const bankStatementImportDetailQ = useQuery({
+    queryKey: ['bank-statement-import-detail', selectedStatementImportId || null],
+    queryFn: () => getBankStatementImportDetail(selectedStatementImportId),
+    enabled: canView && !!selectedStatementImportId,
+  });
+
+
+  const createReconciliationMut = useMutation({
+    mutationFn: createBankReconciliation,
+    onSuccess: async (result: any) => {
+      await qc.invalidateQueries({ queryKey: ['bank-reconciliations'] });
+      const createdId = result?.id || result?.Id;
+      if (createdId) {
+        setSelectedReconciliationId(createdId);
+      }
+      setReconciliationNotes('');
+    },
+  });
+
+
+  const updateReconciliationLineMut = useMutation({
+    mutationFn: ({
+      bankReconciliationId,
+      bankReconciliationLineId,
+      payload,
+    }: {
+      bankReconciliationId: string;
+      bankReconciliationLineId: string;
+      payload: { isReconciled: boolean; notes?: string | null };
+    }) =>
+      setBankReconciliationLineReconciledState(
+        bankReconciliationId,
+        bankReconciliationLineId,
+        payload
+      ),
+    onSuccess: async () => {
+      if (selectedReconciliationId) {
+        await qc.invalidateQueries({
+          queryKey: ['bank-reconciliation-detail', selectedReconciliationId],
+        });
+        await qc.invalidateQueries({
+          queryKey: ['bank-reconciliations'],
+        });
+      }
+    },
+  });
+
+
+  const completeReconciliationMut = useMutation({
+    mutationFn: completeBankReconciliation,
+    onSuccess: async () => {
+      if (selectedReconciliationId) {
+        await qc.invalidateQueries({
+          queryKey: ['bank-reconciliation-detail', selectedReconciliationId],
+        });
+      }
+      await qc.invalidateQueries({
+        queryKey: ['bank-reconciliations'],
+      });
+    },
+  });
+
+  const cancelReconciliationMut = useMutation({
+    mutationFn: cancelBankReconciliation,
+    onSuccess: async () => {
+      if (selectedReconciliationId) {
+        await qc.invalidateQueries({
+          queryKey: ['bank-reconciliation-detail', selectedReconciliationId],
+        });
+      }
+      await qc.invalidateQueries({
+        queryKey: ['bank-reconciliations'],
+      });
+    },
+  });
+
+
+  const uploadStatementImportMut = useMutation({
+    mutationFn: uploadBankStatementImport,
+    onSuccess: async (result: any) => {
+      await qc.invalidateQueries({ queryKey: ['bank-statement-imports'] });
+      const createdId = result?.id || result?.Id;
+      if (createdId) {
+        setSelectedStatementImportId(createdId);
+      }
+      setStatementImportNotes('');
+    },
+  });
+
+  const createApiPlaceholderImportMut = useMutation({
+    mutationFn: createApiPlaceholderBankStatementImport,
+    onSuccess: async (result: any) => {
+      await qc.invalidateQueries({ queryKey: ['bank-statement-imports'] });
+      const createdId = result?.id || result?.Id;
+      if (createdId) {
+        setSelectedStatementImportId(createdId);
+      }
+    },
+  });
+
 
   const salesInvoicesQ = useQuery({
     queryKey: ['ar-sales-invoices'],
@@ -534,6 +769,124 @@ export function ReportsPage() {
     };
   }, [filteredPurchaseInvoices, filteredVendorPayments]);
 
+
+  const reconciliationMetrics = useMemo(() => {
+    const detail = bankReconciliationDetailQ.data;
+
+    if (!detail) {
+      return {
+        totalLines: 0,
+        reconciledLines: 0,
+        unreconciledLines: 0,
+        reconciledAmount: 0,
+        unreconciledAmount: 0,
+        reconciledDebit: 0,
+        reconciledCredit: 0,
+        unreconciledDebit: 0,
+        unreconciledCredit: 0,
+        reconciledLinePercentage: 0,
+        reconciledAmountPercentage: 0,
+      };
+    }
+
+    const absoluteAmount = (debitAmount: number, creditAmount: number) =>
+      Math.abs(Number(debitAmount || 0) - Number(creditAmount || 0));
+
+    const reconciledItems = detail.items.filter((x) => x.isReconciled);
+    const unreconciledItems = detail.items.filter((x) => !x.isReconciled);
+
+    const reconciledAmount = reconciledItems.reduce(
+      (sum, item) => sum + absoluteAmount(item.debitAmount, item.creditAmount),
+      0
+    );
+
+    const unreconciledAmount = unreconciledItems.reduce(
+      (sum, item) => sum + absoluteAmount(item.debitAmount, item.creditAmount),
+      0
+    );
+
+    const totalAmount = reconciledAmount + unreconciledAmount;
+    const totalLines = detail.count;
+    const reconciledLines = detail.reconciledCount;
+    const unreconciledLines = detail.unreconciledCount;
+
+    return {
+      totalLines,
+      reconciledLines,
+      unreconciledLines,
+      reconciledAmount,
+      unreconciledAmount,
+      reconciledDebit: reconciledItems.reduce((sum, item) => sum + Number(item.debitAmount || 0), 0),
+      reconciledCredit: reconciledItems.reduce((sum, item) => sum + Number(item.creditAmount || 0), 0),
+      unreconciledDebit: unreconciledItems.reduce((sum, item) => sum + Number(item.debitAmount || 0), 0),
+      unreconciledCredit: unreconciledItems.reduce((sum, item) => sum + Number(item.creditAmount || 0), 0),
+      reconciledLinePercentage: totalLines > 0 ? (reconciledLines / totalLines) * 100 : 0,
+      reconciledAmountPercentage: totalAmount > 0 ? (reconciledAmount / totalAmount) * 100 : 0,
+    };
+  }, [bankReconciliationDetailQ.data]);
+
+
+  const filteredReconciliationLines = useMemo(() => {
+    const detail = bankReconciliationDetailQ.data;
+    if (!detail) return [];
+
+    switch (reconciliationLineFilter) {
+      case 'reconciled':
+        return detail.items.filter((x) => x.isReconciled);
+      case 'unreconciled':
+        return detail.items.filter((x) => !x.isReconciled);
+      default:
+        return detail.items;
+    }
+  }, [bankReconciliationDetailQ.data, reconciliationLineFilter]);
+
+
+
+  const filteredStatementLines = useMemo(() => {
+    const detail = bankStatementImportDetailQ.data;
+    if (!detail) return [];
+
+    const search = callOverStatementSearch.trim().toLowerCase();
+
+    return detail.items.filter((item) => {
+      if (!search) return true;
+
+      return (
+        item.reference.toLowerCase().includes(search) ||
+        item.description.toLowerCase().includes(search) ||
+        (item.externalReference || '').toLowerCase().includes(search)
+      );
+    });
+  }, [bankStatementImportDetailQ.data, callOverStatementSearch]);
+
+  const filteredBookLines = useMemo(() => {
+    const detail = bankReconciliationDetailQ.data;
+    if (!detail) return [];
+
+    const baseItems = (() => {
+      switch (reconciliationLineFilter) {
+        case 'reconciled':
+          return detail.items.filter((x) => x.isReconciled);
+        case 'unreconciled':
+          return detail.items.filter((x) => !x.isReconciled);
+        default:
+          return detail.items;
+      }
+    })();
+
+    const search = callOverBookSearch.trim().toLowerCase();
+
+    return baseItems.filter((item) => {
+      if (!search) return true;
+
+      return (
+        item.reference.toLowerCase().includes(search) ||
+        item.description.toLowerCase().includes(search)
+      );
+    });
+  }, [bankReconciliationDetailQ.data, reconciliationLineFilter, callOverBookSearch]);
+
+
   function openStandalonePrint(html: string) {
     const printWindow = window.open('', '_blank', 'width=1200,height=900');
     if (!printWindow) return;
@@ -547,6 +900,155 @@ export function ReportsPage() {
       printWindow.print();
     };
   }
+
+  async function handleCreateReconciliation() {
+    if (!reconciliationLedgerAccountId || !fromUtc || !toUtc) {
+      return;
+    }
+
+    const parsedStatementClosingBalance = Number(statementClosingBalance);
+
+    if (Number.isNaN(parsedStatementClosingBalance)) {
+      return;
+    }
+
+    await createReconciliationMut.mutateAsync({
+      ledgerAccountId: reconciliationLedgerAccountId,
+      statementFromUtc: fromUtc,
+      statementToUtc: toUtc,
+      statementClosingBalance: parsedStatementClosingBalance,
+      notes: reconciliationNotes.trim() || null,
+    });
+  }
+
+  async function handleToggleReconciliationLine(
+    bankReconciliationId: string,
+    bankReconciliationLineId: string,
+    nextValue: boolean,
+    existingNotes?: string | null
+  ) {
+    await updateReconciliationLineMut.mutateAsync({
+      bankReconciliationId,
+      bankReconciliationLineId,
+      payload: {
+        isReconciled: nextValue,
+        notes: existingNotes || null,
+      },
+    });
+  }
+
+
+  async function handleCompleteReconciliation(bankReconciliationId: string) {
+    await completeReconciliationMut.mutateAsync(bankReconciliationId);
+  }
+
+  async function handleCancelReconciliation(bankReconciliationId: string) {
+    await cancelReconciliationMut.mutateAsync(bankReconciliationId);
+  }
+
+
+  function downloadBankStatementTemplate() {
+    const content = buildBankStatementTemplateCsv();
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ibalance-bank-statement-upload-template.csv';
+    a.click();
+
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleBankStatementUploadFile(file: File | null) {
+    if (!file || !statementImportLedgerAccountId || !fromUtc || !toUtc) {
+      return;
+    }
+
+    const text = await file.text();
+    const lines = text
+      .split(/\r?\n/)
+      .map((x) => x.trim())
+      .filter(Boolean);
+
+    if (lines.length < 2) {
+      throw new Error('The selected bank statement file does not contain any line rows.');
+    }
+
+    const header = splitCsvLine(lines[0]).map((x) => x.toLowerCase());
+    const expected = [
+      'transactiondate',
+      'valuedate',
+      'reference',
+      'description',
+      'debitamount',
+      'creditamount',
+      'balance',
+      'externalreference',
+    ];
+
+    if (expected.some((value, index) => header[index] !== value)) {
+      throw new Error('The file format is not valid. Please use the Bank Statement Upload Template.');
+    }
+
+    const parsedLines = lines.slice(1).map((line, rowIndex) => {
+      const cols = splitCsvLine(line);
+
+      if (cols.length < 8) {
+        throw new Error(`Row ${rowIndex + 2}: incomplete statement line data.`);
+      }
+
+      const transactionDateUtc = new Date(cols[0]).toISOString();
+      const valueDateUtc = cols[1] ? new Date(cols[1]).toISOString() : null;
+      const debitAmount = Number(cols[4] || 0);
+      const creditAmount = Number(cols[5] || 0);
+      const balance = cols[6] ? Number(cols[6]) : null;
+
+      if (Number.isNaN(debitAmount) || Number.isNaN(creditAmount)) {
+        throw new Error(`Row ${rowIndex + 2}: invalid debit or credit amount.`);
+      }
+
+      if (balance !== null && Number.isNaN(balance)) {
+        throw new Error(`Row ${rowIndex + 2}: invalid balance value.`);
+      }
+
+      return {
+        transactionDateUtc,
+        valueDateUtc,
+        reference: cols[2],
+        description: cols[3],
+        debitAmount,
+        creditAmount,
+        balance,
+        externalReference: cols[7] || null,
+      };
+    });
+
+    await uploadStatementImportMut.mutateAsync({
+      ledgerAccountId: statementImportLedgerAccountId,
+      statementFromUtc: fromUtc,
+      statementToUtc: toUtc,
+      sourceReference: statementSourceReference.trim() || null,
+      fileName: file.name,
+      notes: statementImportNotes.trim() || null,
+      lines: parsedLines,
+    });
+  }
+
+  async function handleCreateApiPlaceholderImport() {
+    if (!statementImportLedgerAccountId || !fromUtc || !toUtc || !apiPlaceholderReference.trim()) {
+      return;
+    }
+
+    await createApiPlaceholderImportMut.mutateAsync({
+      ledgerAccountId: statementImportLedgerAccountId,
+      statementFromUtc: fromUtc,
+      statementToUtc: toUtc,
+      sourceReference: apiPlaceholderReference.trim(),
+      notes: statementImportNotes.trim() || null,
+    });
+  }
+
 
   function printTrialBalanceStandalone() {
     const bodyHtml = `
@@ -773,6 +1275,71 @@ export function ReportsPage() {
     openStandalonePrint(buildStandaloneHtml({
       title: 'Cashbook',
       subtitle: `${periodText} | ${selectedAccountLabel}`,
+      bodyHtml,
+    }));
+  }
+
+  function printCashbookSummaryStandalone() {
+    const bodyHtml = `
+      <div class="kv">
+        <div class="kv-row"><span>Reporting Period</span><span>${periodText.replace('Reporting Period: ', '')}</span></div>
+        <div class="kv-row"><span>Treasury Accounts</span><span>${cashbookSummary.data?.count ?? 0}</span></div>
+        <div class="kv-row"><span>Total Opening Balance (Debit)</span><span>${formatAmount(cashbookSummary.data?.totalOpeningBalanceDebit ?? 0)}</span></div>
+        <div class="kv-row"><span>Total Opening Balance (Credit)</span><span>${formatAmount(cashbookSummary.data?.totalOpeningBalanceCredit ?? 0)}</span></div>
+        <div class="kv-row"><span>Total Period Debit</span><span>${formatAmount(cashbookSummary.data?.totalPeriodDebit ?? 0)}</span></div>
+        <div class="kv-row"><span>Total Period Credit</span><span>${formatAmount(cashbookSummary.data?.totalPeriodCredit ?? 0)}</span></div>
+        <div class="kv-row"><span>Total Closing Balance (Debit)</span><span>${formatAmount(cashbookSummary.data?.totalClosingBalanceDebit ?? 0)}</span></div>
+        <div class="kv-row"><span>Total Closing Balance (Credit)</span><span>${formatAmount(cashbookSummary.data?.totalClosingBalanceCredit ?? 0)}</span></div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Account Name</th>
+              <th class="right">Opening Debit</th>
+              <th class="right">Opening Credit</th>
+              <th class="right">Period Debit</th>
+              <th class="right">Period Credit</th>
+              <th class="right">Closing Debit</th>
+              <th class="right">Closing Credit</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(cashbookSummary.data?.items ?? []).length === 0
+              ? '<tr><td colspan="8" class="muted">No treasury accounts were found for the selected reporting period.</td></tr>'
+              : (cashbookSummary.data?.items ?? []).map((item) => `
+                  <tr>
+                    <td>${item.code}</td>
+                    <td>${item.name}</td>
+                    <td class="right">${formatAmount(item.openingBalanceDebit)}</td>
+                    <td class="right">${formatAmount(item.openingBalanceCredit)}</td>
+                    <td class="right">${formatAmount(item.periodDebit)}</td>
+                    <td class="right">${formatAmount(item.periodCredit)}</td>
+                    <td class="right">${formatAmount(item.closingBalanceDebit)}</td>
+                    <td class="right">${formatAmount(item.closingBalanceCredit)}</td>
+                  </tr>
+                `).join('')}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th colSpan="2">Totals</th>
+              <th class="right">${formatAmount(cashbookSummary.data?.totalOpeningBalanceDebit ?? 0)}</th>
+              <th class="right">${formatAmount(cashbookSummary.data?.totalOpeningBalanceCredit ?? 0)}</th>
+              <th class="right">${formatAmount(cashbookSummary.data?.totalPeriodDebit ?? 0)}</th>
+              <th class="right">${formatAmount(cashbookSummary.data?.totalPeriodCredit ?? 0)}</th>
+              <th class="right">${formatAmount(cashbookSummary.data?.totalClosingBalanceDebit ?? 0)}</th>
+              <th class="right">${formatAmount(cashbookSummary.data?.totalClosingBalanceCredit ?? 0)}</th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    `;
+
+    openStandalonePrint(buildStandaloneHtml({
+      title: 'Treasury / Cashbook Summary',
+      subtitle: periodText,
       bodyHtml,
     }));
   }
@@ -1019,6 +1586,9 @@ export function ReportsPage() {
     balanceSheet.isLoading ||
     incomeStatement.isLoading ||
     cashbook.isLoading ||
+    cashbookSummary.isLoading ||
+    bankReconciliationsQ.isLoading ||
+    bankStatementImportsQ.isLoading ||
     salesInvoicesQ.isLoading ||
     customerReceiptsQ.isLoading ||
     purchaseInvoicesQ.isLoading ||
@@ -1032,6 +1602,9 @@ export function ReportsPage() {
     balanceSheet.error ||
     incomeStatement.error ||
     cashbook.error ||
+    cashbookSummary.error ||
+    bankReconciliationsQ.error ||
+    bankStatementImportsQ.error ||
     salesInvoicesQ.error ||
     customerReceiptsQ.error ||
     purchaseInvoicesQ.error ||
@@ -1040,6 +1613,9 @@ export function ReportsPage() {
     !balanceSheet.data ||
     !incomeStatement.data ||
     !cashbook.data ||
+    !cashbookSummary.data ||
+    !bankReconciliationsQ.data ||
+    !bankStatementImportsQ.data ||
     !salesInvoicesQ.data ||
     !customerReceiptsQ.data ||
     !purchaseInvoicesQ.data ||
@@ -1420,6 +1996,872 @@ export function ReportsPage() {
           </>
         )}
       </section>
+
+
+      <section id="print-cashbook-summary" className="panel printable-report">
+      <div className="section-heading no-print">
+        <div>
+          <h2>Treasury / Cashbook Summary</h2>
+          <span className="muted">{periodText}</span>
+        </div>
+        <button className="button" onClick={printCashbookSummaryStandalone}>
+          Print Treasury Summary
+        </button>
+      </div>
+
+      <ReportPrintHeader title="Treasury / Cashbook Summary" subtitle={periodText} />
+
+      <div className="kv" style={{ marginBottom: 16 }}>
+        <div className="kv-row">
+          <span>Reporting Period</span>
+          <span>{periodText.replace('Reporting Period: ', '')}</span>
+        </div>
+        <div className="kv-row">
+          <span>Treasury Accounts</span>
+          <span>{cashbookSummary.data.count}</span>
+        </div>
+        <div className="kv-row">
+          <span>Total Opening Balance (Debit)</span>
+          <span>{formatAmount(cashbookSummary.data.totalOpeningBalanceDebit)}</span>
+        </div>
+        <div className="kv-row">
+          <span>Total Opening Balance (Credit)</span>
+          <span>{formatAmount(cashbookSummary.data.totalOpeningBalanceCredit)}</span>
+        </div>
+        <div className="kv-row">
+          <span>Total Period Debit</span>
+          <span>{formatAmount(cashbookSummary.data.totalPeriodDebit)}</span>
+        </div>
+        <div className="kv-row">
+          <span>Total Period Credit</span>
+          <span>{formatAmount(cashbookSummary.data.totalPeriodCredit)}</span>
+        </div>
+        <div className="kv-row">
+          <span>Total Closing Balance (Debit)</span>
+          <span>{formatAmount(cashbookSummary.data.totalClosingBalanceDebit)}</span>
+        </div>
+        <div className="kv-row">
+          <span>Total Closing Balance (Credit)</span>
+          <span>{formatAmount(cashbookSummary.data.totalClosingBalanceCredit)}</span>
+        </div>
+      </div>
+
+      <div className="table-wrap">
+        <table className="data-table report-print-table">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Account Name</th>
+              <th style={{ textAlign: 'right' }}>Opening Debit</th>
+              <th style={{ textAlign: 'right' }}>Opening Credit</th>
+              <th style={{ textAlign: 'right' }}>Period Debit</th>
+              <th style={{ textAlign: 'right' }}>Period Credit</th>
+              <th style={{ textAlign: 'right' }}>Closing Debit</th>
+              <th style={{ textAlign: 'right' }}>Closing Credit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {cashbookSummary.data.items.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="muted">
+                  No treasury accounts were found for the selected reporting period.
+                </td>
+              </tr>
+            ) : (
+              cashbookSummary.data.items.map((item) => (
+                <tr key={item.ledgerAccountId}>
+                  <td>{item.code}</td>
+                  <td>{item.name}</td>
+                  <td style={{ textAlign: 'right' }}>{formatAmount(item.openingBalanceDebit)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatAmount(item.openingBalanceCredit)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatAmount(item.periodDebit)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatAmount(item.periodCredit)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatAmount(item.closingBalanceDebit)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatAmount(item.closingBalanceCredit)}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th colSpan={2}>Totals</th>
+              <th style={{ textAlign: 'right' }}>{formatAmount(cashbookSummary.data.totalOpeningBalanceDebit)}</th>
+              <th style={{ textAlign: 'right' }}>{formatAmount(cashbookSummary.data.totalOpeningBalanceCredit)}</th>
+              <th style={{ textAlign: 'right' }}>{formatAmount(cashbookSummary.data.totalPeriodDebit)}</th>
+              <th style={{ textAlign: 'right' }}>{formatAmount(cashbookSummary.data.totalPeriodCredit)}</th>
+              <th style={{ textAlign: 'right' }}>{formatAmount(cashbookSummary.data.totalClosingBalanceDebit)}</th>
+              <th style={{ textAlign: 'right' }}>{formatAmount(cashbookSummary.data.totalClosingBalanceCredit)}</th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+
+
+    <section className="panel no-print">
+    <div className="section-heading">
+      <div>
+        <h2>Bank Reconciliation</h2>
+        <span className="muted">Create and review reconciliation drafts for treasury accounts</span>
+      </div>
+    </div>
+
+    <div className="form-grid two" style={{ marginBottom: 16 }}>
+      <div className="form-row">
+        <label>Treasury Account</label>
+        <select
+          className="select"
+          value={reconciliationLedgerAccountId}
+          onChange={(e) => setReconciliationLedgerAccountId(e.target.value)}
+        >
+          <option value="">— Select Treasury Account —</option>
+          {cashbook.data.cashOrBankAccounts.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.code} - {item.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="form-row">
+        <label>Statement Closing Balance</label>
+        <input
+          className="input"
+          type="number"
+          step="0.01"
+          value={statementClosingBalance}
+          onChange={(e) => setStatementClosingBalance(e.target.value)}
+          placeholder="Enter statement closing balance"
+        />
+      </div>
+
+      <div className="form-row" style={{ gridColumn: '1 / -1' }}>
+        <label>Notes</label>
+        <input
+          className="input"
+          value={reconciliationNotes}
+          onChange={(e) => setReconciliationNotes(e.target.value)}
+          placeholder="Optional reconciliation notes"
+        />
+      </div>
+
+      <div className="form-row">
+        <label>Statement Period</label>
+        <div className="panel" style={{ margin: 0, padding: 12 }}>
+          <div className="muted">{periodText}</div>
+        </div>
+      </div>
+
+      <div className="form-row">
+        <label>Create Reconciliation</label>
+        <div className="inline-actions">
+          <button
+            className="button primary"
+            onClick={handleCreateReconciliation}
+            disabled={
+              !reconciliationLedgerAccountId ||
+              !fromUtc ||
+              !toUtc ||
+              !statementClosingBalance ||
+              createReconciliationMut.isPending
+            }
+          >
+            {createReconciliationMut.isPending ? 'Creating…' : 'Create Draft Reconciliation'}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    {createReconciliationMut.isError ? (
+      <div className="panel error-panel" style={{ marginBottom: 16 }}>
+        We could not create the bank reconciliation draft at this time.
+      </div>
+    ) : null}
+
+    {createReconciliationMut.isSuccess ? (
+      <div className="panel" style={{ marginBottom: 16 }}>
+        <div className="muted">Bank reconciliation draft created successfully.</div>
+      </div>
+    ) : null}
+
+    <div className="section-heading" style={{ marginTop: 8 }}>
+      <div>
+        <h2>Reconciliation Listing</h2>
+        <span className="muted">{bankReconciliationsQ.data.count} reconciliation record(s)</span>
+      </div>
+    </div>
+
+    <div className="table-wrap" style={{ marginBottom: 16 }}>
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>Treasury Account</th>
+            <th>Statement From</th>
+            <th>Statement To</th>
+            <th style={{ textAlign: 'right' }}>Statement Balance</th>
+            <th style={{ textAlign: 'right' }}>Book Balance</th>
+            <th style={{ textAlign: 'right' }}>Difference</th>
+            <th>Status</th>
+            <th style={{ width: 140 }}>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {bankReconciliationsQ.data.items.length === 0 ? (
+            <tr>
+              <td colSpan={8} className="muted">
+                No bank reconciliations have been created yet.
+              </td>
+            </tr>
+          ) : (
+            bankReconciliationsQ.data.items.map((item) => (
+              <tr key={item.id}>
+                <td>{item.ledgerAccountCode} - {item.ledgerAccountName}</td>
+                <td>{formatDateTime(item.statementFromUtc)}</td>
+                <td>{formatDateTime(item.statementToUtc)}</td>
+                <td style={{ textAlign: 'right' }}>{formatAmount(item.statementClosingBalance)}</td>
+                <td style={{ textAlign: 'right' }}>{formatAmount(item.bookClosingBalance)}</td>
+                <td style={{ textAlign: 'right' }}>{formatAmount(item.differenceAmount)}</td>
+                <td>{reconciliationStatusLabel(item.status)}</td>
+                <td>
+                <button
+                className="button"
+                onClick={() => {
+                  setSelectedReconciliationId(item.id);
+                  setReconciliationLineFilter('all');
+                }}
+              >
+                Open
+              </button>
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+
+    <div className="section-heading">
+      <div>
+        <h2>Reconciliation Detail</h2>
+        <span className="muted">
+          {selectedReconciliationId ? 'Opened reconciliation detail' : 'Select a reconciliation from the listing'}
+        </span>
+      </div>
+    </div>
+
+    {!selectedReconciliationId ? (
+      <div className="panel">
+        <div className="muted">Choose a reconciliation record above to view its lines and summary.</div>
+      </div>
+    ) : bankReconciliationDetailQ.isLoading ? (
+      <div className="panel">
+        <div className="muted">Loading reconciliation detail...</div>
+      </div>
+    ) : bankReconciliationDetailQ.isError || !bankReconciliationDetailQ.data ? (
+      <div className="panel error-panel">
+        We could not load the reconciliation detail at this time.
+      </div>
+    ) : (
+      <>
+
+
+      <div className="inline-actions" style={{ marginBottom: 16 }}>
+      <button
+        className="button primary"
+        disabled={
+          bankReconciliationDetailQ.data.reconciliation.status !== 1 ||
+          completeReconciliationMut.isPending ||
+          cancelReconciliationMut.isPending
+        }
+        onClick={() =>
+          handleCompleteReconciliation(bankReconciliationDetailQ.data.reconciliation.id)
+        }
+      >
+        {completeReconciliationMut.isPending ? 'Completing…' : 'Complete Reconciliation'}
+      </button>
+
+      <button
+        className="button"
+        disabled={
+          bankReconciliationDetailQ.data.reconciliation.status !== 1 ||
+          completeReconciliationMut.isPending ||
+          cancelReconciliationMut.isPending
+        }
+        onClick={() =>
+          handleCancelReconciliation(bankReconciliationDetailQ.data.reconciliation.id)
+        }
+      >
+        {cancelReconciliationMut.isPending ? 'Cancelling…' : 'Cancel Reconciliation'}
+      </button>
+    </div>
+
+
+
+        <div className="kv" style={{ marginBottom: 16 }}>
+          <div className="kv-row">
+            <span>Treasury Account</span>
+            <span>
+              {bankReconciliationDetailQ.data.reconciliation.ledgerAccountCode} - {bankReconciliationDetailQ.data.reconciliation.ledgerAccountName}
+            </span>
+          </div>
+          <div className="kv-row">
+            <span>Status</span>
+            <span>{reconciliationStatusLabel(bankReconciliationDetailQ.data.reconciliation.status)}</span>
+          </div>
+          <div className="kv-row">
+            <span>Statement Closing Balance</span>
+            <span>{formatAmount(bankReconciliationDetailQ.data.reconciliation.statementClosingBalance)}</span>
+          </div>
+          <div className="kv-row">
+            <span>Book Closing Balance</span>
+            <span>{formatAmount(bankReconciliationDetailQ.data.reconciliation.bookClosingBalance)}</span>
+          </div>
+          <div className="kv-row">
+            <span>Difference</span>
+            <span>{formatAmount(bankReconciliationDetailQ.data.reconciliation.differenceAmount)}</span>
+          </div>
+          <div className="kv-row">
+            <span>Reconciled Lines</span>
+            <span>{bankReconciliationDetailQ.data.reconciledCount}</span>
+          </div>
+          <div className="kv-row">
+            <span>Unreconciled Lines</span>
+            <span>{bankReconciliationDetailQ.data.unreconciledCount}</span>
+          </div>
+        </div>
+
+
+        <div className="kv" style={{ marginBottom: 16 }}>
+        <div className="kv-row">
+          <span>Reconciled Amount</span>
+          <span>{formatAmount(reconciliationMetrics.reconciledAmount)}</span>
+        </div>
+        <div className="kv-row">
+          <span>Unreconciled Amount</span>
+          <span>{formatAmount(reconciliationMetrics.unreconciledAmount)}</span>
+        </div>
+        <div className="kv-row">
+          <span>Reconciled Debit</span>
+          <span>{formatAmount(reconciliationMetrics.reconciledDebit)}</span>
+        </div>
+        <div className="kv-row">
+          <span>Reconciled Credit</span>
+          <span>{formatAmount(reconciliationMetrics.reconciledCredit)}</span>
+        </div>
+        <div className="kv-row">
+          <span>Unreconciled Debit</span>
+          <span>{formatAmount(reconciliationMetrics.unreconciledDebit)}</span>
+        </div>
+        <div className="kv-row">
+          <span>Unreconciled Credit</span>
+          <span>{formatAmount(reconciliationMetrics.unreconciledCredit)}</span>
+        </div>
+        <div className="kv-row">
+          <span>Reconciled Lines %</span>
+          <span>{formatPercentage(reconciliationMetrics.reconciledLinePercentage)}</span>
+        </div>
+        <div className="kv-row">
+          <span>Reconciled Amount %</span>
+          <span>{formatPercentage(reconciliationMetrics.reconciledAmountPercentage)}</span>
+        </div>
+      </div>
+
+
+      <div className="panel" style={{ marginBottom: 16 }}>
+      <div className="muted">
+        Draft reconciliations can be updated, completed, or cancelled. Completed and cancelled reconciliations are locked and become read-only.
+      </div>
+      <div className="muted" style={{ marginTop: 8 }}>
+        Progress: {reconciliationMetrics.reconciledLines} of {reconciliationMetrics.totalLines} lines reconciled
+        {' '}({formatPercentage(reconciliationMetrics.reconciledLinePercentage)}).
+      </div>
+      <div className="muted" style={{ marginTop: 4 }}>
+        Amount progress: {formatAmount(reconciliationMetrics.reconciledAmount)} reconciled out of{' '}
+        {formatAmount(reconciliationMetrics.reconciledAmount + reconciliationMetrics.unreconciledAmount)}
+        {' '}({formatPercentage(reconciliationMetrics.reconciledAmountPercentage)}).
+      </div>
+    </div>
+
+    <div className="form-grid two" style={{ marginBottom: 16 }}>
+    <div className="form-row">
+      <label>Reconciliation Line Filter</label>
+      <select
+        className="select"
+        value={reconciliationLineFilter}
+        onChange={(e) => setReconciliationLineFilter(e.target.value)}
+      >
+        <option value="all">All Lines</option>
+        <option value="reconciled">Reconciled Only</option>
+        <option value="unreconciled">Unreconciled Only</option>
+      </select>
+    </div>
+
+    <div className="form-row">
+      <label>Filtered Result</label>
+      <div className="panel" style={{ margin: 0, padding: 12 }}>
+        <div className="muted">
+          Showing {filteredReconciliationLines.length} of {bankReconciliationDetailQ.data.count} line(s)
+        </div>
+      </div>
+    </div>
+  </div>
+
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Reference</th>
+                <th>Description</th>
+                <th style={{ textAlign: 'right' }}>Debit</th>
+                <th style={{ textAlign: 'right' }}>Credit</th>
+                <th>Reconciled</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+            {filteredReconciliationLines.length === 0 ? (
+                <tr>
+                <td colSpan={7} className="muted">
+                No reconciliation lines matched the current filter.
+              </td>
+                </tr>
+              ) : (
+                filteredReconciliationLines.map((item) => (
+                  <tr key={item.id}>
+                    <td>{formatDateTime(item.movementDateUtc)}</td>
+                    <td>{item.reference}</td>
+                    <td>{item.description}</td>
+                    <td style={{ textAlign: 'right' }}>{formatAmount(item.debitAmount)}</td>
+                    <td style={{ textAlign: 'right' }}>{formatAmount(item.creditAmount)}</td>
+                    <td>
+                    <label className="muted" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={item.isReconciled}
+                        disabled={
+                          bankReconciliationDetailQ.data.reconciliation.status !== 1 ||
+                          updateReconciliationLineMut.isPending
+                        }
+                        onChange={(e) =>
+                          handleToggleReconciliationLine(
+                            item.bankReconciliationId,
+                            item.id,
+                            e.target.checked,
+                            item.notes
+                          )
+                        }
+                      />
+                      {item.isReconciled ? 'Yes' : 'No'}
+                    </label>
+                  </td>
+                    <td>{item.notes || '—'}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </>
+    )}
+  </section>
+
+
+  <section className="panel no-print">
+  <div className="section-heading">
+    <div>
+      <h2>Call-over Workspace</h2>
+      <span className="muted">
+        Split-window statement-to-book review for treasury reconciliation activities
+      </span>
+    </div>
+  </div>
+
+  <div className="form-grid two" style={{ marginBottom: 16 }}>
+    <div className="form-row">
+      <label>Treasury Account for Statement Import</label>
+      <select
+        className="select"
+        value={statementImportLedgerAccountId}
+        onChange={(e) => setStatementImportLedgerAccountId(e.target.value)}
+      >
+        <option value="">— Select Treasury Account —</option>
+        {cashbook.data.cashOrBankAccounts.map((item) => (
+          <option key={item.id} value={item.id}>
+            {item.code} - {item.name}
+          </option>
+        ))}
+      </select>
+    </div>
+
+    <div className="form-row">
+      <label>Statement Period</label>
+      <div className="panel" style={{ margin: 0, padding: 12 }}>
+        <div className="muted">{periodText}</div>
+      </div>
+    </div>
+
+    <div className="form-row">
+      <label>Upload Source Reference</label>
+      <input
+        className="input"
+        value={statementSourceReference}
+        onChange={(e) => setStatementSourceReference(e.target.value)}
+        placeholder="Optional source reference for upload batch"
+      />
+    </div>
+
+    <div className="form-row">
+      <label>API Placeholder Reference</label>
+      <input
+        className="input"
+        value={apiPlaceholderReference}
+        onChange={(e) => setApiPlaceholderReference(e.target.value)}
+        placeholder="Required for API placeholder creation"
+      />
+    </div>
+
+    <div className="form-row" style={{ gridColumn: '1 / -1' }}>
+      <label>Statement Import Notes</label>
+      <input
+        className="input"
+        value={statementImportNotes}
+        onChange={(e) => setStatementImportNotes(e.target.value)}
+        placeholder="Optional notes for upload or API import"
+      />
+    </div>
+
+    <div className="form-row">
+      <label>Statement Upload Template</label>
+      <div className="inline-actions">
+        <button className="button" onClick={downloadBankStatementTemplate}>
+          Download Template
+        </button>
+
+        <label
+          className="button"
+          style={{
+            cursor: !statementImportLedgerAccountId || !fromUtc || !toUtc || uploadStatementImportMut.isPending
+              ? 'not-allowed'
+              : 'pointer',
+            opacity: !statementImportLedgerAccountId || !fromUtc || !toUtc || uploadStatementImportMut.isPending
+              ? 0.7
+              : 1,
+          }}
+        >
+          {uploadStatementImportMut.isPending ? 'Uploading…' : 'Upload Statement'}
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            disabled={!statementImportLedgerAccountId || !fromUtc || !toUtc || uploadStatementImportMut.isPending}
+            onChange={async (e) => {
+              try {
+                await handleBankStatementUploadFile(e.target.files?.[0] || null);
+              } catch {
+                // page-level message omitted for now; kept intentionally quiet
+              } finally {
+                e.currentTarget.value = '';
+              }
+            }}
+          />
+        </label>
+      </div>
+    </div>
+
+    <div className="form-row">
+      <label>API Source Placeholder</label>
+      <div className="inline-actions">
+        <button
+          className="button"
+          onClick={handleCreateApiPlaceholderImport}
+          disabled={
+            !statementImportLedgerAccountId ||
+            !fromUtc ||
+            !toUtc ||
+            !apiPlaceholderReference.trim() ||
+            createApiPlaceholderImportMut.isPending
+          }
+        >
+          {createApiPlaceholderImportMut.isPending ? 'Creating…' : 'Create API Placeholder'}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div className="section-heading" style={{ marginTop: 8 }}>
+    <div>
+      <h2>Statement Import Listing</h2>
+      <span className="muted">{bankStatementImportsQ.data.count} import batch(es)</span>
+    </div>
+  </div>
+
+  <div className="table-wrap" style={{ marginBottom: 16 }}>
+    <table className="data-table">
+      <thead>
+        <tr>
+          <th>Treasury Account</th>
+          <th>Statement From</th>
+          <th>Statement To</th>
+          <th>Source Type</th>
+          <th>Source Reference</th>
+          <th>File Name</th>
+          <th>Lines</th>
+          <th>Imported On</th>
+          <th style={{ width: 140 }}>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {bankStatementImportsQ.data.items.length === 0 ? (
+          <tr>
+            <td colSpan={9} className="muted">
+              No bank statement imports have been created yet.
+            </td>
+          </tr>
+        ) : (
+          bankStatementImportsQ.data.items.map((item) => (
+            <tr key={item.id}>
+              <td>{item.ledgerAccountCode} - {item.ledgerAccountName}</td>
+              <td>{formatDateTime(item.statementFromUtc)}</td>
+              <td>{formatDateTime(item.statementToUtc)}</td>
+              <td>{statementSourceTypeLabel(item.sourceType)}</td>
+              <td>{item.sourceReference}</td>
+              <td>{item.fileName || '—'}</td>
+              <td>{item.lineCount}</td>
+              <td>{formatDateTime(item.importedOnUtc)}</td>
+              <td>
+                <button
+                  className="button"
+                  onClick={() => setSelectedStatementImportId(item.id)}
+                >
+                  Open
+                </button>
+              </td>
+            </tr>
+          ))
+        )}
+      </tbody>
+    </table>
+  </div>
+
+  <div
+    style={{
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr',
+      gap: 16,
+      alignItems: 'start',
+    }}
+  >
+    <div className="panel" style={{ margin: 0, background: 'rgba(59, 130, 246, 0.06)' }}>
+      <div className="section-heading">
+        <div>
+          <h2>Bank Statement Window</h2>
+          <span className="muted">
+            Uploaded or API-sourced statement lines for Call-over review
+          </span>
+        </div>
+      </div>
+
+      <div className="form-row" style={{ marginBottom: 16 }}>
+        <label>Statement Line Search</label>
+        <input
+          className="input"
+          value={callOverStatementSearch}
+          onChange={(e) => setCallOverStatementSearch(e.target.value)}
+          placeholder="Search by reference, description, or external reference"
+        />
+      </div>
+
+      {!selectedStatementImportId ? (
+        <div className="muted">Select a statement import from the listing above.</div>
+      ) : bankStatementImportDetailQ.isLoading ? (
+        <div className="muted">Loading statement import detail...</div>
+      ) : bankStatementImportDetailQ.isError || !bankStatementImportDetailQ.data ? (
+        <div className="panel error-panel">
+          We could not load the statement import detail at this time.
+        </div>
+      ) : (
+        <>
+          <div className="kv" style={{ marginBottom: 16 }}>
+            <div className="kv-row">
+              <span>Treasury Account</span>
+              <span>
+                {bankStatementImportDetailQ.data.bankStatementImport.ledgerAccountCode} - {bankStatementImportDetailQ.data.bankStatementImport.ledgerAccountName}
+              </span>
+            </div>
+            <div className="kv-row">
+              <span>Source Type</span>
+              <span>{statementSourceTypeLabel(bankStatementImportDetailQ.data.bankStatementImport.sourceType)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Source Reference</span>
+              <span>{bankStatementImportDetailQ.data.bankStatementImport.sourceReference}</span>
+            </div>
+            <div className="kv-row">
+              <span>Total Debit</span>
+              <span>{formatAmount(bankStatementImportDetailQ.data.totalDebit)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Total Credit</span>
+              <span>{formatAmount(bankStatementImportDetailQ.data.totalCredit)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Visible Lines</span>
+              <span>{filteredStatementLines.length} of {bankStatementImportDetailQ.data.count}</span>
+            </div>
+          </div>
+
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Value Date</th>
+                  <th>Reference</th>
+                  <th>Description</th>
+                  <th style={{ textAlign: 'right' }}>Debit</th>
+                  <th style={{ textAlign: 'right' }}>Credit</th>
+                  <th style={{ textAlign: 'right' }}>Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredStatementLines.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="muted">
+                      No statement lines matched the current search.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredStatementLines.map((item) => (
+                    <tr key={item.id}>
+                      <td>{formatDateTime(item.transactionDateUtc)}</td>
+                      <td>{formatDateTime(item.valueDateUtc || null)}</td>
+                      <td>{item.reference}</td>
+                      <td>{item.description}</td>
+                      <td style={{ textAlign: 'right' }}>{formatAmount(item.debitAmount)}</td>
+                      <td style={{ textAlign: 'right' }}>{formatAmount(item.creditAmount)}</td>
+                      <td style={{ textAlign: 'right' }}>{formatAmount(item.balance || 0)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+
+    <div className="panel" style={{ margin: 0, background: 'rgba(16, 185, 129, 0.06)' }}>
+      <div className="section-heading">
+        <div>
+          <h2>Cashbook / Book Window</h2>
+          <span className="muted">
+            Reconciliation book-side review with filters and reconciliation status
+          </span>
+        </div>
+      </div>
+
+      <div className="form-grid two" style={{ marginBottom: 16 }}>
+        <div className="form-row">
+          <label>Book Line Search</label>
+          <input
+            className="input"
+            value={callOverBookSearch}
+            onChange={(e) => setCallOverBookSearch(e.target.value)}
+            placeholder="Search by reference or description"
+          />
+        </div>
+
+        <div className="form-row">
+          <label>Book Line Filter</label>
+          <select
+            className="select"
+            value={reconciliationLineFilter}
+            onChange={(e) => setReconciliationLineFilter(e.target.value)}
+          >
+            <option value="all">All Lines</option>
+            <option value="reconciled">Reconciled Only</option>
+            <option value="unreconciled">Unreconciled Only</option>
+          </select>
+        </div>
+      </div>
+
+      {!selectedReconciliationId ? (
+        <div className="muted">Open a reconciliation above to review book-side lines here.</div>
+      ) : bankReconciliationDetailQ.isLoading ? (
+        <div className="muted">Loading reconciliation detail...</div>
+      ) : bankReconciliationDetailQ.isError || !bankReconciliationDetailQ.data ? (
+        <div className="panel error-panel">
+          We could not load the reconciliation detail at this time.
+        </div>
+      ) : (
+        <>
+          <div className="kv" style={{ marginBottom: 16 }}>
+            <div className="kv-row">
+              <span>Treasury Account</span>
+              <span>
+                {bankReconciliationDetailQ.data.reconciliation.ledgerAccountCode} - {bankReconciliationDetailQ.data.reconciliation.ledgerAccountName}
+              </span>
+            </div>
+            <div className="kv-row">
+              <span>Status</span>
+              <span>{reconciliationStatusLabel(bankReconciliationDetailQ.data.reconciliation.status)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Difference</span>
+              <span>{formatAmount(bankReconciliationDetailQ.data.reconciliation.differenceAmount)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Visible Lines</span>
+              <span>{filteredBookLines.length} of {bankReconciliationDetailQ.data.count}</span>
+            </div>
+            <div className="kv-row">
+              <span>Reconciled Progress</span>
+              <span>{formatPercentage(reconciliationMetrics.reconciledLinePercentage)}</span>
+            </div>
+          </div>
+
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Reference</th>
+                  <th>Description</th>
+                  <th style={{ textAlign: 'right' }}>Debit</th>
+                  <th style={{ textAlign: 'right' }}>Credit</th>
+                  <th>Reconciled</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredBookLines.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="muted">
+                      No book lines matched the current filters.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredBookLines.map((item) => (
+                    <tr key={item.id}>
+                      <td>{formatDateTime(item.movementDateUtc)}</td>
+                      <td>{item.reference}</td>
+                      <td>{item.description}</td>
+                      <td style={{ textAlign: 'right' }}>{formatAmount(item.debitAmount)}</td>
+                      <td style={{ textAlign: 'right' }}>{formatAmount(item.creditAmount)}</td>
+                      <td>{item.isReconciled ? 'Yes' : 'No'}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  </div>
+</section>
+
+
 
       <section id="print-accounts-receivable-summary" className="panel printable-report">
         <div className="section-heading no-print">

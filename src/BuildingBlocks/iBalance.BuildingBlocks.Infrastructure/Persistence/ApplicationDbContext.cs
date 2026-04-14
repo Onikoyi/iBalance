@@ -35,11 +35,14 @@ public class ApplicationDbContext : DbContext
     public DbSet<BillingSettings> BillingSettings => Set<BillingSettings>();
     public DbSet<TenantSubscriptionApplication> TenantSubscriptionApplications => Set<TenantSubscriptionApplication>();
     public DbSet<TenantLicense> TenantLicenses => Set<TenantLicense>();
-
     public DbSet<LedgerAccount> LedgerAccounts => Set<LedgerAccount>();
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
     public DbSet<JournalEntryLine> JournalEntryLines => Set<JournalEntryLine>();
     public DbSet<LedgerMovement> LedgerMovements => Set<LedgerMovement>();
+    public DbSet<BankReconciliation> BankReconciliations => Set<BankReconciliation>();
+    public DbSet<BankReconciliationLine> BankReconciliationLines => Set<BankReconciliationLine>();
+    public DbSet<BankStatementImport> BankStatementImports => Set<BankStatementImport>();
+    public DbSet<BankStatementImportLine> BankStatementImportLines => Set<BankStatementImportLine>();
     public DbSet<FiscalPeriod> FiscalPeriods => Set<FiscalPeriod>();
     public DbSet<JournalNumberSequence> JournalNumberSequences => Set<JournalNumberSequence>();
     public DbSet<Customer> Customers => Set<Customer>();

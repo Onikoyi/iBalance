@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createLedgerAccount,
@@ -8,6 +8,7 @@ import {
   getTenantKey,
   getTenantLogoDataUrl,
   getTenantReadableError,
+  updateLedgerAccount,
   type LedgerAccountDto,
   type LedgerAccountStatementResponse,
 } from '../lib/api';
@@ -73,6 +74,16 @@ type FormState = {
   parentLedgerAccountId: string;
 };
 
+type EditFormState = {
+  id: string;
+  code: string;
+  name: string;
+  purpose: string;
+  isActive: boolean;
+  isCashOrBankAccount: boolean;
+  isHeader: boolean;
+};
+
 type UploadRow = {
   code: string;
   name: string;
@@ -95,6 +106,16 @@ const emptyForm: FormState = {
   isPostingAllowed: true,
   isCashOrBankAccount: false,
   parentLedgerAccountId: '',
+};
+
+const emptyEditForm: EditFormState = {
+  id: '',
+  code: '',
+  name: '',
+  purpose: '',
+  isActive: true,
+  isCashOrBankAccount: false,
+  isHeader: false,
 };
 
 function csvEscape(value: string) {
@@ -408,17 +429,187 @@ function buildLedgerPrintHtml(args: PrintLedgerArgs) {
 </html>`;
 }
 
+function buildAccountsPrintHtml(args: {
+  tenantKey: string;
+  tenantLogo: string;
+  companyLogo: string;
+  items: LedgerAccountDto[];
+}) {
+  const { tenantKey, tenantLogo, companyLogo, items } = args;
+
+  const logoOrFallback = (src: string, fallback: string) =>
+    src
+      ? `<img src="${src}" alt="${fallback}" style="height:44px;max-width:180px;object-fit:contain;" />`
+      : `<div style="min-width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:rgba(75,29,115,0.12);font-weight:700;">${fallback}</div>`;
+
+  const rowsHtml = items.length === 0
+    ? `<tr><td colspan="10" style="padding:12px;color:#6b7280;">No accounts matched the current filter selection.</td></tr>`
+    : items.map((item) => `
+        <tr>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${item.code}</td>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${item.name}</td>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${item.purpose || '—'}</td>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${categoryLabel(item.category)}</td>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${normalBalanceLabel(item.normalBalance)}</td>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${item.isHeader ? 'Header' : 'Posting Account'}</td>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${item.isPostingAllowed ? 'Enabled' : 'Not Enabled'}</td>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${item.isCashOrBankAccount ? 'Yes' : 'No'}</td>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${item.isActive ? 'Active' : 'Inactive'}</td>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${item.parentCode ? `${item.parentCode} - ${item.parentName}` : '—'}</td>
+        </tr>
+      `).join('');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Chart of Accounts</title>
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      color: #111827;
+      margin: 0;
+      padding: 24px;
+      background: #ffffff;
+    }
+    .page {
+      max-width: 1300px;
+      margin: 0 auto;
+    }
+    .brand-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+    .brand-block {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .brand-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .brand-meta strong {
+      font-size: 15px;
+    }
+    .brand-meta span {
+      font-size: 12px;
+      color: #6b7280;
+    }
+    .title-block {
+      margin-bottom: 18px;
+      border-bottom: 2px solid #e5e7eb;
+      padding-bottom: 12px;
+    }
+    .title-block h1 {
+      margin: 0 0 8px 0;
+      font-size: 26px;
+    }
+    .muted {
+      color: #6b7280;
+      font-size: 14px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+    th {
+      text-align: left;
+      padding: 8px;
+      border-bottom: 1px solid #d1d5db;
+      font-size: 14px;
+    }
+    td {
+      font-size: 13px;
+      vertical-align: top;
+    }
+    @media print {
+      body {
+        padding: 0;
+      }
+      .page {
+        max-width: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="brand-row">
+      <div class="brand-block">
+        ${logoOrFallback(companyLogo, 'iBalance')}
+        <div class="brand-meta">
+          <strong>Nikosoft Technologies</strong>
+          <span>iBalance Accounting Cloud</span>
+        </div>
+      </div>
+      <div class="brand-block">
+        ${logoOrFallback(tenantLogo, 'Org')}
+        <div class="brand-meta">
+          <strong>${tenantKey || 'Organization'}</strong>
+          <span>Client Workspace</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="title-block">
+      <h1>Chart of Accounts</h1>
+      <div class="muted">Filtered printable account listing</div>
+      <div class="muted">Total Accounts in Print View: ${items.length}</div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Account Name</th>
+          <th>Purpose</th>
+          <th>Category</th>
+          <th>Normal Balance</th>
+          <th>Type</th>
+          <th>Posting</th>
+          <th>Is Cash / Bank</th>
+          <th>Status</th>
+          <th>Parent Account</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rowsHtml}
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>`;
+}
+
 export function AccountsPage() {
   const qc = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
   const [errorText, setErrorText] = useState('');
   const [infoText, setInfoText] = useState('');
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [editForm, setEditForm] = useState<EditFormState>(emptyEditForm);
   const [isUploading, setIsUploading] = useState(false);
 
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [statementFromDate, setStatementFromDate] = useState('');
   const [statementToDate, setStatementToDate] = useState('');
+
+  const [accountSearch, setAccountSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [cashBankFilter, setCashBankFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const canView = canViewFinance();
   const canManage = canManageFinanceSetup();
@@ -448,6 +639,65 @@ export function AccountsPage() {
       cashOrBank: items.filter((x) => x.isCashOrBankAccount).length,
     };
   }, [data?.items]);
+
+  const filteredAccounts = useMemo(() => {
+    const items = data?.items ?? [];
+    const search = accountSearch.trim().toLowerCase();
+
+    return items.filter((item) => {
+      const matchesSearch =
+        !search ||
+        item.code.toLowerCase().includes(search) ||
+        item.name.toLowerCase().includes(search) ||
+        (item.purpose || '').toLowerCase().includes(search) ||
+        (item.parentCode || '').toLowerCase().includes(search) ||
+        (item.parentName || '').toLowerCase().includes(search);
+
+      const matchesCategory =
+        categoryFilter === 'all' || String(item.category) === categoryFilter;
+
+      const matchesType =
+        typeFilter === 'all' ||
+        (typeFilter === 'header' && item.isHeader) ||
+        (typeFilter === 'posting' && !item.isHeader);
+
+      const matchesCashBank =
+        cashBankFilter === 'all' ||
+        (cashBankFilter === 'cashbank' && item.isCashOrBankAccount) ||
+        (cashBankFilter === 'standard' && !item.isCashOrBankAccount);
+
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'active' && item.isActive) ||
+        (statusFilter === 'inactive' && !item.isActive);
+
+      return (
+        matchesSearch &&
+        matchesCategory &&
+        matchesType &&
+        matchesCashBank &&
+        matchesStatus
+      );
+    });
+  }, [data?.items, accountSearch, categoryFilter, typeFilter, cashBankFilter, statusFilter]);
+
+
+  const totalPages = Math.max(1, Math.ceil(filteredAccounts.length / pageSize));
+
+  const pagedAccounts = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredAccounts.slice(startIndex, startIndex + pageSize);
+  }, [filteredAccounts, currentPage, pageSize]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [accountSearch, categoryFilter, typeFilter, cashBankFilter, statusFilter, pageSize]);
 
   const isStatementRangeValid = !!statementFromDate && !!statementToDate;
   const reportingPeriodText = buildReportingPeriodText(statementFromDate, statementToDate);
@@ -481,8 +731,31 @@ export function AccountsPage() {
     },
   });
 
+  const editMut = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: { name: string; purpose?: string | null; isActive: boolean; isCashOrBankAccount: boolean } }) =>
+      updateLedgerAccount(id, payload),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['accounts'] });
+      if (selectedAccountId) {
+        await qc.invalidateQueries({ queryKey: ['ledger-account-statement', selectedAccountId, statementFromUtc, statementToUtc] });
+      }
+      setShowEdit(false);
+      setEditForm(emptyEditForm);
+      setErrorText('');
+      setInfoText('The account has been updated successfully.');
+    },
+    onError: (e) => {
+      setErrorText(getTenantReadableError(e, 'We could not update the account at this time.'));
+      setInfoText('');
+    },
+  });
+
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((s) => ({ ...s, [key]: value }));
+  }
+
+  function updateEdit<K extends keyof EditFormState>(key: K, value: EditFormState[K]) {
+    setEditForm((s) => ({ ...s, [key]: value }));
   }
 
   function openModal() {
@@ -502,6 +775,35 @@ export function AccountsPage() {
     if (!createMut.isPending) {
       setShowCreate(false);
       setErrorText('');
+    }
+  }
+
+  function openEditModal(account: LedgerAccountDto) {
+    if (!canManage) {
+      setErrorText('You have view access only on this page.');
+      setInfoText('');
+      return;
+    }
+
+    setErrorText('');
+    setInfoText('');
+    setEditForm({
+      id: account.id,
+      code: account.code,
+      name: account.name,
+      purpose: account.purpose || '',
+      isActive: account.isActive,
+      isCashOrBankAccount: account.isCashOrBankAccount,
+      isHeader: account.isHeader,
+    });
+    setShowEdit(true);
+  }
+
+  function closeEditModal() {
+    if (!editMut.isPending) {
+      setShowEdit(false);
+      setErrorText('');
+      setEditForm(emptyEditForm);
     }
   }
 
@@ -539,6 +841,41 @@ export function AccountsPage() {
       isPostingAllowed: form.isPostingAllowed,
       isCashOrBankAccount: form.isCashOrBankAccount,
       parentLedgerAccountId: form.parentLedgerAccountId ? form.parentLedgerAccountId : null,
+    });
+  }
+
+  async function submitEdit() {
+    setErrorText('');
+    setInfoText('');
+
+    if (!canManage) {
+      setErrorText('You have view access only on this page.');
+      return;
+    }
+
+    if (!editForm.id) {
+      setErrorText('No account is selected for editing.');
+      return;
+    }
+
+    if (!editForm.name.trim()) {
+      setErrorText('Please enter the account name.');
+      return;
+    }
+
+    if (editForm.isHeader && editForm.isCashOrBankAccount) {
+      setErrorText('A header account cannot be marked as a cash or bank account.');
+      return;
+    }
+
+    await editMut.mutateAsync({
+      id: editForm.id,
+      payload: {
+        name: editForm.name.trim(),
+        purpose: editForm.purpose.trim() || null,
+        isActive: editForm.isActive,
+        isCashOrBankAccount: editForm.isCashOrBankAccount,
+      },
     });
   }
 
@@ -580,6 +917,28 @@ export function AccountsPage() {
       printWindow.print();
     };
   }
+
+  function printAccountsListing() {
+    const html = buildAccountsPrintHtml({
+      tenantKey,
+      tenantLogo,
+      companyLogo,
+      items: filteredAccounts,
+    });
+
+    const printWindow = window.open('', '_blank', 'width=1400,height=900');
+    if (!printWindow) return;
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+
+    printWindow.onload = () => {
+      printWindow.focus();
+      printWindow.print();
+    };
+  }
+
 
   async function onUploadFile(file: File | null) {
     if (!file) return;
@@ -809,9 +1168,103 @@ export function AccountsPage() {
       </section>
 
       <section className="panel no-print">
-        <div className="section-heading">
-          <h2>Account listing</h2>
-          <span className="muted">{data.count} account(s)</span>
+      <div className="section-heading">
+          <div>
+            <h2>Account listing</h2>
+            <span className="muted">{filteredAccounts.length} of {data.count} account(s)</span>
+          </div>
+
+          <div className="inline-actions">
+            <button className="button" onClick={printAccountsListing}>
+              Print Accounts
+            </button>
+          </div>
+        </div>
+
+        <div className="form-grid two" style={{ marginBottom: 16 }}>
+          <div className="form-row">
+            <label>Search Accounts</label>
+            <input
+              className="input"
+              value={accountSearch}
+              onChange={(e) => setAccountSearch(e.target.value)}
+              placeholder="Search by code, name, purpose, or parent account"
+            />
+          </div>
+
+          <div className="form-row">
+            <label>Category</label>
+            <select
+              className="select"
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+            >
+              <option value="all">All Categories</option>
+              <option value="1">Asset</option>
+              <option value="2">Liability</option>
+              <option value="3">Equity</option>
+              <option value="4">Income</option>
+              <option value="5">Expense</option>
+            </select>
+          </div>
+
+          <div className="form-row">
+            <label>Account Type</label>
+            <select
+              className="select"
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+            >
+              <option value="all">All Types</option>
+              <option value="header">Header</option>
+              <option value="posting">Posting Account</option>
+            </select>
+          </div>
+
+          <div className="form-row">
+            <label>Cash / Bank Filter</label>
+            <select
+              className="select"
+              value={cashBankFilter}
+              onChange={(e) => setCashBankFilter(e.target.value)}
+            >
+              <option value="all">All Accounts</option>
+              <option value="cashbank">Cash / Bank Only</option>
+              <option value="standard">Non Cash / Bank Only</option>
+            </select>
+          </div>
+
+          <div className="form-row">
+            <label>Status</label>
+            <select
+              className="select"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="all">All Statuses</option>
+              <option value="active">Active Only</option>
+              <option value="inactive">Inactive Only</option>
+            </select>
+          </div>
+
+          <div className="form-row">
+            <label>Clear Filters</label>
+            <div className="inline-actions">
+            <button
+                className="button"
+                onClick={() => {
+                  setAccountSearch('');
+                  setCategoryFilter('all');
+                  setTypeFilter('all');
+                  setCashBankFilter('all');
+                  setStatusFilter('all');
+                  setCurrentPage(1);
+                }}
+              >
+                Reset Filters
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="table-wrap">
@@ -825,37 +1278,122 @@ export function AccountsPage() {
                 <th>Normal Balance</th>
                 <th>Type</th>
                 <th>Posting</th>
-                <th>Treasury</th>
+                <th>Is Cash / Bank</th>
+                <th>Status</th>
                 <th>Parent Account</th>
-                <th style={{ width: 140 }}>Action</th>
+                <th style={{ width: 220 }}>Action</th>
               </tr>
             </thead>
             <tbody>
-              {data.items.map((item: LedgerAccountDto) => (
-                <tr key={item.id}>
-                  <td>{item.code}</td>
-                  <td>{item.name}</td>
-                  <td>{item.purpose || '—'}</td>
-                  <td>{categoryLabel(item.category)}</td>
-                  <td>{normalBalanceLabel(item.normalBalance)}</td>
-                  <td>{formatStatus(item.isHeader, 'Header', 'Posting Account')}</td>
-                  <td>{formatStatus(item.isPostingAllowed, 'Enabled', 'Not Enabled')}</td>
-                  <td>{formatStatus(item.isCashOrBankAccount, 'Cash/Bank', 'Standard')}</td>
-                  <td>{item.parentCode ? `${item.parentCode} - ${item.parentName}` : '—'}</td>
-                  <td>
-                    <button
-                      className="button"
-                      onClick={() => setSelectedAccountId(item.id)}
-                    >
-                      Drill Down
-                    </button>
+            {filteredAccounts.length === 0 ? (
+                <tr>
+                  <td colSpan={11} className="muted">
+                    No accounts matched the current search/filter selection.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                pagedAccounts.map((item: LedgerAccountDto) => (
+                  <tr key={item.id}>
+                    <td>{item.code}</td>
+                    <td>{item.name}</td>
+                    <td>{item.purpose || '—'}</td>
+                    <td>{categoryLabel(item.category)}</td>
+                    <td>{normalBalanceLabel(item.normalBalance)}</td>
+                    <td>{formatStatus(item.isHeader, 'Header', 'Posting Account')}</td>
+                    <td>{formatStatus(item.isPostingAllowed, 'Enabled', 'Not Enabled')}</td>
+                    <td>{formatStatus(item.isCashOrBankAccount, 'Yes', 'No')}</td>
+                    <td>{formatStatus(item.isActive, 'Active', 'Inactive')}</td>
+                    <td>{item.parentCode ? `${item.parentCode} - ${item.parentName}` : '—'}</td>
+                    <td>
+                      <div className="inline-actions">
+                        <button
+                          className="button"
+                          onClick={() => setSelectedAccountId(item.id)}
+                        >
+                          Drill Down
+                        </button>
+                        {canManage ? (
+                          <button
+                            className="button"
+                            onClick={() => openEditModal(item)}
+                          >
+                            Edit
+                          </button>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </section>
+
+
+              <div className="panel" style={{ marginTop: 16 }}>
+          <div className="inline-actions" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+            <div className="inline-actions" style={{ flexWrap: 'wrap', gap: 12 }}>
+              <span className="muted">
+                Page {totalPages === 0 ? 0 : currentPage} of {totalPages}
+              </span>
+              <span className="muted">
+                Showing {filteredAccounts.length === 0 ? 0 : ((currentPage - 1) * pageSize) + 1}
+                {' '}to{' '}
+                {Math.min(currentPage * pageSize, filteredAccounts.length)}
+                {' '}of {filteredAccounts.length} filtered account(s)
+              </span>
+            </div>
+
+            <div className="inline-actions" style={{ flexWrap: 'wrap', gap: 12 }}>
+              <div className="form-row" style={{ margin: 0 }}>
+                <label style={{ marginBottom: 4 }}>Rows per page</label>
+                <select
+                  className="select"
+                  value={pageSize}
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+
+              <button
+                className="button"
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+              >
+                First
+              </button>
+
+              <button
+                className="button"
+                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </button>
+
+              <button
+                className="button"
+                onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </button>
+
+              <button
+                className="button"
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+              >
+                Last
+              </button>
+            </div>
+          </div>
+        </div>
 
       <section className="panel printable-report">
         <div className="section-heading no-print">
@@ -1173,6 +1711,91 @@ export function AccountsPage() {
               <button className="button" onClick={closeModal} disabled={createMut.isPending}>Cancel</button>
               <button className="button primary" onClick={submit} disabled={createMut.isPending}>
                 {createMut.isPending ? 'Creating…' : 'Create Account'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showEdit ? (
+        <div className="modal-backdrop" onMouseDown={closeEditModal}>
+          <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Edit account</h2>
+              <button className="button ghost" onClick={closeEditModal} aria-label="Close">✕</button>
+            </div>
+
+            {errorText ? <div className="error-panel">{errorText}</div> : null}
+
+            <div className="form-grid two">
+              <div className="form-row">
+                <label>Account Code</label>
+                <input
+                  className="input"
+                  value={editForm.code}
+                  disabled
+                />
+              </div>
+
+              <div className="form-row">
+                <label>Account Name</label>
+                <input
+                  className="input"
+                  value={editForm.name}
+                  onChange={(e) => updateEdit('name', e.target.value)}
+                  placeholder="Enter account name"
+                />
+              </div>
+
+              <div className="form-row" style={{ gridColumn: '1 / -1' }}>
+                <label>Purpose</label>
+                <input
+                  className="input"
+                  value={editForm.purpose}
+                  onChange={(e) => updateEdit('purpose', e.target.value)}
+                  placeholder="Enter the business purpose of this account"
+                />
+              </div>
+
+              <div className="form-row">
+                <label>Status</label>
+                <div className="inline-actions" style={{ flexWrap: 'wrap' }}>
+                  <label className="muted" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={editForm.isActive}
+                      onChange={(e) => updateEdit('isActive', e.target.checked)}
+                    />
+                    Active
+                  </label>
+                </div>
+              </div>
+
+              <div className="form-row">
+                <label>Treasury Classification</label>
+                <div className="inline-actions" style={{ flexWrap: 'wrap' }}>
+                  <label className="muted" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={editForm.isCashOrBankAccount}
+                      disabled={editForm.isHeader}
+                      onChange={(e) => updateEdit('isCashOrBankAccount', e.target.checked)}
+                    />
+                    Cash / Bank account
+                  </label>
+                </div>
+                {editForm.isHeader ? (
+                  <div className="muted" style={{ marginTop: 8 }}>
+                    Header accounts cannot be marked as Cash / Bank accounts.
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button className="button" onClick={closeEditModal} disabled={editMut.isPending}>Cancel</button>
+              <button className="button primary" onClick={submitEdit} disabled={editMut.isPending}>
+                {editMut.isPending ? 'Saving…' : 'Save Changes'}
               </button>
             </div>
           </div>

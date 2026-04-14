@@ -238,6 +238,206 @@ export type CashbookResponse = {
   items: CashbookLineDto[];
 };
 
+export type CashbookSummaryRowDto = {
+  ledgerAccountId: string;
+  code: string;
+  name: string;
+  category: number;
+  normalBalance: number;
+  openingBalanceDebit: number;
+  openingBalanceCredit: number;
+  periodDebit: number;
+  periodCredit: number;
+  closingBalanceDebit: number;
+  closingBalanceCredit: number;
+};
+
+export type CashbookSummaryResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  fromUtc: string | null;
+  toUtc: string | null;
+  count: number;
+  totalOpeningBalanceDebit: number;
+  totalOpeningBalanceCredit: number;
+  totalPeriodDebit: number;
+  totalPeriodCredit: number;
+  totalClosingBalanceDebit: number;
+  totalClosingBalanceCredit: number;
+  items: CashbookSummaryRowDto[];
+};
+
+export type BankReconciliationListItemDto = {
+  id: string;
+  tenantId: string;
+  ledgerAccountId: string;
+  ledgerAccountCode?: string | null;
+  ledgerAccountName?: string | null;
+  statementFromUtc: string;
+  statementToUtc: string;
+  statementClosingBalance: number;
+  bookClosingBalance: number;
+  differenceAmount: number;
+  status: number;
+  notes?: string | null;
+  completedOnUtc?: string | null;
+  cancelledOnUtc?: string | null;
+};
+
+export type BankReconciliationsResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  count: number;
+  items: BankReconciliationListItemDto[];
+};
+
+export type BankReconciliationDetailLineDto = {
+  id: string;
+  bankReconciliationId: string;
+  ledgerMovementId: string;
+  isReconciled: boolean;
+  notes?: string | null;
+  journalEntryId: string;
+  journalEntryLineId: string;
+  movementDateUtc: string;
+  reference: string;
+  description: string;
+  debitAmount: number;
+  creditAmount: number;
+};
+
+export type BankReconciliationDetailResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  reconciliation: {
+    id: string;
+    tenantId: string;
+    ledgerAccountId: string;
+    ledgerAccountCode?: string | null;
+    ledgerAccountName?: string | null;
+    statementFromUtc: string;
+    statementToUtc: string;
+    statementClosingBalance: number;
+    bookClosingBalance: number;
+    differenceAmount: number;
+    status: number;
+    notes?: string | null;
+    completedOnUtc?: string | null;
+    cancelledOnUtc?: string | null;
+  };
+  count: number;
+  reconciledCount: number;
+  unreconciledCount: number;
+  items: BankReconciliationDetailLineDto[];
+};
+
+export type CreateBankReconciliationRequest = {
+  ledgerAccountId: string;
+  statementFromUtc: string;
+  statementToUtc: string;
+  statementClosingBalance: number;
+  notes?: string | null;
+};
+
+
+export type SetBankReconciliationLineReconciledStateRequest = {
+  isReconciled: boolean;
+  notes?: string | null;
+};
+
+export type UploadBankStatementImportLineRequest = {
+  transactionDateUtc: string;
+  valueDateUtc?: string | null;
+  reference: string;
+  description: string;
+  debitAmount: number;
+  creditAmount: number;
+  balance?: number | null;
+  externalReference?: string | null;
+};
+
+export type UploadBankStatementImportRequest = {
+  ledgerAccountId: string;
+  statementFromUtc: string;
+  statementToUtc: string;
+  sourceReference?: string | null;
+  fileName?: string | null;
+  notes?: string | null;
+  lines: UploadBankStatementImportLineRequest[];
+};
+
+export type CreateApiPlaceholderBankStatementImportRequest = {
+  ledgerAccountId: string;
+  statementFromUtc: string;
+  statementToUtc: string;
+  sourceReference: string;
+  notes?: string | null;
+};
+
+export type BankStatementImportListItemDto = {
+  id: string;
+  tenantId: string;
+  ledgerAccountId: string;
+  ledgerAccountCode?: string | null;
+  ledgerAccountName?: string | null;
+  statementFromUtc: string;
+  statementToUtc: string;
+  sourceType: number;
+  sourceReference: string;
+  fileName?: string | null;
+  notes?: string | null;
+  importedOnUtc: string;
+  lineCount: number;
+};
+
+export type BankStatementImportsResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  count: number;
+  items: BankStatementImportListItemDto[];
+};
+
+export type BankStatementImportDetailLineDto = {
+  id: string;
+  bankStatementImportId: string;
+  transactionDateUtc: string;
+  valueDateUtc?: string | null;
+  reference: string;
+  description: string;
+  debitAmount: number;
+  creditAmount: number;
+  balance?: number | null;
+  externalReference?: string | null;
+};
+
+export type BankStatementImportDetailResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  bankStatementImport: {
+    id: string;
+    tenantId: string;
+    ledgerAccountId: string;
+    ledgerAccountCode?: string | null;
+    ledgerAccountName?: string | null;
+    statementFromUtc: string;
+    statementToUtc: string;
+    sourceType: number;
+    sourceReference: string;
+    fileName?: string | null;
+    notes?: string | null;
+    importedOnUtc: string;
+  };
+  count: number;
+  totalDebit: number;
+  totalCredit: number;
+  items: BankStatementImportDetailLineDto[];
+};
+
 export type JournalEntryDto = {
   id: string;
   tenantId: string;
@@ -1374,6 +1574,107 @@ export async function getCashbook(
   return response.data;
 }
 
+export async function getCashbookSummary(
+  fromUtc?: string | null,
+  toUtc?: string | null
+) {
+  const response = await api.get<CashbookSummaryResponse>('/api/finance/reports/cashbook-summary', {
+    params: {
+      ...(fromUtc ? { fromUtc } : {}),
+      ...(toUtc ? { toUtc } : {}),
+    },
+  });
+
+  return response.data;
+}
+
+export async function createBankReconciliation(payload: CreateBankReconciliationRequest) {
+  const response = await api.post('/api/finance/reconciliations', payload);
+  return response.data;
+}
+
+export async function getBankReconciliations(ledgerAccountId?: string | null) {
+  const response = await api.get<BankReconciliationsResponse>('/api/finance/reconciliations', {
+    params: {
+      ...(ledgerAccountId ? { ledgerAccountId } : {}),
+    },
+  });
+
+  return response.data;
+}
+
+export async function getBankReconciliationDetail(bankReconciliationId: string) {
+  const response = await api.get<BankReconciliationDetailResponse>(
+    `/api/finance/reconciliations/${encodeURIComponent(bankReconciliationId)}`
+  );
+
+  return response.data;
+}
+
+export async function setBankReconciliationLineReconciledState(
+  bankReconciliationId: string,
+  bankReconciliationLineId: string,
+  payload: SetBankReconciliationLineReconciledStateRequest
+) {
+  const response = await api.post(
+    `/api/finance/reconciliations/${encodeURIComponent(bankReconciliationId)}/lines/${encodeURIComponent(bankReconciliationLineId)}/set-reconciled`,
+    payload
+  );
+
+  return response.data;
+}
+
+
+export async function completeBankReconciliation(bankReconciliationId: string) {
+  const response = await api.post(
+    `/api/finance/reconciliations/${encodeURIComponent(bankReconciliationId)}/complete`,
+    {}
+  );
+
+  return response.data;
+}
+
+export async function cancelBankReconciliation(bankReconciliationId: string) {
+  const response = await api.post(
+    `/api/finance/reconciliations/${encodeURIComponent(bankReconciliationId)}/cancel`,
+    {}
+  );
+
+  return response.data;
+}
+
+
+export async function uploadBankStatementImport(payload: UploadBankStatementImportRequest) {
+  const response = await api.post('/api/finance/bank-statements/imports/upload', payload);
+  return response.data;
+}
+
+export async function createApiPlaceholderBankStatementImport(
+  payload: CreateApiPlaceholderBankStatementImportRequest
+) {
+  const response = await api.post('/api/finance/bank-statements/imports/api-placeholder', payload);
+  return response.data;
+}
+
+export async function getBankStatementImports(ledgerAccountId?: string | null) {
+  const response = await api.get<BankStatementImportsResponse>('/api/finance/bank-statements/imports', {
+    params: {
+      ...(ledgerAccountId ? { ledgerAccountId } : {}),
+    },
+  });
+
+  return response.data;
+}
+
+export async function getBankStatementImportDetail(bankStatementImportId: string) {
+  const response = await api.get<BankStatementImportDetailResponse>(
+    `/api/finance/bank-statements/imports/${encodeURIComponent(bankStatementImportId)}`
+  );
+
+  return response.data;
+}
+
+
 export async function getJournalEntries() {
   const response = await api.get<ListEnvelope<JournalEntryDto>>('/api/finance/journal-entries');
   return response.data;
@@ -1413,8 +1714,23 @@ export type CreateLedgerAccountRequest = {
   isCashOrBankAccount: boolean;
 };
 
+export type UpdateLedgerAccountRequest = {
+  name: string;
+  purpose?: string | null;
+  isActive: boolean;
+  isCashOrBankAccount: boolean;
+};
+
 export async function createLedgerAccount(payload: CreateLedgerAccountRequest) {
   const response = await api.post('/api/finance/accounts', payload);
+  return response.data;
+}
+
+export async function updateLedgerAccount(ledgerAccountId: string, payload: UpdateLedgerAccountRequest) {
+  const response = await api.put(
+    `/api/finance/accounts/${encodeURIComponent(ledgerAccountId)}`,
+    payload
+  );
   return response.data;
 }
 

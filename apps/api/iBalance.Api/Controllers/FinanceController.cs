@@ -186,10 +186,7 @@ public sealed class FinanceController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(new
-            {
-                Message = ex.Message
-            });
+            return BadRequest(new { Message = ex.Message });
         }
     }
 
@@ -298,7 +295,6 @@ public sealed class FinanceController : ControllerBase
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
-
         var todayUtc = DateTime.UtcNow;
         var todayDateOnly = DateOnly.FromDateTime(todayUtc.Date);
 
@@ -422,9 +418,7 @@ public sealed class FinanceController : ControllerBase
 
         var duplicateReferenceExists = await dbContext.JournalEntries
             .AsNoTracking()
-            .AnyAsync(
-                x => x.Id != journalEntryId && x.Reference == normalizedReference,
-                cancellationToken);
+            .AnyAsync(x => x.Id != journalEntryId && x.Reference == normalizedReference, cancellationToken);
 
         if (duplicateReferenceExists)
         {
@@ -532,10 +526,7 @@ public sealed class FinanceController : ControllerBase
 
         if (request.EndDate < request.StartDate)
         {
-            return BadRequest(new
-            {
-                Message = "EndDate cannot be earlier than StartDate."
-            });
+            return BadRequest(new { Message = "EndDate cannot be earlier than StartDate." });
         }
 
         var normalizedName = request.Name.Trim();
@@ -555,9 +546,7 @@ public sealed class FinanceController : ControllerBase
 
         var overlaps = await dbContext.FiscalPeriods
             .AsNoTracking()
-            .AnyAsync(
-                x => request.StartDate <= x.EndDate && request.EndDate >= x.StartDate,
-                cancellationToken);
+            .AnyAsync(x => request.StartDate <= x.EndDate && request.EndDate >= x.StartDate, cancellationToken);
 
         if (overlaps)
         {
@@ -744,18 +733,12 @@ public sealed class FinanceController : ControllerBase
 
         if (request.IsHeader && request.IsPostingAllowed)
         {
-            return BadRequest(new
-            {
-                Message = "Header accounts cannot allow posting."
-            });
+            return BadRequest(new { Message = "Header accounts cannot allow posting." });
         }
 
         if (request.IsHeader && request.IsCashOrBankAccount)
         {
-            return BadRequest(new
-            {
-                Message = "Header accounts cannot be marked as cash or bank accounts."
-            });
+            return BadRequest(new { Message = "Header accounts cannot be marked as cash or bank accounts." });
         }
 
         LedgerAccount? parentLedgerAccount = null;
@@ -764,9 +747,7 @@ public sealed class FinanceController : ControllerBase
         {
             parentLedgerAccount = await dbContext.LedgerAccounts
                 .AsNoTracking()
-                .FirstOrDefaultAsync(
-                    x => x.Id == request.ParentLedgerAccountId.Value,
-                    cancellationToken);
+                .FirstOrDefaultAsync(x => x.Id == request.ParentLedgerAccountId.Value, cancellationToken);
 
             if (parentLedgerAccount is null)
             {
@@ -839,6 +820,92 @@ public sealed class FinanceController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+    [HttpPut("accounts/{ledgerAccountId:guid}")]
+    public async Task<IActionResult> UpdateLedgerAccount(
+        Guid ledgerAccountId,
+        [FromBody] UpdateLedgerAccountRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Name))
+        {
+            return BadRequest(new { Message = "Name is required." });
+        }
+
+        var ledgerAccount = await dbContext.LedgerAccounts
+            .FirstOrDefaultAsync(x => x.Id == ledgerAccountId, cancellationToken);
+
+        if (ledgerAccount is null)
+        {
+            return NotFound(new
+            {
+                Message = "Ledger account was not found for the current tenant.",
+                LedgerAccountId = ledgerAccountId
+            });
+        }
+
+        if (ledgerAccount.IsHeader && request.IsCashOrBankAccount)
+        {
+            return BadRequest(new
+            {
+                Message = "Header accounts cannot be marked as cash or bank accounts.",
+                LedgerAccountId = ledgerAccountId
+            });
+        }
+
+        try
+        {
+            ledgerAccount.Rename(request.Name.Trim());
+            ledgerAccount.SetPurpose(request.Purpose);
+            ledgerAccount.SetCashOrBankAccount(request.IsCashOrBankAccount);
+
+            if (request.IsActive)
+            {
+                ledgerAccount.Activate();
+            }
+            else
+            {
+                ledgerAccount.Deactivate();
+            }
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return Ok(new
+            {
+                Message = "Ledger account updated successfully.",
+                ledgerAccount.Id,
+                ledgerAccount.TenantId,
+                ledgerAccount.Code,
+                ledgerAccount.Name,
+                ledgerAccount.Purpose,
+                ledgerAccount.Category,
+                ledgerAccount.NormalBalance,
+                ledgerAccount.IsHeader,
+                ledgerAccount.IsPostingAllowed,
+                ledgerAccount.IsActive,
+                ledgerAccount.IsCashOrBankAccount,
+                ledgerAccount.ParentLedgerAccountId
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
+    }
+
     [Authorize(Policy = AuthorizationPolicies.FinanceView)]
     [HttpGet("accounts")]
     public async Task<IActionResult> GetLedgerAccounts(
@@ -901,10 +968,7 @@ public sealed class FinanceController : ControllerBase
 
         if (request.Lines is null || request.Lines.Count < 2)
         {
-            return BadRequest(new
-            {
-                Message = "A journal entry must contain at least two lines."
-            });
+            return BadRequest(new { Message = "A journal entry must contain at least two lines." });
         }
 
         var effectiveReference = request.Reference?.Trim();
@@ -943,10 +1007,7 @@ public sealed class FinanceController : ControllerBase
             });
         }
 
-        var requestedLedgerAccountIds = request.Lines
-            .Select(x => x.LedgerAccountId)
-            .Distinct()
-            .ToList();
+        var requestedLedgerAccountIds = request.Lines.Select(x => x.LedgerAccountId).Distinct().ToList();
 
         var ledgerAccounts = await dbContext.LedgerAccounts
             .AsNoTracking()
@@ -1025,10 +1086,7 @@ public sealed class FinanceController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(new
-            {
-                Message = ex.Message
-            });
+            return BadRequest(new { Message = ex.Message });
         }
     }
 
@@ -1151,10 +1209,7 @@ public sealed class FinanceController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(new
-            {
-                Message = ex.Message
-            });
+            return BadRequest(new { Message = ex.Message });
         }
     }
 
@@ -1218,10 +1273,7 @@ public sealed class FinanceController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(new
-            {
-                Message = ex.Message
-            });
+            return BadRequest(new { Message = ex.Message });
         }
     }
 
@@ -1292,10 +1344,7 @@ public sealed class FinanceController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(new
-            {
-                Message = ex.Message
-            });
+            return BadRequest(new { Message = ex.Message });
         }
     }
 
@@ -1347,10 +1396,7 @@ public sealed class FinanceController : ControllerBase
             });
         }
 
-        var postingPeriod = await GetOpenFiscalPeriodForDateAsync(
-            dbContext,
-            journalEntry.EntryDateUtc,
-            cancellationToken);
+        var postingPeriod = await GetOpenFiscalPeriodForDateAsync(dbContext, journalEntry.EntryDateUtc, cancellationToken);
 
         if (postingPeriod is null)
         {
@@ -1374,10 +1420,7 @@ public sealed class FinanceController : ControllerBase
             });
         }
 
-        var lineLedgerAccountIds = journalEntry.Lines
-            .Select(x => x.LedgerAccountId)
-            .Distinct()
-            .ToList();
+        var lineLedgerAccountIds = journalEntry.Lines.Select(x => x.LedgerAccountId).Distinct().ToList();
 
         var ledgerAccounts = await dbContext.LedgerAccounts
             .Where(x => lineLedgerAccountIds.Contains(x.Id))
@@ -1521,10 +1564,7 @@ public sealed class FinanceController : ControllerBase
             return BadRequest(new { Message = "Description is required." });
         }
 
-        var reversalPeriod = await GetOpenFiscalPeriodForDateAsync(
-            dbContext,
-            request.ReversalDateUtc,
-            cancellationToken);
+        var reversalPeriod = await GetOpenFiscalPeriodForDateAsync(dbContext, request.ReversalDateUtc, cancellationToken);
 
         if (reversalPeriod is null)
         {
@@ -1583,10 +1623,7 @@ public sealed class FinanceController : ControllerBase
             });
         }
 
-        var lineLedgerAccountIds = journalEntry.Lines
-            .Select(x => x.LedgerAccountId)
-            .Distinct()
-            .ToList();
+        var lineLedgerAccountIds = journalEntry.Lines.Select(x => x.LedgerAccountId).Distinct().ToList();
 
         var ledgerAccounts = await dbContext.LedgerAccounts
             .Where(x => lineLedgerAccountIds.Contains(x.Id))
@@ -1719,8 +1756,7 @@ public sealed class FinanceController : ControllerBase
     {
         var tenantContext = tenantContextAccessor.Current;
 
-        IQueryable<LedgerMovement> movementQuery = dbContext.LedgerMovements
-            .AsNoTracking();
+        IQueryable<LedgerMovement> movementQuery = dbContext.LedgerMovements.AsNoTracking();
 
         if (fromUtc.HasValue)
         {
@@ -1839,7 +1875,6 @@ public sealed class FinanceController : ControllerBase
             {
                 var totalDebit = group.Sum(x => x.DebitAmount);
                 var totalCredit = group.Sum(x => x.CreditAmount);
-
                 var net = group.Key.NormalBalance == AccountNature.Debit
                     ? totalDebit - totalCredit
                     : totalCredit - totalDebit;
@@ -1933,8 +1968,7 @@ public sealed class FinanceController : ControllerBase
     {
         var tenantContext = tenantContextAccessor.Current;
 
-        IQueryable<LedgerMovement> movementQuery = dbContext.LedgerMovements
-            .AsNoTracking();
+        IQueryable<LedgerMovement> movementQuery = dbContext.LedgerMovements.AsNoTracking();
 
         if (fromUtc.HasValue)
         {
@@ -1995,9 +2029,7 @@ public sealed class FinanceController : ControllerBase
                     Amount = amount
                 };
             })
-            .Where(x =>
-                x.Category == AccountCategory.Income ||
-                x.Category == AccountCategory.Expense)
+            .Where(x => x.Category == AccountCategory.Income || x.Category == AccountCategory.Expense)
             .OrderBy(x => x.Code)
             .ToList();
 
@@ -2060,11 +2092,7 @@ public sealed class FinanceController : ControllerBase
 
         var cashAndBankAccounts = await dbContext.LedgerAccounts
             .AsNoTracking()
-            .Where(x =>
-                x.IsCashOrBankAccount &&
-                x.IsActive &&
-                !x.IsHeader &&
-                x.IsPostingAllowed)
+            .Where(x => x.IsCashOrBankAccount && x.IsActive && !x.IsHeader && x.IsPostingAllowed)
             .OrderBy(x => x.Code)
             .Select(x => new
             {
@@ -2101,9 +2129,7 @@ public sealed class FinanceController : ControllerBase
 
         var selectedLedgerAccount = await dbContext.LedgerAccounts
             .AsNoTracking()
-            .FirstOrDefaultAsync(
-                x => x.Id == ledgerAccountId.Value,
-                cancellationToken);
+            .FirstOrDefaultAsync(x => x.Id == ledgerAccountId.Value, cancellationToken);
 
         if (selectedLedgerAccount is null)
         {
@@ -2137,11 +2163,7 @@ public sealed class FinanceController : ControllerBase
         }
 
         var openingRows = await openingRowsQuery
-            .Select(x => new
-            {
-                x.DebitAmount,
-                x.CreditAmount
-            })
+            .Select(x => new { x.DebitAmount, x.CreditAmount })
             .ToListAsync(cancellationToken);
 
         var runningBalance = 0m;
@@ -2240,6 +2262,1052 @@ public sealed class FinanceController : ControllerBase
             Items = items
         });
     }
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+    [HttpPost("reconciliations")]
+    public async Task<IActionResult> CreateBankReconciliation(
+        [FromBody] CreateBankReconciliationRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        if (request.LedgerAccountId == Guid.Empty)
+        {
+            return BadRequest(new { Message = "Ledger account id is required." });
+        }
+
+        if (request.StatementToUtc < request.StatementFromUtc)
+        {
+            return BadRequest(new { Message = "Statement end date cannot be earlier than statement start date." });
+        }
+
+        var ledgerAccount = await dbContext.LedgerAccounts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == request.LedgerAccountId, cancellationToken);
+
+        if (ledgerAccount is null)
+        {
+            return NotFound(new
+            {
+                Message = "Ledger account was not found for the current tenant.",
+                request.LedgerAccountId
+            });
+        }
+
+        if (!ledgerAccount.IsActive || ledgerAccount.IsHeader || !ledgerAccount.IsPostingAllowed || !ledgerAccount.IsCashOrBankAccount)
+        {
+            return BadRequest(new
+            {
+                Message = "Selected ledger account must be an active posting cash or bank account.",
+                request.LedgerAccountId,
+                ledgerAccount.Code
+            });
+        }
+
+        var duplicateExists = await dbContext.BankReconciliations
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.LedgerAccountId == request.LedgerAccountId &&
+                     x.StatementFromUtc == request.StatementFromUtc &&
+                     x.StatementToUtc == request.StatementToUtc,
+                cancellationToken);
+
+        if (duplicateExists)
+        {
+            return Conflict(new
+            {
+                Message = "A reconciliation already exists for this treasury account and statement period.",
+                request.LedgerAccountId,
+                request.StatementFromUtc,
+                request.StatementToUtc
+            });
+        }
+
+        var openingMovementsQuery = dbContext.LedgerMovements
+            .AsNoTracking()
+            .Where(x => x.LedgerAccountId == request.LedgerAccountId && x.MovementDateUtc < request.StatementFromUtc);
+
+        var openingMovements = await openingMovementsQuery
+            .Select(x => new
+            {
+                x.DebitAmount,
+                x.CreditAmount
+            })
+            .ToListAsync(cancellationToken);
+
+        var periodMovements = await dbContext.LedgerMovements
+            .AsNoTracking()
+            .Where(x =>
+                x.LedgerAccountId == request.LedgerAccountId &&
+                x.MovementDateUtc >= request.StatementFromUtc &&
+                x.MovementDateUtc <= request.StatementToUtc)
+            .OrderBy(x => x.MovementDateUtc)
+            .ThenBy(x => x.Reference)
+            .ThenBy(x => x.Id)
+            .Select(x => new
+            {
+                x.Id,
+                x.JournalEntryId,
+                x.JournalEntryLineId,
+                x.MovementDateUtc,
+                x.Reference,
+                x.Description,
+                x.DebitAmount,
+                x.CreditAmount
+            })
+            .ToListAsync(cancellationToken);
+
+        var openingNet = ledgerAccount.NormalBalance == AccountNature.Debit
+            ? openingMovements.Sum(x => x.DebitAmount) - openingMovements.Sum(x => x.CreditAmount)
+            : openingMovements.Sum(x => x.CreditAmount) - openingMovements.Sum(x => x.DebitAmount);
+
+        var periodNet = ledgerAccount.NormalBalance == AccountNature.Debit
+            ? periodMovements.Sum(x => x.DebitAmount) - periodMovements.Sum(x => x.CreditAmount)
+            : periodMovements.Sum(x => x.CreditAmount) - periodMovements.Sum(x => x.DebitAmount);
+
+        var bookClosingBalance = openingNet + periodNet;
+
+        var reconciliation = new BankReconciliation(
+            Guid.NewGuid(),
+            tenantContext.TenantId,
+            request.LedgerAccountId,
+            request.StatementFromUtc,
+            request.StatementToUtc,
+            request.StatementClosingBalance,
+            bookClosingBalance,
+            request.Notes);
+
+        var lines = periodMovements
+            .Select(x => new BankReconciliationLine(
+                Guid.NewGuid(),
+                reconciliation.Id,
+                x.Id,
+                isReconciled: false))
+            .ToList();
+
+        dbContext.BankReconciliations.Add(reconciliation);
+        dbContext.BankReconciliationLines.AddRange(lines);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Bank reconciliation draft created successfully.",
+            reconciliation.Id,
+            reconciliation.TenantId,
+            reconciliation.LedgerAccountId,
+            LedgerAccountCode = ledgerAccount.Code,
+            LedgerAccountName = ledgerAccount.Name,
+            reconciliation.StatementFromUtc,
+            reconciliation.StatementToUtc,
+            reconciliation.StatementClosingBalance,
+            reconciliation.BookClosingBalance,
+            DifferenceAmount = reconciliation.DifferenceAmount,
+            reconciliation.Status,
+            reconciliation.Notes,
+            LineCount = lines.Count
+        });
+    }
+
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+    [HttpGet("reports/cashbook-summary")]
+    public async Task<IActionResult> GetCashbookSummary(
+        [FromQuery] DateTime? fromUtc,
+        [FromQuery] DateTime? toUtc,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        var treasuryAccounts = await dbContext.LedgerAccounts
+            .AsNoTracking()
+            .Where(x =>
+                x.IsCashOrBankAccount &&
+                x.IsActive &&
+                !x.IsHeader &&
+                x.IsPostingAllowed)
+            .OrderBy(x => x.Code)
+            .Select(x => new
+            {
+                x.Id,
+                x.Code,
+                x.Name,
+                x.Category,
+                x.NormalBalance,
+                x.IsCashOrBankAccount
+            })
+            .ToListAsync(cancellationToken);
+
+        var treasuryAccountIds = treasuryAccounts
+            .Select(x => x.Id)
+            .ToList();
+
+        if (treasuryAccountIds.Count == 0)
+        {
+            return Ok(new
+            {
+                TenantContextAvailable = tenantContext.IsAvailable,
+                TenantId = tenantContext.IsAvailable ? tenantContext.TenantId : (Guid?)null,
+                TenantKey = tenantContext.IsAvailable ? tenantContext.TenantKey : null,
+                FromUtc = fromUtc,
+                ToUtc = toUtc,
+                Count = 0,
+                TotalOpeningBalanceDebit = 0m,
+                TotalOpeningBalanceCredit = 0m,
+                TotalPeriodDebit = 0m,
+                TotalPeriodCredit = 0m,
+                TotalClosingBalanceDebit = 0m,
+                TotalClosingBalanceCredit = 0m,
+                Items = Array.Empty<object>()
+            });
+        }
+
+        var openingMovementsQuery = dbContext.LedgerMovements
+            .AsNoTracking()
+            .Where(x => treasuryAccountIds.Contains(x.LedgerAccountId));
+
+        if (fromUtc.HasValue)
+        {
+            openingMovementsQuery = openingMovementsQuery.Where(x => x.MovementDateUtc < fromUtc.Value);
+        }
+        else
+        {
+            openingMovementsQuery = openingMovementsQuery.Where(x => false);
+        }
+
+        var openingMovements = await openingMovementsQuery
+            .Select(x => new
+            {
+                x.LedgerAccountId,
+                x.DebitAmount,
+                x.CreditAmount
+            })
+            .ToListAsync(cancellationToken);
+
+        var periodMovementsQuery = dbContext.LedgerMovements
+            .AsNoTracking()
+            .Where(x => treasuryAccountIds.Contains(x.LedgerAccountId));
+
+        if (fromUtc.HasValue)
+        {
+            periodMovementsQuery = periodMovementsQuery.Where(x => x.MovementDateUtc >= fromUtc.Value);
+        }
+
+        if (toUtc.HasValue)
+        {
+            periodMovementsQuery = periodMovementsQuery.Where(x => x.MovementDateUtc <= toUtc.Value);
+        }
+
+        var periodMovements = await periodMovementsQuery
+            .Select(x => new
+            {
+                x.LedgerAccountId,
+                x.DebitAmount,
+                x.CreditAmount
+            })
+            .ToListAsync(cancellationToken);
+
+        var items = treasuryAccounts
+            .Select(account =>
+            {
+                var openingRows = openingMovements.Where(x => x.LedgerAccountId == account.Id).ToList();
+                var periodRows = periodMovements.Where(x => x.LedgerAccountId == account.Id).ToList();
+
+                var openingNet = account.NormalBalance == AccountNature.Debit
+                    ? openingRows.Sum(x => x.DebitAmount) - openingRows.Sum(x => x.CreditAmount)
+                    : openingRows.Sum(x => x.CreditAmount) - openingRows.Sum(x => x.DebitAmount);
+
+                var openingBalanceDebit = openingNet > 0m ? openingNet : 0m;
+                var openingBalanceCredit = openingNet < 0m ? Math.Abs(openingNet) : 0m;
+
+                var periodDebit = periodRows.Sum(x => x.DebitAmount);
+                var periodCredit = periodRows.Sum(x => x.CreditAmount);
+
+                var closingNet = account.NormalBalance == AccountNature.Debit
+                    ? (openingRows.Sum(x => x.DebitAmount) + periodRows.Sum(x => x.DebitAmount))
+                        - (openingRows.Sum(x => x.CreditAmount) + periodRows.Sum(x => x.CreditAmount))
+                    : (openingRows.Sum(x => x.CreditAmount) + periodRows.Sum(x => x.CreditAmount))
+                        - (openingRows.Sum(x => x.DebitAmount) + periodRows.Sum(x => x.DebitAmount));
+
+                var closingBalanceDebit = closingNet > 0m ? closingNet : 0m;
+                var closingBalanceCredit = closingNet < 0m ? Math.Abs(closingNet) : 0m;
+
+                return new
+                {
+                    LedgerAccountId = account.Id,
+                    account.Code,
+                    account.Name,
+                    account.Category,
+                    account.NormalBalance,
+                    OpeningBalanceDebit = openingBalanceDebit,
+                    OpeningBalanceCredit = openingBalanceCredit,
+                    PeriodDebit = periodDebit,
+                    PeriodCredit = periodCredit,
+                    ClosingBalanceDebit = closingBalanceDebit,
+                    ClosingBalanceCredit = closingBalanceCredit
+                };
+            })
+            .ToList();
+
+        return Ok(new
+        {
+            TenantContextAvailable = tenantContext.IsAvailable,
+            TenantId = tenantContext.IsAvailable ? tenantContext.TenantId : (Guid?)null,
+            TenantKey = tenantContext.IsAvailable ? tenantContext.TenantKey : null,
+            FromUtc = fromUtc,
+            ToUtc = toUtc,
+            Count = items.Count,
+            TotalOpeningBalanceDebit = items.Sum(x => x.OpeningBalanceDebit),
+            TotalOpeningBalanceCredit = items.Sum(x => x.OpeningBalanceCredit),
+            TotalPeriodDebit = items.Sum(x => x.PeriodDebit),
+            TotalPeriodCredit = items.Sum(x => x.PeriodCredit),
+            TotalClosingBalanceDebit = items.Sum(x => x.ClosingBalanceDebit),
+            TotalClosingBalanceCredit = items.Sum(x => x.ClosingBalanceCredit),
+            Items = items
+        });
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+    [HttpGet("reconciliations")]
+    public async Task<IActionResult> GetBankReconciliations(
+        [FromQuery] Guid? ledgerAccountId,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        IQueryable<BankReconciliation> query = dbContext.BankReconciliations
+            .AsNoTracking();
+
+        if (ledgerAccountId.HasValue)
+        {
+            query = query.Where(x => x.LedgerAccountId == ledgerAccountId.Value);
+        }
+
+        var items = await query
+            .OrderByDescending(x => x.StatementToUtc)
+            .ThenByDescending(x => x.StatementFromUtc)
+            .Select(x => new
+            {
+                x.Id,
+                x.TenantId,
+                x.LedgerAccountId,
+                LedgerAccountCode = x.LedgerAccount != null ? x.LedgerAccount.Code : null,
+                LedgerAccountName = x.LedgerAccount != null ? x.LedgerAccount.Name : null,
+                x.StatementFromUtc,
+                x.StatementToUtc,
+                x.StatementClosingBalance,
+                x.BookClosingBalance,
+                DifferenceAmount = x.StatementClosingBalance - x.BookClosingBalance,
+                x.Status,
+                x.Notes,
+                x.CompletedOnUtc,
+                x.CancelledOnUtc
+            })
+            .ToListAsync(cancellationToken);
+
+        return Ok(new
+        {
+            TenantContextAvailable = tenantContext.IsAvailable,
+            TenantId = tenantContext.IsAvailable ? tenantContext.TenantId : (Guid?)null,
+            TenantKey = tenantContext.IsAvailable ? tenantContext.TenantKey : null,
+            Count = items.Count,
+            Items = items
+        });
+    }
+
+
+        [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+    [HttpGet("reconciliations/{bankReconciliationId:guid}")]
+    public async Task<IActionResult> GetBankReconciliationDetail(
+        Guid bankReconciliationId,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        var reconciliation = await dbContext.BankReconciliations
+            .AsNoTracking()
+            .Include(x => x.Lines)
+            .Include(x => x.LedgerAccount)
+            .FirstOrDefaultAsync(x => x.Id == bankReconciliationId, cancellationToken);
+
+        if (reconciliation is null)
+        {
+            return NotFound(new
+            {
+                Message = "Bank reconciliation was not found for the current tenant.",
+                BankReconciliationId = bankReconciliationId
+            });
+        }
+
+        var movementIds = reconciliation.Lines
+            .Select(x => x.LedgerMovementId)
+            .Distinct()
+            .ToList();
+
+        var movements = await dbContext.LedgerMovements
+            .AsNoTracking()
+            .Where(x => movementIds.Contains(x.Id))
+            .Select(x => new
+            {
+                x.Id,
+                x.JournalEntryId,
+                x.JournalEntryLineId,
+                x.LedgerAccountId,
+                x.MovementDateUtc,
+                x.Reference,
+                x.Description,
+                x.DebitAmount,
+                x.CreditAmount
+            })
+            .ToDictionaryAsync(x => x.Id, cancellationToken);
+
+        var items = reconciliation.Lines
+            .OrderBy(x => movements.ContainsKey(x.LedgerMovementId) ? movements[x.LedgerMovementId].MovementDateUtc : DateTime.MaxValue)
+            .ThenBy(x => movements.ContainsKey(x.LedgerMovementId) ? movements[x.LedgerMovementId].Reference : string.Empty)
+            .Select(x =>
+            {
+                var movement = movements[x.LedgerMovementId];
+
+                return new
+                {
+                    x.Id,
+                    x.BankReconciliationId,
+                    x.LedgerMovementId,
+                    x.IsReconciled,
+                    x.Notes,
+                    movement.JournalEntryId,
+                    movement.JournalEntryLineId,
+                    movement.MovementDateUtc,
+                    movement.Reference,
+                    movement.Description,
+                    movement.DebitAmount,
+                    movement.CreditAmount
+                };
+            })
+            .ToList();
+
+        return Ok(new
+        {
+            TenantContextAvailable = tenantContext.IsAvailable,
+            TenantId = tenantContext.IsAvailable ? tenantContext.TenantId : (Guid?)null,
+            TenantKey = tenantContext.IsAvailable ? tenantContext.TenantKey : null,
+            Reconciliation = new
+            {
+                reconciliation.Id,
+                reconciliation.TenantId,
+                reconciliation.LedgerAccountId,
+                LedgerAccountCode = reconciliation.LedgerAccount != null ? reconciliation.LedgerAccount.Code : null,
+                LedgerAccountName = reconciliation.LedgerAccount != null ? reconciliation.LedgerAccount.Name : null,
+                reconciliation.StatementFromUtc,
+                reconciliation.StatementToUtc,
+                reconciliation.StatementClosingBalance,
+                reconciliation.BookClosingBalance,
+                DifferenceAmount = reconciliation.DifferenceAmount,
+                reconciliation.Status,
+                reconciliation.Notes,
+                reconciliation.CompletedOnUtc,
+                reconciliation.CancelledOnUtc
+            },
+            Count = items.Count,
+            ReconciledCount = items.Count(x => x.IsReconciled),
+            UnreconciledCount = items.Count(x => !x.IsReconciled),
+            Items = items
+        });
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+    [HttpPost("reconciliations/{bankReconciliationId:guid}/lines/{bankReconciliationLineId:guid}/set-reconciled")]
+    public async Task<IActionResult> SetBankReconciliationLineReconciledState(
+        Guid bankReconciliationId,
+        Guid bankReconciliationLineId,
+        [FromBody] SetBankReconciliationLineReconciledStateRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        var reconciliation = await dbContext.BankReconciliations
+            .Include(x => x.Lines)
+            .FirstOrDefaultAsync(x => x.Id == bankReconciliationId, cancellationToken);
+
+        if (reconciliation is null)
+        {
+            return NotFound(new
+            {
+                Message = "Bank reconciliation was not found for the current tenant.",
+                BankReconciliationId = bankReconciliationId
+            });
+        }
+
+        if (reconciliation.Status != BankReconciliationStatus.Draft)
+        {
+            return Conflict(new
+            {
+                Message = "Only draft bank reconciliations can be modified.",
+                BankReconciliationId = bankReconciliationId,
+                reconciliation.Status
+            });
+        }
+
+        var line = reconciliation.Lines.FirstOrDefault(x => x.Id == bankReconciliationLineId);
+
+        if (line is null)
+        {
+            return NotFound(new
+            {
+                Message = "Bank reconciliation line was not found for the current tenant.",
+                BankReconciliationId = bankReconciliationId,
+                BankReconciliationLineId = bankReconciliationLineId
+            });
+        }
+
+        if (request.IsReconciled)
+        {
+            line.MarkAsReconciled();
+        }
+        else
+        {
+            line.MarkAsUnreconciled();
+        }
+
+        line.SetNotes(request.Notes);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Bank reconciliation line updated successfully.",
+            line.Id,
+            line.BankReconciliationId,
+            line.LedgerMovementId,
+            line.IsReconciled,
+            line.Notes
+        });
+    }
+
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+    [HttpPost("reconciliations/{bankReconciliationId:guid}/complete")]
+    public async Task<IActionResult> CompleteBankReconciliation(
+        Guid bankReconciliationId,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        var reconciliation = await dbContext.BankReconciliations
+            .FirstOrDefaultAsync(x => x.Id == bankReconciliationId, cancellationToken);
+
+        if (reconciliation is null)
+        {
+            return NotFound(new
+            {
+                Message = "Bank reconciliation was not found for the current tenant.",
+                BankReconciliationId = bankReconciliationId
+            });
+        }
+
+        try
+        {
+            reconciliation.Complete(DateTime.UtcNow);
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return Ok(new
+            {
+                Message = "Bank reconciliation completed successfully.",
+                reconciliation.Id,
+                reconciliation.LedgerAccountId,
+                reconciliation.StatementFromUtc,
+                reconciliation.StatementToUtc,
+                reconciliation.StatementClosingBalance,
+                reconciliation.BookClosingBalance,
+                DifferenceAmount = reconciliation.DifferenceAmount,
+                reconciliation.Status,
+                reconciliation.CompletedOnUtc
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new
+            {
+                Message = ex.Message,
+                BankReconciliationId = bankReconciliationId,
+                reconciliation.Status
+            });
+        }
+    }
+
+
+        [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+    [HttpPost("reconciliations/{bankReconciliationId:guid}/cancel")]
+    public async Task<IActionResult> CancelBankReconciliation(
+        Guid bankReconciliationId,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        var reconciliation = await dbContext.BankReconciliations
+            .FirstOrDefaultAsync(x => x.Id == bankReconciliationId, cancellationToken);
+
+        if (reconciliation is null)
+        {
+            return NotFound(new
+            {
+                Message = "Bank reconciliation was not found for the current tenant.",
+                BankReconciliationId = bankReconciliationId
+            });
+        }
+
+        try
+        {
+            reconciliation.Cancel(DateTime.UtcNow);
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return Ok(new
+            {
+                Message = "Bank reconciliation cancelled successfully.",
+                reconciliation.Id,
+                reconciliation.LedgerAccountId,
+                reconciliation.StatementFromUtc,
+                reconciliation.StatementToUtc,
+                reconciliation.StatementClosingBalance,
+                reconciliation.BookClosingBalance,
+                DifferenceAmount = reconciliation.DifferenceAmount,
+                reconciliation.Status,
+                reconciliation.CancelledOnUtc
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new
+            {
+                Message = ex.Message,
+                BankReconciliationId = bankReconciliationId,
+                reconciliation.Status
+            });
+        }
+    }
+
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+    [HttpPost("bank-statements/imports/upload")]
+    public async Task<IActionResult> UploadBankStatementImport(
+        [FromBody] UploadBankStatementImportRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        if (request.LedgerAccountId == Guid.Empty)
+        {
+            return BadRequest(new { Message = "Ledger account id is required." });
+        }
+
+        if (request.StatementToUtc < request.StatementFromUtc)
+        {
+            return BadRequest(new { Message = "Statement end date cannot be earlier than statement start date." });
+        }
+
+        if (request.Lines is null || request.Lines.Count == 0)
+        {
+            return BadRequest(new { Message = "At least one bank statement line is required." });
+        }
+
+        var ledgerAccount = await dbContext.LedgerAccounts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == request.LedgerAccountId, cancellationToken);
+
+        if (ledgerAccount is null)
+        {
+            return NotFound(new
+            {
+                Message = "Ledger account was not found for the current tenant.",
+                request.LedgerAccountId
+            });
+        }
+
+        if (!ledgerAccount.IsActive || ledgerAccount.IsHeader || !ledgerAccount.IsPostingAllowed || !ledgerAccount.IsCashOrBankAccount)
+        {
+            return BadRequest(new
+            {
+                Message = "Selected ledger account must be an active posting cash or bank account.",
+                request.LedgerAccountId,
+                ledgerAccount.Code
+            });
+        }
+
+        var effectiveSourceReference = string.IsNullOrWhiteSpace(request.SourceReference)
+            ? $"UPLOAD-{DateTime.UtcNow:yyyyMMddHHmmss}"
+            : request.SourceReference.Trim();
+
+        var duplicateExists = await dbContext.BankStatementImports
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.LedgerAccountId == request.LedgerAccountId &&
+                     x.StatementFromUtc == request.StatementFromUtc &&
+                     x.StatementToUtc == request.StatementToUtc &&
+                     x.SourceReference == effectiveSourceReference,
+                cancellationToken);
+
+        if (duplicateExists)
+        {
+            return Conflict(new
+            {
+                Message = "A bank statement import with the same account, statement period, and source reference already exists.",
+                request.LedgerAccountId,
+                request.StatementFromUtc,
+                request.StatementToUtc,
+                SourceReference = effectiveSourceReference
+            });
+        }
+
+        try
+        {
+            var bankStatementImport = new BankStatementImport(
+                Guid.NewGuid(),
+                tenantContext.TenantId,
+                request.LedgerAccountId,
+                request.StatementFromUtc,
+                request.StatementToUtc,
+                BankStatementSourceType.Upload,
+                effectiveSourceReference,
+                request.FileName,
+                request.Notes);
+
+            var lines = request.Lines.Select(x => new BankStatementImportLine(
+                Guid.NewGuid(),
+                bankStatementImport.Id,
+                x.TransactionDateUtc,
+                x.Reference,
+                x.Description,
+                x.DebitAmount,
+                x.CreditAmount,
+                x.Balance,
+                x.ValueDateUtc,
+                x.ExternalReference)).ToList();
+
+            dbContext.BankStatementImports.Add(bankStatementImport);
+            dbContext.BankStatementImportLines.AddRange(lines);
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return Ok(new
+            {
+                Message = "Bank statement upload import created successfully.",
+                bankStatementImport.Id,
+                bankStatementImport.TenantId,
+                bankStatementImport.LedgerAccountId,
+                LedgerAccountCode = ledgerAccount.Code,
+                LedgerAccountName = ledgerAccount.Name,
+                bankStatementImport.StatementFromUtc,
+                bankStatementImport.StatementToUtc,
+                bankStatementImport.SourceType,
+                bankStatementImport.SourceReference,
+                bankStatementImport.FileName,
+                bankStatementImport.Notes,
+                bankStatementImport.ImportedOnUtc,
+                LineCount = lines.Count
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+    [HttpPost("bank-statements/imports/api-placeholder")]
+    public async Task<IActionResult> CreateApiPlaceholderBankStatementImport(
+        [FromBody] CreateApiPlaceholderBankStatementImportRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        if (request.LedgerAccountId == Guid.Empty)
+        {
+            return BadRequest(new { Message = "Ledger account id is required." });
+        }
+
+        if (request.StatementToUtc < request.StatementFromUtc)
+        {
+            return BadRequest(new { Message = "Statement end date cannot be earlier than statement start date." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.SourceReference))
+        {
+            return BadRequest(new { Message = "Source reference is required for API placeholder imports." });
+        }
+
+        var ledgerAccount = await dbContext.LedgerAccounts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == request.LedgerAccountId, cancellationToken);
+
+        if (ledgerAccount is null)
+        {
+            return NotFound(new
+            {
+                Message = "Ledger account was not found for the current tenant.",
+                request.LedgerAccountId
+            });
+        }
+
+        if (!ledgerAccount.IsActive || ledgerAccount.IsHeader || !ledgerAccount.IsPostingAllowed || !ledgerAccount.IsCashOrBankAccount)
+        {
+            return BadRequest(new
+            {
+                Message = "Selected ledger account must be an active posting cash or bank account.",
+                request.LedgerAccountId,
+                ledgerAccount.Code
+            });
+        }
+
+        var normalizedSourceReference = request.SourceReference.Trim();
+
+        var duplicateExists = await dbContext.BankStatementImports
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.LedgerAccountId == request.LedgerAccountId &&
+                     x.StatementFromUtc == request.StatementFromUtc &&
+                     x.StatementToUtc == request.StatementToUtc &&
+                     x.SourceReference == normalizedSourceReference,
+                cancellationToken);
+
+        if (duplicateExists)
+        {
+            return Conflict(new
+            {
+                Message = "A bank statement import with the same account, statement period, and source reference already exists.",
+                request.LedgerAccountId,
+                request.StatementFromUtc,
+                request.StatementToUtc,
+                SourceReference = normalizedSourceReference
+            });
+        }
+
+        var bankStatementImport = new BankStatementImport(
+            Guid.NewGuid(),
+            tenantContext.TenantId,
+            request.LedgerAccountId,
+            request.StatementFromUtc,
+            request.StatementToUtc,
+            BankStatementSourceType.ApiFeed,
+            normalizedSourceReference,
+            fileName: null,
+            request.Notes);
+
+        dbContext.BankStatementImports.Add(bankStatementImport);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Bank statement API placeholder import created successfully.",
+            bankStatementImport.Id,
+            bankStatementImport.TenantId,
+            bankStatementImport.LedgerAccountId,
+            LedgerAccountCode = ledgerAccount.Code,
+            LedgerAccountName = ledgerAccount.Name,
+            bankStatementImport.StatementFromUtc,
+            bankStatementImport.StatementToUtc,
+            bankStatementImport.SourceType,
+            bankStatementImport.SourceReference,
+            bankStatementImport.FileName,
+            bankStatementImport.Notes,
+            bankStatementImport.ImportedOnUtc,
+            LineCount = 0
+        });
+    }
+
+
+        [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+    [HttpGet("bank-statements/imports")]
+    public async Task<IActionResult> GetBankStatementImports(
+        [FromQuery] Guid? ledgerAccountId,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        IQueryable<BankStatementImport> query = dbContext.BankStatementImports
+            .AsNoTracking();
+
+        if (ledgerAccountId.HasValue)
+        {
+            query = query.Where(x => x.LedgerAccountId == ledgerAccountId.Value);
+        }
+
+        var items = await query
+            .OrderByDescending(x => x.StatementToUtc)
+            .ThenByDescending(x => x.ImportedOnUtc)
+            .Select(x => new
+            {
+                x.Id,
+                x.TenantId,
+                x.LedgerAccountId,
+                LedgerAccountCode = x.LedgerAccount != null ? x.LedgerAccount.Code : null,
+                LedgerAccountName = x.LedgerAccount != null ? x.LedgerAccount.Name : null,
+                x.StatementFromUtc,
+                x.StatementToUtc,
+                x.SourceType,
+                x.SourceReference,
+                x.FileName,
+                x.Notes,
+                x.ImportedOnUtc,
+                LineCount = x.Lines.Count
+            })
+            .ToListAsync(cancellationToken);
+
+        return Ok(new
+        {
+            TenantContextAvailable = tenantContext.IsAvailable,
+            TenantId = tenantContext.IsAvailable ? tenantContext.TenantId : (Guid?)null,
+            TenantKey = tenantContext.IsAvailable ? tenantContext.TenantKey : null,
+            Count = items.Count,
+            Items = items
+        });
+    }
+
+
+
+        [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+    [HttpGet("bank-statements/imports/{bankStatementImportId:guid}")]
+    public async Task<IActionResult> GetBankStatementImportDetail(
+        Guid bankStatementImportId,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        var bankStatementImport = await dbContext.BankStatementImports
+            .AsNoTracking()
+            .Include(x => x.LedgerAccount)
+            .Include(x => x.Lines)
+            .FirstOrDefaultAsync(x => x.Id == bankStatementImportId, cancellationToken);
+
+        if (bankStatementImport is null)
+        {
+            return NotFound(new
+            {
+                Message = "Bank statement import was not found for the current tenant.",
+                BankStatementImportId = bankStatementImportId
+            });
+        }
+
+        var items = bankStatementImport.Lines
+            .OrderBy(x => x.TransactionDateUtc)
+            .ThenBy(x => x.Reference)
+            .Select(x => new
+            {
+                x.Id,
+                x.BankStatementImportId,
+                x.TransactionDateUtc,
+                x.ValueDateUtc,
+                x.Reference,
+                x.Description,
+                x.DebitAmount,
+                x.CreditAmount,
+                x.Balance,
+                x.ExternalReference
+            })
+            .ToList();
+
+        return Ok(new
+        {
+            TenantContextAvailable = tenantContext.IsAvailable,
+            TenantId = tenantContext.IsAvailable ? tenantContext.TenantId : (Guid?)null,
+            TenantKey = tenantContext.IsAvailable ? tenantContext.TenantKey : null,
+            BankStatementImport = new
+            {
+                bankStatementImport.Id,
+                bankStatementImport.TenantId,
+                bankStatementImport.LedgerAccountId,
+                LedgerAccountCode = bankStatementImport.LedgerAccount != null ? bankStatementImport.LedgerAccount.Code : null,
+                LedgerAccountName = bankStatementImport.LedgerAccount != null ? bankStatementImport.LedgerAccount.Name : null,
+                bankStatementImport.StatementFromUtc,
+                bankStatementImport.StatementToUtc,
+                bankStatementImport.SourceType,
+                bankStatementImport.SourceReference,
+                bankStatementImport.FileName,
+                bankStatementImport.Notes,
+                bankStatementImport.ImportedOnUtc
+            },
+            Count = items.Count,
+            TotalDebit = items.Sum(x => x.DebitAmount),
+            TotalCredit = items.Sum(x => x.CreditAmount),
+            Items = items
+        });
+    }
+
 
     [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
     [HttpGet("accounts/{ledgerAccountId:guid}/ledger")]
@@ -2404,6 +3472,50 @@ public sealed class FinanceController : ControllerBase
         Guid? ParentLedgerAccountId,
         string? Purpose,
         bool IsCashOrBankAccount);
+
+    public sealed record UpdateLedgerAccountRequest(
+        string Name,
+        string? Purpose,
+        bool IsActive,
+        bool IsCashOrBankAccount);
+
+    public sealed record CreateBankReconciliationRequest(
+        Guid LedgerAccountId,
+        DateTime StatementFromUtc,
+        DateTime StatementToUtc,
+        decimal StatementClosingBalance,
+        string? Notes);
+
+    public sealed record SetBankReconciliationLineReconciledStateRequest(
+        bool IsReconciled,
+        string? Notes);
+
+
+        public sealed record UploadBankStatementImportRequest(
+        Guid LedgerAccountId,
+        DateTime StatementFromUtc,
+        DateTime StatementToUtc,
+        string? SourceReference,
+        string? FileName,
+        string? Notes,
+        IReadOnlyCollection<UploadBankStatementImportLineRequest> Lines);
+
+    public sealed record UploadBankStatementImportLineRequest(
+        DateTime TransactionDateUtc,
+        DateTime? ValueDateUtc,
+        string Reference,
+        string Description,
+        decimal DebitAmount,
+        decimal CreditAmount,
+        decimal? Balance,
+        string? ExternalReference);
+
+    public sealed record CreateApiPlaceholderBankStatementImportRequest(
+        Guid LedgerAccountId,
+        DateTime StatementFromUtc,
+        DateTime StatementToUtc,
+        string SourceReference,
+        string? Notes);
 
     public sealed record CreateJournalEntryRequest(
         DateTime EntryDateUtc,
