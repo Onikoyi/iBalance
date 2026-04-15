@@ -43,6 +43,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<BankReconciliationLine> BankReconciliationLines => Set<BankReconciliationLine>();
     public DbSet<BankStatementImport> BankStatementImports => Set<BankStatementImport>();
     public DbSet<BankStatementImportLine> BankStatementImportLines => Set<BankStatementImportLine>();
+    public DbSet<BankReconciliationMatch> BankReconciliationMatches => Set<BankReconciliationMatch>();
     public DbSet<FiscalPeriod> FiscalPeriods => Set<FiscalPeriod>();
     public DbSet<JournalNumberSequence> JournalNumberSequences => Set<JournalNumberSequence>();
     public DbSet<Customer> Customers => Set<Customer>();

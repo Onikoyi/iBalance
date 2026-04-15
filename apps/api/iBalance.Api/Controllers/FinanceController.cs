@@ -3263,21 +3263,57 @@ public sealed class FinanceController : ControllerBase
             });
         }
 
-        var items = bankStatementImport.Lines
-            .OrderBy(x => x.TransactionDateUtc)
-            .ThenBy(x => x.Reference)
+               var matches = await dbContext.BankReconciliationMatches
+            .AsNoTracking()
+            .Where(x => bankStatementImport.Lines.Select(line => line.Id).Contains(x.BankStatementImportLineId))
             .Select(x => new
             {
                 x.Id,
-                x.BankStatementImportId,
-                x.TransactionDateUtc,
-                x.ValueDateUtc,
-                x.Reference,
-                x.Description,
-                x.DebitAmount,
-                x.CreditAmount,
-                x.Balance,
-                x.ExternalReference
+                x.BankReconciliationId,
+                x.BankReconciliationLineId,
+                x.BankStatementImportLineId,
+                x.MatchedOnUtc,
+                x.Notes
+            })
+            .ToListAsync(cancellationToken);
+
+        var matchByStatementLineId = matches
+            .GroupBy(x => x.BankStatementImportLineId)
+            .ToDictionary(x => x.Key, x => x.First());
+
+        var items = bankStatementImport.Lines
+            .OrderBy(x => x.TransactionDateUtc)
+            .ThenBy(x => x.Reference)
+            .Select(x =>
+            {
+                var match = matchByStatementLineId.TryGetValue(x.Id, out var foundMatch)
+                    ? foundMatch
+                    : null;
+
+                return new
+                {
+                    x.Id,
+                    x.BankStatementImportId,
+                    x.TransactionDateUtc,
+                    x.ValueDateUtc,
+                    x.Reference,
+                    x.Description,
+                    x.DebitAmount,
+                    x.CreditAmount,
+                    x.Balance,
+                    x.ExternalReference,
+                    Match = match is null
+                        ? null
+                        : new
+                        {
+                            match.Id,
+                            match.BankReconciliationId,
+                            match.BankReconciliationLineId,
+                            match.BankStatementImportLineId,
+                            match.MatchedOnUtc,
+                            match.Notes
+                        }
+                };
             })
             .ToList();
 
@@ -3301,10 +3337,258 @@ public sealed class FinanceController : ControllerBase
                 bankStatementImport.Notes,
                 bankStatementImport.ImportedOnUtc
             },
+            MatchCount = matches.Count,
             Count = items.Count,
             TotalDebit = items.Sum(x => x.DebitAmount),
             TotalCredit = items.Sum(x => x.CreditAmount),
             Items = items
+        });
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+    [HttpPost("reconciliations/{bankReconciliationId:guid}/matches")]
+    public async Task<IActionResult> CreateBankReconciliationMatch(
+        Guid bankReconciliationId,
+        [FromBody] CreateBankReconciliationMatchRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        if (request.BankReconciliationLineId == Guid.Empty)
+        {
+            return BadRequest(new { Message = "Bank reconciliation line id is required." });
+        }
+
+        if (request.BankStatementImportLineId == Guid.Empty)
+        {
+            return BadRequest(new { Message = "Bank statement import line id is required." });
+        }
+
+        var reconciliation = await dbContext.BankReconciliations
+            .Include(x => x.Lines)
+            .FirstOrDefaultAsync(x => x.Id == bankReconciliationId, cancellationToken);
+
+        if (reconciliation is null)
+        {
+            return NotFound(new
+            {
+                Message = "Bank reconciliation was not found for the current tenant.",
+                BankReconciliationId = bankReconciliationId
+            });
+        }
+
+        if (reconciliation.Status != BankReconciliationStatus.Draft)
+        {
+            return Conflict(new
+            {
+                Message = "Only draft bank reconciliations can be modified.",
+                BankReconciliationId = bankReconciliationId,
+                reconciliation.Status
+            });
+        }
+
+        var reconciliationLine = reconciliation.Lines
+            .FirstOrDefault(x => x.Id == request.BankReconciliationLineId);
+
+        if (reconciliationLine is null)
+        {
+            return NotFound(new
+            {
+                Message = "Bank reconciliation line was not found for the current tenant.",
+                request.BankReconciliationLineId
+            });
+        }
+
+        var statementLine = await dbContext.BankStatementImportLines
+            .AsNoTracking()
+            .Include(x => x.BankStatementImport)
+            .FirstOrDefaultAsync(x => x.Id == request.BankStatementImportLineId, cancellationToken);
+
+        if (statementLine is null)
+        {
+            return NotFound(new
+            {
+                Message = "Bank statement import line was not found for the current tenant.",
+                request.BankStatementImportLineId
+            });
+        }
+
+        if (statementLine.BankStatementImport is null)
+        {
+            return Conflict(new
+            {
+                Message = "Bank statement import line is missing its parent import.",
+                request.BankStatementImportLineId
+            });
+        }
+
+        if (statementLine.BankStatementImport.LedgerAccountId != reconciliation.LedgerAccountId)
+        {
+            return Conflict(new
+            {
+                Message = "Statement line treasury account does not match the reconciliation treasury account.",
+                ReconciliationLedgerAccountId = reconciliation.LedgerAccountId,
+                StatementLedgerAccountId = statementLine.BankStatementImport.LedgerAccountId
+            });
+        }
+
+        if (statementLine.TransactionDateUtc < reconciliation.StatementFromUtc ||
+            statementLine.TransactionDateUtc > reconciliation.StatementToUtc)
+        {
+            return Conflict(new
+            {
+                Message = "Statement line date is outside the reconciliation statement period.",
+                statementLine.TransactionDateUtc,
+                reconciliation.StatementFromUtc,
+                reconciliation.StatementToUtc
+            });
+        }
+
+        var reconciliationLineAlreadyMatched = await dbContext.BankReconciliationMatches
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.BankReconciliationId == bankReconciliationId &&
+                     x.BankReconciliationLineId == request.BankReconciliationLineId,
+                cancellationToken);
+
+        if (reconciliationLineAlreadyMatched)
+        {
+            return Conflict(new
+            {
+                Message = "This reconciliation line has already been matched in the current reconciliation.",
+                request.BankReconciliationLineId
+            });
+        }
+
+        var statementLineAlreadyMatched = await dbContext.BankReconciliationMatches
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.BankReconciliationId == bankReconciliationId &&
+                     x.BankStatementImportLineId == request.BankStatementImportLineId,
+                cancellationToken);
+
+        if (statementLineAlreadyMatched)
+        {
+            return Conflict(new
+            {
+                Message = "This bank statement line has already been matched in the current reconciliation.",
+                request.BankStatementImportLineId
+            });
+        }
+
+        var match = new BankReconciliationMatch(
+            Guid.NewGuid(),
+            bankReconciliationId,
+            request.BankReconciliationLineId,
+            request.BankStatementImportLineId,
+            request.Notes);
+
+        dbContext.BankReconciliationMatches.Add(match);
+        reconciliationLine.MarkAsReconciled();
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Bank reconciliation match created successfully.",
+            match.Id,
+            match.BankReconciliationId,
+            match.BankReconciliationLineId,
+            match.BankStatementImportLineId,
+            match.MatchedOnUtc,
+            match.Notes
+        });
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+    [HttpPost("reconciliations/{bankReconciliationId:guid}/matches/{bankReconciliationMatchId:guid}/remove")]
+    public async Task<IActionResult> RemoveBankReconciliationMatch(
+        Guid bankReconciliationId,
+        Guid bankReconciliationMatchId,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        var reconciliation = await dbContext.BankReconciliations
+            .Include(x => x.Lines)
+            .FirstOrDefaultAsync(x => x.Id == bankReconciliationId, cancellationToken);
+
+        if (reconciliation is null)
+        {
+            return NotFound(new
+            {
+                Message = "Bank reconciliation was not found for the current tenant.",
+                BankReconciliationId = bankReconciliationId
+            });
+        }
+
+        if (reconciliation.Status != BankReconciliationStatus.Draft)
+        {
+            return Conflict(new
+            {
+                Message = "Only draft bank reconciliations can be modified.",
+                BankReconciliationId = bankReconciliationId,
+                reconciliation.Status
+            });
+        }
+
+        var match = await dbContext.BankReconciliationMatches
+            .FirstOrDefaultAsync(
+                x => x.Id == bankReconciliationMatchId &&
+                     x.BankReconciliationId == bankReconciliationId,
+                cancellationToken);
+
+        if (match is null)
+        {
+            return NotFound(new
+            {
+                Message = "Bank reconciliation match was not found for the current tenant.",
+                BankReconciliationId = bankReconciliationId,
+                BankReconciliationMatchId = bankReconciliationMatchId
+            });
+        }
+
+        var reconciliationLine = reconciliation.Lines
+            .FirstOrDefault(x => x.Id == match.BankReconciliationLineId);
+
+        dbContext.BankReconciliationMatches.Remove(match);
+
+        if (reconciliationLine is not null)
+        {
+            reconciliationLine.MarkAsUnreconciled();
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Bank reconciliation match removed successfully.",
+            BankReconciliationId = bankReconciliationId,
+            BankReconciliationMatchId = bankReconciliationMatchId,
+            BankReconciliationLineId = match.BankReconciliationLineId,
+            BankStatementImportLineId = match.BankStatementImportLineId
         });
     }
 
@@ -3515,6 +3799,11 @@ public sealed class FinanceController : ControllerBase
         DateTime StatementFromUtc,
         DateTime StatementToUtc,
         string SourceReference,
+        string? Notes);
+
+    public sealed record CreateBankReconciliationMatchRequest(
+        Guid BankReconciliationLineId,
+        Guid BankStatementImportLineId,
         string? Notes);
 
     public sealed record CreateJournalEntryRequest(

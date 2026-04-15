@@ -5,6 +5,7 @@ import {
   completeBankReconciliation,
   createApiPlaceholderBankStatementImport,
   createBankReconciliation,
+  createBankReconciliationMatch,
   getBalanceSheet,
   getBankReconciliationDetail,
   getBankReconciliations,
@@ -21,6 +22,7 @@ import {
   getTenantLogoDataUrl,
   getTrialBalance,
   getVendorPayments,
+  removeBankReconciliationMatch,
   setBankReconciliationLineReconciledState,
   uploadBankStatementImport,
 } from '../lib/api';
@@ -732,6 +734,9 @@ export function ReportsPage() {
   const [callOverStatementSearch, setCallOverStatementSearch] = useState('');
   const [callOverBookSearch, setCallOverBookSearch] = useState('');
   const [apiPlaceholderReference, setApiPlaceholderReference] = useState('');
+  const [selectedStatementLineId, setSelectedStatementLineId] = useState('');
+  const [selectedBookLineId, setSelectedBookLineId] = useState('');
+  const [matchNotes, setMatchNotes] = useState('');
   const qc = useQueryClient();
 
   const canView = canViewReports();
@@ -892,6 +897,59 @@ export function ReportsPage() {
     },
   });
 
+
+  const createMatchMut = useMutation({
+    mutationFn: ({
+      bankReconciliationId,
+      payload,
+    }: {
+      bankReconciliationId: string;
+      payload: {
+        bankReconciliationLineId: string;
+        bankStatementImportLineId: string;
+        notes?: string | null;
+      };
+    }) => createBankReconciliationMatch(bankReconciliationId, payload),
+    onSuccess: async () => {
+      if (selectedReconciliationId) {
+        await qc.invalidateQueries({
+          queryKey: ['bank-reconciliation-detail', selectedReconciliationId],
+        });
+      }
+      if (selectedStatementImportId) {
+        await qc.invalidateQueries({
+          queryKey: ['bank-statement-import-detail', selectedStatementImportId],
+        });
+      }
+      await qc.invalidateQueries({ queryKey: ['bank-reconciliations'] });
+      setSelectedStatementLineId('');
+      setSelectedBookLineId('');
+      setMatchNotes('');
+    },
+  });
+
+  const removeMatchMut = useMutation({
+    mutationFn: ({
+      bankReconciliationId,
+      bankReconciliationMatchId,
+    }: {
+      bankReconciliationId: string;
+      bankReconciliationMatchId: string;
+    }) => removeBankReconciliationMatch(bankReconciliationId, bankReconciliationMatchId),
+    onSuccess: async () => {
+      if (selectedReconciliationId) {
+        await qc.invalidateQueries({
+          queryKey: ['bank-reconciliation-detail', selectedReconciliationId],
+        });
+      }
+      if (selectedStatementImportId) {
+        await qc.invalidateQueries({
+          queryKey: ['bank-statement-import-detail', selectedStatementImportId],
+        });
+      }
+      await qc.invalidateQueries({ queryKey: ['bank-reconciliations'] });
+    },
+  });
 
   const salesInvoicesQ = useQuery({
     queryKey: ['ar-sales-invoices'],
@@ -1194,6 +1252,40 @@ export function ReportsPage() {
     };
   }, [bankStatementImportDetailQ.data, bankReconciliationDetailQ.data]);
 
+ 
+
+  const matchedStatementLineIds = useMemo(() => {
+    const statementDetail = bankStatementImportDetailQ.data;
+    const reconciliationDetail = bankReconciliationDetailQ.data;
+
+    if (!statementDetail || !reconciliationDetail) return new Set<string>();
+
+    const matchedStatementIds = new Set<string>();
+
+    reconciliationDetail.items.forEach((bookLine) => {
+      const note = (bookLine.notes || '').trim();
+      if (note.startsWith('MATCH:')) {
+        const statementLineId = note.replace('MATCH:', '').trim();
+        if (statementLineId) {
+          matchedStatementIds.add(statementLineId);
+        }
+      }
+    });
+
+    return matchedStatementIds;
+  }, [bankStatementImportDetailQ.data, bankReconciliationDetailQ.data]);
+
+  const selectedStatementLine = useMemo(
+    () => filteredStatementLines.find((x) => x.id === selectedStatementLineId) || null,
+    [filteredStatementLines, selectedStatementLineId]
+  );
+
+  const selectedBookLine = useMemo(
+    () => filteredBookLines.find((x) => x.id === selectedBookLineId) || null,
+    [filteredBookLines, selectedBookLineId]
+  );
+
+
 
   function openStandalonePrint(html: string) {
     const printWindow = window.open('', '_blank', 'width=1200,height=900');
@@ -1373,6 +1465,48 @@ export function ReportsPage() {
     });
 
     openStandalonePrint(html);
+  }
+
+
+  async function handleCreateMatch() {
+    if (!selectedReconciliationId || !selectedStatementLineId || !selectedBookLineId) {
+      return;
+    }
+
+    await createMatchMut.mutateAsync({
+      bankReconciliationId: selectedReconciliationId,
+      payload: {
+        bankReconciliationLineId: selectedBookLineId,
+        bankStatementImportLineId: selectedStatementLineId,
+        notes: `MATCH:${selectedStatementLineId}${matchNotes.trim() ? ` | ${matchNotes.trim()}` : ''}`,
+      },
+    });
+  }
+
+  async function handleRemoveMatchForBookLine(bookLineId: string, notes?: string | null) {
+    if (!selectedReconciliationId || !bankReconciliationDetailQ.data) {
+      return;
+    }
+
+    const currentLine = bankReconciliationDetailQ.data.items.find((x) => x.id === bookLineId);
+    if (!currentLine?.isReconciled) {
+      return;
+    }
+
+    const noteText = notes || '';
+    if (!noteText.startsWith('MATCH:')) {
+      return;
+    }
+
+    // First version: remove by toggling the book line back to unreconciled if no dedicated match id is exposed yet.
+    await updateReconciliationLineMut.mutateAsync({
+      bankReconciliationId: selectedReconciliationId,
+      bankReconciliationLineId: bookLineId,
+      payload: {
+        isReconciled: false,
+        notes: null,
+      },
+    });
   }
 
 
@@ -2555,6 +2689,8 @@ export function ReportsPage() {
                   setSelectedReconciliationId(item.id);
                   setReconciliationLineFilter('all');
                   setCallOverBookSearch('');
+                  setSelectedBookLineId('');
+                  setMatchNotes('');
                 }}
               >
                 Open
@@ -2975,6 +3111,8 @@ export function ReportsPage() {
               onClick={() => {
                 setSelectedStatementImportId(item.id);
                 setCallOverStatementSearch('');
+                setSelectedStatementLineId('');
+                setMatchNotes('');
               }}
             >
               Open
@@ -3041,6 +3179,84 @@ export function ReportsPage() {
 </div>
 <div className="muted" style={{ marginTop: 8 }}>
   The workspace is strongest when the statement import and reconciliation are aligned on the same treasury account and statement period.
+</div>
+</div>
+
+
+<div className="panel" style={{ marginBottom: 16 }}>
+<div className="section-heading">
+  <div>
+    <h2>Match Control</h2>
+    <span className="muted">Select one statement line and one book line to create a Call-over match</span>
+  </div>
+</div>
+
+<div className="form-grid two">
+  <div className="form-row">
+    <label>Selected Statement Line</label>
+    <div className="panel" style={{ margin: 0, padding: 12 }}>
+      <div className="muted">
+        {selectedStatementLine
+          ? `${selectedStatementLine.reference} — ${selectedStatementLine.description}`
+          : 'No statement line selected'}
+      </div>
+    </div>
+  </div>
+
+  <div className="form-row">
+    <label>Selected Book Line</label>
+    <div className="panel" style={{ margin: 0, padding: 12 }}>
+      <div className="muted">
+        {selectedBookLine
+          ? `${selectedBookLine.reference} — ${selectedBookLine.description}`
+          : 'No book line selected'}
+      </div>
+    </div>
+  </div>
+
+  <div className="form-row" style={{ gridColumn: '1 / -1' }}>
+    <label>Match Notes</label>
+    <input
+      className="input"
+      value={matchNotes}
+      onChange={(e) => setMatchNotes(e.target.value)}
+      placeholder="Optional notes for this match"
+    />
+  </div>
+
+  <div className="form-row">
+    <label>Create Match</label>
+    <div className="inline-actions">
+      <button
+        className="button primary"
+        onClick={handleCreateMatch}
+        disabled={
+          !selectedReconciliationId ||
+          !selectedStatementLineId ||
+          !selectedBookLineId ||
+          createMatchMut.isPending
+        }
+      >
+        {createMatchMut.isPending ? 'Matching…' : 'Create Match'}
+      </button>
+    </div>
+  </div>
+
+  <div className="form-row">
+    <label>Reset Selection</label>
+    <div className="inline-actions">
+      <button
+        className="button"
+        onClick={() => {
+          setSelectedStatementLineId('');
+          setSelectedBookLineId('');
+          setMatchNotes('');
+        }}
+      >
+        Clear Selection
+      </button>
+    </div>
+  </div>
 </div>
 </div>
 
@@ -3114,31 +3330,48 @@ export function ReportsPage() {
           <div className="table-wrap">
             <table className="data-table">
               <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Value Date</th>
-                  <th>Reference</th>
-                  <th>Description</th>
-                  <th style={{ textAlign: 'right' }}>Debit</th>
-                  <th style={{ textAlign: 'right' }}>Credit</th>
-                  <th style={{ textAlign: 'right' }}>Balance</th>
-                </tr>
+              <tr>
+              <th>Date</th>
+              <th>Value Date</th>
+              <th>Reference</th>
+              <th>Description</th>
+              <th style={{ textAlign: 'right' }}>Debit</th>
+              <th style={{ textAlign: 'right' }}>Credit</th>
+              <th style={{ textAlign: 'right' }}>Balance</th>
+              <th>Matched</th>
+            </tr>
               </thead>
               <tbody>
                 {filteredStatementLines.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="muted">
+                  <td colSpan={8} className="muted">
                       No statement lines matched the current search.
                     </td>
                   </tr>
                 ) : (
-                  filteredStatementLines.map((item, index) => (
-                    <tr
-                      key={item.id}
-                      style={{
-                        background: index % 2 === 0 ? 'rgba(59, 130, 246, 0.04)' : 'transparent',
-                      }}
-                    >
+                  filteredStatementLines.map((item, index) => {
+                    const isMatched = matchedStatementLineIds.has(item.id);
+                    const isSelected = selectedStatementLineId === item.id;
+
+                    return (
+                      <tr
+                        key={item.id}
+                        onClick={() => {
+                          if (!isMatched) {
+                            setSelectedStatementLineId(item.id);
+                          }
+                        }}
+                        style={{
+                          cursor: isMatched ? 'default' : 'pointer',
+                          background: isSelected
+                            ? 'rgba(37, 99, 235, 0.18)'
+                            : isMatched
+                              ? 'rgba(16, 185, 129, 0.10)'
+                              : index % 2 === 0
+                                ? 'rgba(59, 130, 246, 0.04)'
+                                : 'transparent',
+                        }}
+                      >
                       <td>{formatDateTime(item.transactionDateUtc)}</td>
                       <td>{formatDateTime(item.valueDateUtc || null)}</td>
                       <td>{item.reference}</td>
@@ -3146,8 +3379,9 @@ export function ReportsPage() {
                       <td style={{ textAlign: 'right' }}>{formatAmount(item.debitAmount)}</td>
                       <td style={{ textAlign: 'right' }}>{formatAmount(item.creditAmount)}</td>
                       <td style={{ textAlign: 'right' }}>{formatAmount(item.balance || 0)}</td>
-                    </tr>
-                  ))
+                      <td>{matchedStatementLineIds.has(item.id) ? 'Yes' : 'No'}</td>
+                      </tr>
+                    )})
                 )}
               </tbody>
             </table>
@@ -3229,42 +3463,70 @@ export function ReportsPage() {
           <div className="table-wrap">
             <table className="data-table">
               <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Reference</th>
-                  <th>Description</th>
-                  <th style={{ textAlign: 'right' }}>Debit</th>
-                  <th style={{ textAlign: 'right' }}>Credit</th>
-                  <th>Reconciled</th>
-                </tr>
+              <tr>
+              <th>Date</th>
+              <th>Reference</th>
+              <th>Description</th>
+              <th style={{ textAlign: 'right' }}>Debit</th>
+              <th style={{ textAlign: 'right' }}>Credit</th>
+              <th>Reconciled</th>
+              <th>Action</th>
+            </tr>
               </thead>
               <tbody>
                 {filteredBookLines.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="muted">
+                    <td colSpan={7} className="muted">
                       No book lines matched the current filters.
                     </td>
                   </tr>
                 ) : (
-                  filteredBookLines.map((item, index) => (
-                    <tr
-                      key={item.id}
-                      style={{
-                        background: item.isReconciled
-                          ? 'rgba(16, 185, 129, 0.10)'
-                          : index % 2 === 0
-                            ? 'rgba(245, 158, 11, 0.06)'
-                            : 'transparent',
-                      }}
-                    >
+                  filteredBookLines.map((item, index) => {
+                    const isSelected = selectedBookLineId === item.id;
+
+                    return (
+                      <tr
+                        key={item.id}
+                        onClick={() => {
+                          if (!item.isReconciled) {
+                            setSelectedBookLineId(item.id);
+                          }
+                        }}
+                        style={{
+                          cursor: item.isReconciled ? 'default' : 'pointer',
+                          background: isSelected
+                            ? 'rgba(245, 158, 11, 0.18)'
+                            : item.isReconciled
+                              ? 'rgba(16, 185, 129, 0.10)'
+                              : index % 2 === 0
+                                ? 'rgba(245, 158, 11, 0.06)'
+                                : 'transparent',
+                        }}
+                      >
                       <td>{formatDateTime(item.movementDateUtc)}</td>
                       <td>{item.reference}</td>
                       <td>{item.description}</td>
                       <td style={{ textAlign: 'right' }}>{formatAmount(item.debitAmount)}</td>
                       <td style={{ textAlign: 'right' }}>{formatAmount(item.creditAmount)}</td>
                       <td>{item.isReconciled ? 'Yes' : 'No'}</td>
-                    </tr>
-                  ))
+                      <td>
+                        {item.isReconciled ? (
+                          <button
+                            className="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveMatchForBookLine(item.id, item.notes);
+                            }}
+                            disabled={updateReconciliationLineMut.isPending || removeMatchMut.isPending}
+                          >
+                            Unmatch
+                          </button>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      </tr>
+                    )})
                 )}
               </tbody>
             </table>

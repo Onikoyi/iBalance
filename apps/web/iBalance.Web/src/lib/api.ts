@@ -293,6 +293,15 @@ export type BankReconciliationsResponse = {
   items: BankReconciliationListItemDto[];
 };
 
+export type BankReconciliationMatchDto = {
+  id: string;
+  bankReconciliationId: string;
+  bankReconciliationLineId: string;
+  bankStatementImportLineId: string;
+  matchedOnUtc: string;
+  notes?: string | null;
+};
+
 export type BankReconciliationDetailLineDto = {
   id: string;
   bankReconciliationId: string;
@@ -306,6 +315,7 @@ export type BankReconciliationDetailLineDto = {
   description: string;
   debitAmount: number;
   creditAmount: number;
+  match?: BankReconciliationMatchDto | null;
 };
 
 export type BankReconciliationDetailResponse = {
@@ -328,6 +338,7 @@ export type BankReconciliationDetailResponse = {
     completedOnUtc?: string | null;
     cancelledOnUtc?: string | null;
   };
+  matchCount: number;
   count: number;
   reconciledCount: number;
   unreconciledCount: number;
@@ -412,6 +423,7 @@ export type BankStatementImportDetailLineDto = {
   creditAmount: number;
   balance?: number | null;
   externalReference?: string | null;
+  match?: BankReconciliationMatchDto | null;
 };
 
 export type BankStatementImportDetailResponse = {
@@ -432,10 +444,17 @@ export type BankStatementImportDetailResponse = {
     notes?: string | null;
     importedOnUtc: string;
   };
+  matchCount: number;
   count: number;
   totalDebit: number;
   totalCredit: number;
   items: BankStatementImportDetailLineDto[];
+};
+
+export type CreateBankReconciliationMatchRequest = {
+  bankReconciliationLineId: string;
+  bankStatementImportLineId: string;
+  notes?: string | null;
 };
 
 export type JournalEntryDto = {
@@ -1669,6 +1688,31 @@ export async function getBankStatementImports(ledgerAccountId?: string | null) {
 export async function getBankStatementImportDetail(bankStatementImportId: string) {
   const response = await api.get<BankStatementImportDetailResponse>(
     `/api/finance/bank-statements/imports/${encodeURIComponent(bankStatementImportId)}`
+  );
+
+  return response.data;
+}
+
+
+export async function createBankReconciliationMatch(
+  bankReconciliationId: string,
+  payload: CreateBankReconciliationMatchRequest
+) {
+  const response = await api.post(
+    `/api/finance/reconciliations/${encodeURIComponent(bankReconciliationId)}/matches`,
+    payload
+  );
+
+  return response.data;
+}
+
+export async function removeBankReconciliationMatch(
+  bankReconciliationId: string,
+  bankReconciliationMatchId: string
+) {
+  const response = await api.post(
+    `/api/finance/reconciliations/${encodeURIComponent(bankReconciliationId)}/matches/${encodeURIComponent(bankReconciliationMatchId)}/remove`,
+    {}
   );
 
   return response.data;
