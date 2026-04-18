@@ -44,6 +44,10 @@ public class ApplicationDbContext : DbContext
     public DbSet<BankStatementImport> BankStatementImports => Set<BankStatementImport>();
     public DbSet<BankStatementImportLine> BankStatementImportLines => Set<BankStatementImportLine>();
     public DbSet<BankReconciliationMatch> BankReconciliationMatches => Set<BankReconciliationMatch>();
+    public DbSet<TaxCode> TaxCodes => Set<TaxCode>();
+    public DbSet<TaxTransactionLine> TaxTransactionLines => Set<TaxTransactionLine>();
+    public DbSet<SalesInvoiceTaxLine> SalesInvoiceTaxLines => Set<SalesInvoiceTaxLine>();
+    public DbSet<PurchaseInvoiceTaxLine> PurchaseInvoiceTaxLines => Set<PurchaseInvoiceTaxLine>();
     public DbSet<FiscalPeriod> FiscalPeriods => Set<FiscalPeriod>();
     public DbSet<JournalNumberSequence> JournalNumberSequences => Set<JournalNumberSequence>();
     public DbSet<Customer> Customers => Set<Customer>();

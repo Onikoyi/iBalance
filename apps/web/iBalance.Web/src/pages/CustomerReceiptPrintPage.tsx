@@ -72,6 +72,10 @@ function buildReceiptHtml(args: {
     invoiceDateUtc?: string | null;
     invoiceDescription: string;
     invoiceTotalAmount: number;
+    invoiceTaxAdditionAmount: number;
+    invoiceTaxDeductionAmount: number;
+    invoiceGrossAmount: number;
+    invoiceNetReceivableAmount: number;
     invoiceAmountPaid: number;
     invoiceBalanceAmount: number;
     createdOnUtc: string;
@@ -120,10 +124,22 @@ function buildReceiptHtml(args: {
           `).join('')}
         </tbody>
         <tfoot>
-          <tr>
-            <th colspan="3" style="padding:8px;text-align:left;border-top:1px solid #d1d5db;">Invoice Total</th>
-            <th style="padding:8px;text-align:right;border-top:1px solid #d1d5db;">${formatAmount(receipt.invoiceTotalAmount)}</th>
-          </tr>
+        <tr>
+        <th colspan="3" style="padding:8px;text-align:left;border-top:1px solid #d1d5db;">Base Invoice Amount</th>
+        <th style="padding:8px;text-align:right;border-top:1px solid #d1d5db;">${formatAmount(receipt.invoiceTotalAmount)}</th>
+      </tr>
+      <tr>
+        <th colspan="3" style="padding:8px;text-align:left;">Tax Additions</th>
+        <th style="padding:8px;text-align:right;">${formatAmount(receipt.invoiceTaxAdditionAmount || 0)}</th>
+      </tr>
+      <tr>
+        <th colspan="3" style="padding:8px;text-align:left;">Tax Deductions</th>
+        <th style="padding:8px;text-align:right;">${formatAmount(receipt.invoiceTaxDeductionAmount || 0)}</th>
+      </tr>
+      <tr>
+        <th colspan="3" style="padding:8px;text-align:left;">Net Receivable Amount</th>
+        <th style="padding:8px;text-align:right;">${formatAmount(receipt.invoiceNetReceivableAmount || receipt.invoiceTotalAmount)}</th>
+      </tr>
         </tfoot>
       </table>`;
 
@@ -299,7 +315,11 @@ function buildReceiptHtml(args: {
         <div class="kv-row"><span>Invoice Number</span><span>${receipt.invoiceNumber}</span></div>
         <div class="kv-row"><span>Invoice Date</span><span>${formatUtcDate(receipt.invoiceDateUtc)}</span></div>
         <div class="kv-row"><span>Invoice Description</span><span>${receipt.invoiceDescription}</span></div>
-        <div class="kv-row"><span>Invoice Total</span><span>${formatAmount(receipt.invoiceTotalAmount)}</span></div>
+        <div class="kv-row"><span>Base Invoice Amount</span><span>${formatAmount(receipt.invoiceTotalAmount)}</span></div>
+        <div class="kv-row"><span>Tax Additions</span><span>${formatAmount(receipt.invoiceTaxAdditionAmount || 0)}</span></div>
+        <div class="kv-row"><span>Tax Deductions</span><span>${formatAmount(receipt.invoiceTaxDeductionAmount || 0)}</span></div>
+        <div class="kv-row"><span>Gross Amount</span><span>${formatAmount(receipt.invoiceGrossAmount || receipt.invoiceTotalAmount)}</span></div>
+        <div class="kv-row"><span>Net Receivable Amount</span><span>${formatAmount(receipt.invoiceNetReceivableAmount || receipt.invoiceTotalAmount)}</span></div>
         <div class="kv-row"><span>Total Paid</span><span>${formatAmount(receipt.invoiceAmountPaid)}</span></div>
         <div class="kv-row"><span>Outstanding Balance</span><span>${formatAmount(receipt.invoiceBalanceAmount)}</span></div>
       </div>
@@ -507,8 +527,24 @@ export function CustomerReceiptPrintPage() {
               <span>{receipt.invoiceDescription}</span>
             </div>
             <div className="kv-row">
-              <span>Invoice Total</span>
+              <span>Base Invoice Amount</span>
               <span>{formatAmount(receipt.invoiceTotalAmount)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Tax Additions</span>
+              <span>{formatAmount(receipt.invoiceTaxAdditionAmount || 0)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Tax Deductions</span>
+              <span>{formatAmount(receipt.invoiceTaxDeductionAmount || 0)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Gross Amount</span>
+              <span>{formatAmount(receipt.invoiceGrossAmount || receipt.invoiceTotalAmount)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Net Receivable Amount</span>
+              <span>{formatAmount(receipt.invoiceNetReceivableAmount || receipt.invoiceTotalAmount)}</span>
             </div>
             <div className="kv-row">
               <span>Total Paid</span>
@@ -548,9 +584,23 @@ export function CustomerReceiptPrintPage() {
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr>
-                    <th colSpan={3}>Invoice Total</th>
+                <tr>
+                    <th colSpan={3}>Base Invoice Amount</th>
                     <th style={{ textAlign: 'right' }}>{formatAmount(receipt.invoiceTotalAmount)}</th>
+                  </tr>
+                  <tr>
+                    <th colSpan={3}>Tax Additions</th>
+                    <th style={{ textAlign: 'right' }}>{formatAmount(receipt.invoiceTaxAdditionAmount || 0)}</th>
+                  </tr>
+                  <tr>
+                    <th colSpan={3}>Tax Deductions</th>
+                    <th style={{ textAlign: 'right' }}>{formatAmount(receipt.invoiceTaxDeductionAmount || 0)}</th>
+                  </tr>
+                  <tr>
+                    <th colSpan={3}>Net Receivable Amount</th>
+                    <th style={{ textAlign: 'right' }}>
+                      {formatAmount(receipt.invoiceNetReceivableAmount || receipt.invoiceTotalAmount)}
+                    </th>
                   </tr>
                 </tfoot>
               </table>

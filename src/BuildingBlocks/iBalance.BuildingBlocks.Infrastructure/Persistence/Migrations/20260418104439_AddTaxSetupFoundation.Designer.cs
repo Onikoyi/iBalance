@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using iBalance.BuildingBlocks.Infrastructure.Persistence;
 namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260418104439_AddTaxSetupFoundation")]
+    partial class AddTaxSetupFoundation
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -780,9 +783,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<decimal>("GrossAmount")
-                        .HasColumnType("numeric");
-
                     b.Property<DateTime>("InvoiceDateUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -800,20 +800,11 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("LastModifiedOnUtc")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<decimal>("NetPayableAmount")
-                        .HasColumnType("numeric");
-
                     b.Property<DateTime?>("PostedOnUtc")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
-
-                    b.Property<decimal>("TaxAdditionAmount")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal>("TaxDeductionAmount")
-                        .HasColumnType("numeric");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -883,53 +874,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.ToTable("PurchaseInvoiceLines", "finance");
                 });
 
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PurchaseInvoiceTaxLine", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("ApplicationMode")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ComponentKind")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("PurchaseInvoiceId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("RatePercent")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal>("TaxAmount")
-                        .HasColumnType("numeric");
-
-                    b.Property<Guid>("TaxCodeId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("TaxLedgerAccountId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("TaxableAmount")
-                        .HasColumnType("numeric");
-
-                    b.Property<int>("TransactionScope")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PurchaseInvoiceId");
-
-                    b.HasIndex("TaxCodeId");
-
-                    b.HasIndex("TaxLedgerAccountId");
-
-                    b.ToTable("PurchaseInvoiceTaxLines", "public");
-                });
-
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.SalesInvoice", b =>
                 {
                     b.Property<Guid>("Id")
@@ -961,9 +905,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<decimal>("GrossAmount")
-                        .HasColumnType("numeric");
-
                     b.Property<DateTime>("InvoiceDateUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -981,20 +922,11 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("LastModifiedOnUtc")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<decimal>("NetReceivableAmount")
-                        .HasColumnType("numeric");
-
                     b.Property<DateTime?>("PostedOnUtc")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
-
-                    b.Property<decimal>("TaxAdditionAmount")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal>("TaxDeductionAmount")
-                        .HasColumnType("numeric");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -1059,53 +991,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.HasIndex("SalesInvoiceId");
 
                     b.ToTable("SalesInvoiceLines", "finance");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.SalesInvoiceTaxLine", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("ApplicationMode")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ComponentKind")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text");
-
-                    b.Property<decimal>("RatePercent")
-                        .HasColumnType("numeric");
-
-                    b.Property<Guid>("SalesInvoiceId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("TaxAmount")
-                        .HasColumnType("numeric");
-
-                    b.Property<Guid>("TaxCodeId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("TaxLedgerAccountId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("TaxableAmount")
-                        .HasColumnType("numeric");
-
-                    b.Property<int>("TransactionScope")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SalesInvoiceId");
-
-                    b.HasIndex("TaxCodeId");
-
-                    b.HasIndex("TaxLedgerAccountId");
-
-                    b.ToTable("SalesInvoiceTaxLines", "public");
                 });
 
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.TaxCode", b =>
@@ -1976,33 +1861,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.Navigation("PurchaseInvoice");
                 });
 
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PurchaseInvoiceTaxLine", b =>
-                {
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.PurchaseInvoice", "PurchaseInvoice")
-                        .WithMany()
-                        .HasForeignKey("PurchaseInvoiceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.TaxCode", "TaxCode")
-                        .WithMany()
-                        .HasForeignKey("TaxCodeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.LedgerAccount", "TaxLedgerAccount")
-                        .WithMany()
-                        .HasForeignKey("TaxLedgerAccountId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("PurchaseInvoice");
-
-                    b.Navigation("TaxCode");
-
-                    b.Navigation("TaxLedgerAccount");
-                });
-
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.SalesInvoice", b =>
                 {
                     b.HasOne("iBalance.Modules.Finance.Domain.Entities.Customer", "Customer")
@@ -2023,33 +1881,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("SalesInvoice");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.SalesInvoiceTaxLine", b =>
-                {
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.SalesInvoice", "SalesInvoice")
-                        .WithMany()
-                        .HasForeignKey("SalesInvoiceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.TaxCode", "TaxCode")
-                        .WithMany()
-                        .HasForeignKey("TaxCodeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.LedgerAccount", "TaxLedgerAccount")
-                        .WithMany()
-                        .HasForeignKey("TaxLedgerAccountId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("SalesInvoice");
-
-                    b.Navigation("TaxCode");
-
-                    b.Navigation("TaxLedgerAccount");
                 });
 
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.TaxCode", b =>

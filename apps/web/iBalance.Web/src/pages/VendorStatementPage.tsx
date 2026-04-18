@@ -129,6 +129,10 @@ export function VendorStatementPage() {
     return {
       debit: items.reduce((sum, x) => sum + Number(x.debitAmount || 0), 0),
       credit: items.reduce((sum, x) => sum + Number(x.creditAmount || 0), 0),
+      baseAmount: items.reduce((sum, x) => sum + Number(x.baseAmount || 0), 0),
+      taxAdditions: items.reduce((sum, x) => sum + Number(x.taxAdditionAmount || 0), 0),
+      taxDeductions: items.reduce((sum, x) => sum + Number(x.taxDeductionAmount || 0), 0),
+      netPayable: items.reduce((sum, x) => sum + Number(x.netPayableAmount || 0), 0),
     };
   }, [statementQ.data?.items]);
 
@@ -265,21 +269,33 @@ export function VendorStatementPage() {
                 <span>{statement.totalInvoices}</span>
               </div>
               <div className="kv-row">
-                <span>Total Payments</span>
-                <span>{statement.totalPayments}</span>
-              </div>
-              <div className="kv-row">
-                <span>Total Invoiced</span>
-                <span>{formatAmount(statement.totalInvoiced)}</span>
-              </div>
-              <div className="kv-row">
-                <span>Total Paid</span>
-                <span>{formatAmount(statement.totalPaid)}</span>
-              </div>
-              <div className="kv-row">
-                <span>Closing Balance</span>
-                <span>{formatAmount(statement.closingBalance)}</span>
-              </div>
+                  <span>Total Base Amount</span>
+                  <span>{formatAmount(statement.totalBaseAmount || 0)}</span>
+                </div>
+                <div className="kv-row">
+                  <span>Total Tax Additions</span>
+                  <span>{formatAmount(statement.totalTaxAdditions || 0)}</span>
+                </div>
+                <div className="kv-row">
+                  <span>Total Tax Deductions</span>
+                  <span>{formatAmount(statement.totalTaxDeductions || 0)}</span>
+                </div>
+                <div className="kv-row">
+                  <span>Total Gross Amount</span>
+                  <span>{formatAmount(statement.totalGrossAmount || statement.totalInvoiced)}</span>
+                </div>
+                <div className="kv-row">
+                  <span>Total Net Payable</span>
+                  <span>{formatAmount(statement.totalInvoiced)}</span>
+                </div>
+                <div className="kv-row">
+                  <span>Total Paid</span>
+                  <span>{formatAmount(statement.totalPaid)}</span>
+                </div>
+                <div className="kv-row">
+                  <span>Closing Balance</span>
+                  <span>{formatAmount(statement.closingBalance)}</span>
+                </div>
             </div>
           </section>
         </div>
@@ -303,7 +319,10 @@ export function VendorStatementPage() {
                   <th>Status</th>
                   <th style={{ textAlign: 'right' }}>Debit</th>
                   <th style={{ textAlign: 'right' }}>Credit</th>
-                  <th style={{ textAlign: 'right' }}>Invoice Amount</th>
+                  <th style={{ textAlign: 'right' }}>Base</th>
+                  <th style={{ textAlign: 'right' }}>Tax +</th>
+                  <th style={{ textAlign: 'right' }}>Tax -</th>
+                  <th style={{ textAlign: 'right' }}>Net Payable</th>
                   <th style={{ textAlign: 'right' }}>Payment Amount</th>
                   <th style={{ textAlign: 'right' }}>Running Balance</th>
                 </tr>
@@ -311,7 +330,7 @@ export function VendorStatementPage() {
               <tbody>
                 {statement.items.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="muted">
+                    <td colSpan={13} className="muted">
                       No vendor statement movements were found for the selected reporting period.
                     </td>
                   </tr>
@@ -325,7 +344,10 @@ export function VendorStatementPage() {
                       <td>{vendorMovementStatusLabel(item.type, item.status)}</td>
                       <td style={{ textAlign: 'right' }}>{formatAmount(item.debitAmount)}</td>
                       <td style={{ textAlign: 'right' }}>{formatAmount(item.creditAmount)}</td>
-                      <td style={{ textAlign: 'right' }}>{formatAmount(item.invoiceAmount)}</td>
+                      <td style={{ textAlign: 'right' }}>{formatAmount(item.baseAmount || 0)}</td>
+                      <td style={{ textAlign: 'right' }}>{formatAmount(item.taxAdditionAmount || 0)}</td>
+                      <td style={{ textAlign: 'right' }}>{formatAmount(item.taxDeductionAmount || 0)}</td>
+                      <td style={{ textAlign: 'right' }}>{formatAmount(item.netPayableAmount || item.invoiceAmount || 0)}</td>
                       <td style={{ textAlign: 'right' }}>{formatAmount(item.paymentAmount)}</td>
                       <td style={{ textAlign: 'right' }}>{formatAmount(item.runningBalance)}</td>
                     </tr>
@@ -334,12 +356,15 @@ export function VendorStatementPage() {
               </tbody>
               <tfoot>
                 <tr>
-                  <th colSpan={5}>Totals</th>
-                  <th style={{ textAlign: 'right' }}>{formatAmount(totals.debit)}</th>
-                  <th style={{ textAlign: 'right' }}>{formatAmount(totals.credit)}</th>
-                  <th style={{ textAlign: 'right' }}>{formatAmount(statement.totalInvoiced)}</th>
-                  <th style={{ textAlign: 'right' }}>{formatAmount(statement.totalPaid)}</th>
-                  <th style={{ textAlign: 'right' }}>{formatAmount(statement.closingBalance)}</th>
+                <th colSpan={5}>Totals</th>
+                <th style={{ textAlign: 'right' }}>{formatAmount(totals.debit)}</th>
+                <th style={{ textAlign: 'right' }}>{formatAmount(totals.credit)}</th>
+                <th style={{ textAlign: 'right' }}>{formatAmount(totals.baseAmount)}</th>
+                <th style={{ textAlign: 'right' }}>{formatAmount(totals.taxAdditions)}</th>
+                <th style={{ textAlign: 'right' }}>{formatAmount(totals.taxDeductions)}</th>
+                <th style={{ textAlign: 'right' }}>{formatAmount(totals.netPayable)}</th>
+                <th style={{ textAlign: 'right' }}>{formatAmount(statement.totalPaid)}</th>
+                <th style={{ textAlign: 'right' }}>{formatAmount(statement.closingBalance)}</th>
                 </tr>
               </tfoot>
             </table>

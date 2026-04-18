@@ -45,6 +45,10 @@ type VoucherData = {
     invoiceDescription: string;
     invoiceDateUtc?: string | null;
     invoiceTotalAmount: number;
+    invoiceTaxAdditionAmount: number;
+    invoiceTaxDeductionAmount: number;
+    invoiceGrossAmount: number;
+    invoiceNetPayableAmount: number;
     invoiceAmountPaid: number;
     invoiceBalanceAmount: number;
     paymentDateUtc: string;
@@ -99,7 +103,7 @@ function buildVoucherPrintHtml(args: {
       `).join('');
 
   const totalQuantity = payment.invoiceLines.reduce((sum, line) => sum + Number(line.quantity || 0), 0);
-  const totalLineAmount = payment.invoiceLines.reduce((sum, line) => sum + Number(line.lineTotal || 0), 0);
+ 
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -261,7 +265,11 @@ function buildVoucherPrintHtml(args: {
           <div class="kv-row"><span>Invoice Number</span><span>${payment.invoiceNumber}</span></div>
           <div class="kv-row"><span>Invoice Date</span><span>${formatDateTime(payment.invoiceDateUtc)}</span></div>
           <div class="kv-row"><span>Description</span><span>${payment.invoiceDescription}</span></div>
-          <div class="kv-row"><span>Invoice Total</span><span>${formatAmount(payment.invoiceTotalAmount)}</span></div>
+          <div class="kv-row"><span>Base Invoice Amount</span><span>${formatAmount(payment.invoiceTotalAmount)}</span></div>
+          <div class="kv-row"><span>Tax Additions</span><span>${formatAmount(payment.invoiceTaxAdditionAmount || 0)}</span></div>
+          <div class="kv-row"><span>Tax Deductions</span><span>${formatAmount(payment.invoiceTaxDeductionAmount || 0)}</span></div>
+          <div class="kv-row"><span>Gross Amount</span><span>${formatAmount(payment.invoiceGrossAmount || payment.invoiceTotalAmount)}</span></div>
+          <div class="kv-row"><span>Net Payable Amount</span><span>${formatAmount(payment.invoiceNetPayableAmount || payment.invoiceTotalAmount)}</span></div>
           <div class="kv-row"><span>Amount Paid</span><span>${formatAmount(payment.invoiceAmountPaid)}</span></div>
           <div class="kv-row"><span>Outstanding Balance</span><span>${formatAmount(payment.invoiceBalanceAmount)}</span></div>
         </div>
@@ -285,12 +293,24 @@ function buildVoucherPrintHtml(args: {
           ${lineRows}
         </tbody>
         <tfoot>
-          <tr>
-            <th>Total</th>
-            <th style="text-align:right;">${formatAmount(totalQuantity)}</th>
-            <th></th>
-            <th style="text-align:right;">${formatAmount(totalLineAmount)}</th>
-          </tr>
+        <tr>
+        <th>Base Invoice Amount</th>
+        <th style="text-align:right;">${formatAmount(totalQuantity)}</th>
+        <th></th>
+        <th style="text-align:right;">${formatAmount(payment.invoiceTotalAmount)}</th>
+      </tr>
+      <tr>
+        <th colspan="3" style="text-align:left;">Tax Additions</th>
+        <th style="text-align:right;">${formatAmount(payment.invoiceTaxAdditionAmount || 0)}</th>
+      </tr>
+      <tr>
+        <th colspan="3" style="text-align:left;">Tax Deductions</th>
+        <th style="text-align:right;">${formatAmount(payment.invoiceTaxDeductionAmount || 0)}</th>
+      </tr>
+      <tr>
+        <th colspan="3" style="text-align:left;">Net Payable Amount</th>
+        <th style="text-align:right;">${formatAmount(payment.invoiceNetPayableAmount || payment.invoiceTotalAmount)}</th>
+      </tr>
         </tfoot>
       </table>
     </div>
@@ -474,7 +494,11 @@ export function VendorPaymentVoucherPrintPage() {
               <div className="kv-row"><span>Invoice Number</span><span>{payment.invoiceNumber}</span></div>
               <div className="kv-row"><span>Invoice Date</span><span>{formatDateTime(payment.invoiceDateUtc)}</span></div>
               <div className="kv-row"><span>Description</span><span>{payment.invoiceDescription}</span></div>
-              <div className="kv-row"><span>Invoice Total</span><span>{formatAmount(payment.invoiceTotalAmount)}</span></div>
+              <div className="kv-row"><span>Base Invoice Amount</span><span>{formatAmount(payment.invoiceTotalAmount)}</span></div>
+              <div className="kv-row"><span>Tax Additions</span><span>{formatAmount(payment.invoiceTaxAdditionAmount || 0)}</span></div>
+              <div className="kv-row"><span>Tax Deductions</span><span>{formatAmount(payment.invoiceTaxDeductionAmount || 0)}</span></div>
+              <div className="kv-row"><span>Gross Amount</span><span>{formatAmount(payment.invoiceGrossAmount || payment.invoiceTotalAmount)}</span></div>
+              <div className="kv-row"><span>Net Payable Amount</span><span>{formatAmount(payment.invoiceNetPayableAmount || payment.invoiceTotalAmount)}</span></div>
               <div className="kv-row"><span>Amount Paid</span><span>{formatAmount(payment.invoiceAmountPaid)}</span></div>
               <div className="kv-row"><span>Outstanding Balance</span><span>{formatAmount(payment.invoiceBalanceAmount)}</span></div>
             </div>
@@ -518,12 +542,26 @@ export function VendorPaymentVoucherPrintPage() {
                 )}
               </tbody>
               <tfoot>
-                <tr>
-                  <th>Total</th>
-                  <th style={{ textAlign: 'right' }}>{formatAmount(totals.quantity)}</th>
-                  <th />
-                  <th style={{ textAlign: 'right' }}>{formatAmount(totals.total)}</th>
-                </tr>
+              <tr>
+                    <th>Base Invoice Amount</th>
+                    <th style={{ textAlign: 'right' }}>{formatAmount(totals.quantity)}</th>
+                    <th />
+                    <th style={{ textAlign: 'right' }}>{formatAmount(payment.invoiceTotalAmount)}</th>
+                  </tr>
+                  <tr>
+                    <th colSpan={3}>Tax Additions</th>
+                    <th style={{ textAlign: 'right' }}>{formatAmount(payment.invoiceTaxAdditionAmount || 0)}</th>
+                  </tr>
+                  <tr>
+                    <th colSpan={3}>Tax Deductions</th>
+                    <th style={{ textAlign: 'right' }}>{formatAmount(payment.invoiceTaxDeductionAmount || 0)}</th>
+                  </tr>
+                  <tr>
+                    <th colSpan={3}>Net Payable Amount</th>
+                    <th style={{ textAlign: 'right' }}>
+                      {formatAmount(payment.invoiceNetPayableAmount || payment.invoiceTotalAmount)}
+                    </th>
+                  </tr>
               </tfoot>
             </table>
           </div>

@@ -48,33 +48,63 @@ public sealed class SalesInvoice
         InvoiceNumber = invoiceNumber.Trim().ToUpperInvariant();
         Description = description.Trim();
         Status = SalesInvoiceStatus.Draft;
+        TotalAmount = 0m;
+        TaxAdditionAmount = 0m;
+        TaxDeductionAmount = 0m;
+        GrossAmount = 0m;
+        NetReceivableAmount = 0m;
+        AmountPaid = 0m;
+        BalanceAmount = 0m;
         CreatedOnUtc = DateTime.UtcNow;
     }
 
     public Guid Id { get; private set; }
+
     public Guid TenantId { get; private set; }
+
     public Guid CustomerId { get; private set; }
 
     public DateTime InvoiceDateUtc { get; private set; }
+
     public string InvoiceNumber { get; private set; } = string.Empty;
+
     public string Description { get; private set; } = string.Empty;
 
     public SalesInvoiceStatus Status { get; private set; }
 
+    /// <summary>
+    /// Base invoice amount before VAT/WHT/Other tax adjustments.
+    /// </summary>
     public decimal TotalAmount { get; private set; }
+
+    public decimal TaxAdditionAmount { get; private set; }
+
+    public decimal TaxDeductionAmount { get; private set; }
+
+    public decimal GrossAmount { get; private set; }
+
+    public decimal NetReceivableAmount { get; private set; }
+
     public decimal AmountPaid { get; private set; }
+
     public decimal BalanceAmount { get; private set; }
 
     public Guid? JournalEntryId { get; private set; }
+
     public DateTime? PostedOnUtc { get; private set; }
+
     public DateTime? CancelledOnUtc { get; private set; }
 
     public DateTime CreatedOnUtc { get; private set; }
+
     public string? CreatedBy { get; private set; }
+
     public DateTime? LastModifiedOnUtc { get; private set; }
+
     public string? LastModifiedBy { get; private set; }
 
     public Customer? Customer { get; private set; }
+
     public ICollection<SalesInvoiceLine> Lines { get; private set; } = new List<SalesInvoiceLine>();
 
     public void UpdateHeader(
@@ -103,11 +133,36 @@ public sealed class SalesInvoice
 
     public void RecalculateTotals()
     {
-        TotalAmount = Lines.Sum(x => x.LineTotal);
-        BalanceAmount = TotalAmount - AmountPaid;
-        if (BalanceAmount < 0)
+        RecalculateTotals(TaxAdditionAmount, TaxDeductionAmount);
+    }
+
+    public void RecalculateTotals(decimal taxAdditionAmount, decimal taxDeductionAmount)
+    {
+        if (taxAdditionAmount < 0m)
         {
-            BalanceAmount = 0;
+            throw new ArgumentException("Tax addition amount cannot be negative.", nameof(taxAdditionAmount));
+        }
+
+        if (taxDeductionAmount < 0m)
+        {
+            throw new ArgumentException("Tax deduction amount cannot be negative.", nameof(taxDeductionAmount));
+        }
+
+        TotalAmount = Lines.Sum(x => x.LineTotal);
+        TaxAdditionAmount = taxAdditionAmount;
+        TaxDeductionAmount = taxDeductionAmount;
+        GrossAmount = TotalAmount + TaxAdditionAmount;
+        NetReceivableAmount = GrossAmount - TaxDeductionAmount;
+        BalanceAmount = NetReceivableAmount - AmountPaid;
+
+        if (NetReceivableAmount < 0m)
+        {
+            throw new InvalidOperationException("Sales invoice net receivable amount cannot be negative.");
+        }
+
+        if (BalanceAmount < 0m)
+        {
+            throw new InvalidOperationException("Sales invoice balance cannot be negative.");
         }
 
         Touch();
@@ -122,16 +177,17 @@ public sealed class SalesInvoice
             throw new ArgumentException("Journal entry id is required.", nameof(journalEntryId));
         }
 
-        if (TotalAmount <= 0)
+        if (NetReceivableAmount <= 0m)
         {
-            throw new InvalidOperationException("Only invoices with a positive total can be posted.");
+            throw new InvalidOperationException("Only invoices with a positive net receivable amount can be posted.");
         }
 
         JournalEntryId = journalEntryId;
         PostedOnUtc = DateTime.UtcNow;
-        Status = SalesInvoiceStatus.Posted;
+        Status = BalanceAmount == 0m
+            ? SalesInvoiceStatus.Paid
+            : SalesInvoiceStatus.Posted;
 
-        RecalculateTotals();
         Touch();
     }
 
@@ -142,22 +198,30 @@ public sealed class SalesInvoice
             throw new InvalidOperationException("Payments can only be applied to posted invoices.");
         }
 
-        if (amount <= 0)
+        if (amount <= 0m)
         {
             throw new ArgumentException("Payment amount must be greater than zero.", nameof(amount));
         }
 
-        AmountPaid += amount;
-
-        if (AmountPaid >= TotalAmount)
+        if (amount > BalanceAmount)
         {
-            AmountPaid = TotalAmount;
-            BalanceAmount = 0;
+            throw new InvalidOperationException("Payment amount cannot exceed the outstanding invoice balance.");
+        }
+
+        AmountPaid += amount;
+        BalanceAmount = NetReceivableAmount - AmountPaid;
+
+        if (BalanceAmount < 0m)
+        {
+            throw new InvalidOperationException("Sales invoice balance cannot be negative.");
+        }
+
+        if (BalanceAmount == 0m)
+        {
             Status = SalesInvoiceStatus.Paid;
         }
-        else
+        else if (AmountPaid > 0m)
         {
-            BalanceAmount = TotalAmount - AmountPaid;
             Status = SalesInvoiceStatus.PartPaid;
         }
 

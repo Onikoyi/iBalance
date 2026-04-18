@@ -17,8 +17,6 @@ public sealed class PurchaseInvoice : TenantOwnedEntity
         string invoiceNumber,
         string description)
     {
-
-        
         if (id == Guid.Empty)
         {
             throw new ArgumentException("Purchase invoice id is required.", nameof(id));
@@ -52,9 +50,14 @@ public sealed class PurchaseInvoice : TenantOwnedEntity
         Description = description.Trim();
         Status = PurchaseInvoiceStatus.Draft;
         TotalAmount = 0m;
+        TaxAdditionAmount = 0m;
+        TaxDeductionAmount = 0m;
+        GrossAmount = 0m;
+        NetPayableAmount = 0m;
         AmountPaid = 0m;
         BalanceAmount = 0m;
     }
+
     public Guid Id { get; private set; }
 
     public Guid VendorId { get; private set; }
@@ -69,7 +72,18 @@ public sealed class PurchaseInvoice : TenantOwnedEntity
 
     public PurchaseInvoiceStatus Status { get; private set; }
 
+    /// <summary>
+    /// Base invoice amount before VAT/WHT/Other tax adjustments.
+    /// </summary>
     public decimal TotalAmount { get; private set; }
+
+    public decimal TaxAdditionAmount { get; private set; }
+
+    public decimal TaxDeductionAmount { get; private set; }
+
+    public decimal GrossAmount { get; private set; }
+
+    public decimal NetPayableAmount { get; private set; }
 
     public decimal AmountPaid { get; private set; }
 
@@ -89,15 +103,38 @@ public sealed class PurchaseInvoice : TenantOwnedEntity
 
     public void RecalculateTotals()
     {
+        RecalculateTotals(TaxAdditionAmount, TaxDeductionAmount);
+    }
+
+    public void RecalculateTotals(decimal taxAdditionAmount, decimal taxDeductionAmount)
+    {
+        if (taxAdditionAmount < 0m)
+        {
+            throw new ArgumentException("Tax addition amount cannot be negative.", nameof(taxAdditionAmount));
+        }
+
+        if (taxDeductionAmount < 0m)
+        {
+            throw new ArgumentException("Tax deduction amount cannot be negative.", nameof(taxDeductionAmount));
+        }
+
         TotalAmount = Lines.Sum(x => x.LineTotal);
-        BalanceAmount = TotalAmount - AmountPaid;
+        TaxAdditionAmount = taxAdditionAmount;
+        TaxDeductionAmount = taxDeductionAmount;
+        GrossAmount = TotalAmount + TaxAdditionAmount;
+        NetPayableAmount = GrossAmount - TaxDeductionAmount;
+        BalanceAmount = NetPayableAmount - AmountPaid;
+
+        if (NetPayableAmount < 0m)
+        {
+            throw new InvalidOperationException("Purchase invoice net payable amount cannot be negative.");
+        }
 
         if (BalanceAmount < 0m)
         {
             throw new InvalidOperationException("Purchase invoice balance cannot be negative.");
         }
     }
-    
 
     public void MarkPosted(Guid journalEntryId)
     {
@@ -111,9 +148,9 @@ public sealed class PurchaseInvoice : TenantOwnedEntity
             throw new InvalidOperationException("Only draft purchase invoices can be posted.");
         }
 
-        if (TotalAmount <= 0m)
+        if (NetPayableAmount <= 0m)
         {
-            throw new InvalidOperationException("Only purchase invoices with a positive total can be posted.");
+            throw new InvalidOperationException("Only purchase invoices with a positive net payable amount can be posted.");
         }
 
         JournalEntryId = journalEntryId;
@@ -141,7 +178,12 @@ public sealed class PurchaseInvoice : TenantOwnedEntity
         }
 
         AmountPaid += amount;
-        BalanceAmount -= amount;
+        BalanceAmount = NetPayableAmount - AmountPaid;
+
+        if (BalanceAmount < 0m)
+        {
+            throw new InvalidOperationException("Purchase invoice balance cannot be negative.");
+        }
 
         if (BalanceAmount == 0m)
         {

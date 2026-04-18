@@ -18,6 +18,7 @@ import {
   getIncomeStatement,
   getPurchaseInvoices,
   getSalesInvoices,
+  getTaxReport,
   getTenantKey,
   getTenantLogoDataUrl,
   getTrialBalance,
@@ -721,8 +722,9 @@ export function ReportsPage() {
   const [toDate, setToDate] = useState(defaultToDate);
   const [balanceSheetAsAtDate, setBalanceSheetAsAtDate] = useState(defaultToDate);
   const [cashbookLedgerAccountId, setCashbookLedgerAccountId] = useState('');
-
   const [reconciliationLedgerAccountId, setReconciliationLedgerAccountId] = useState('');
+  const [taxReportComponentKind, setTaxReportComponentKind] = useState('all');
+  const [taxReportTransactionScope, setTaxReportTransactionScope] = useState('all');
   const [statementClosingBalance, setStatementClosingBalance] = useState('');
   const [reconciliationNotes, setReconciliationNotes] = useState('');
   const [selectedReconciliationId, setSelectedReconciliationId] = useState('');
@@ -775,6 +777,25 @@ export function ReportsPage() {
   const cashbookSummary = useQuery({
     queryKey: ['cashbook-summary', fromUtc ?? null, toUtc ?? null],
     queryFn: () => getCashbookSummary(fromUtc, toUtc),
+    enabled: canView && isPeriodRangeValid,
+  });
+
+
+  const taxReportQ = useQuery({
+    queryKey: [
+      'tax-report',
+      fromUtc ?? null,
+      toUtc ?? null,
+      taxReportComponentKind,
+      taxReportTransactionScope,
+    ],
+    queryFn: () =>
+      getTaxReport(
+        fromUtc,
+        toUtc,
+        taxReportComponentKind === 'all' ? null : Number(taxReportComponentKind),
+        taxReportTransactionScope === 'all' ? null : Number(taxReportTransactionScope)
+      ),
     enabled: canView && isPeriodRangeValid,
   });
 
@@ -1483,6 +1504,32 @@ export function ReportsPage() {
     });
   }
 
+  function taxComponentKindLabel(value: number) {
+    switch (value) {
+      case 1: return 'VAT';
+      case 2: return 'WHT';
+      case 3: return 'Other';
+      default: return 'Unknown';
+    }
+  }
+  
+  function taxApplicationModeLabel(value: number) {
+    switch (value) {
+      case 1: return 'Add to Amount';
+      case 2: return 'Deduct from Amount';
+      default: return 'Unknown';
+    }
+  }
+  
+  function taxTransactionScopeLabel(value: number) {
+    switch (value) {
+      case 1: return 'Sales';
+      case 2: return 'Purchases';
+      case 3: return 'Both';
+      default: return 'Unknown';
+    }
+  }
+
   async function handleRemoveMatchForBookLine(bookLineId: string, notes?: string | null) {
     if (!selectedReconciliationId || !bankReconciliationDetailQ.data) {
       return;
@@ -1804,6 +1851,143 @@ export function ReportsPage() {
     }));
   }
 
+  function printTaxReportStandalone() {
+    const bodyHtml = `
+      <div class="kv">
+        <div class="kv-row"><span>Reporting Period</span><span>${periodText.replace('Reporting Period: ', '')}</span></div>
+        <div class="kv-row"><span>Tax Type Filter</span><span>${
+          taxReportComponentKind === 'all'
+            ? 'All Tax Types'
+            : taxComponentKindLabel(Number(taxReportComponentKind))
+        }</span></div>
+        <div class="kv-row"><span>Transaction Scope Filter</span><span>${
+          taxReportTransactionScope === 'all'
+            ? 'All Scopes'
+            : taxTransactionScopeLabel(Number(taxReportTransactionScope))
+        }</span></div>
+        <div class="kv-row"><span>Tax Line Count</span><span>${taxReportQ.data?.count ?? 0}</span></div>
+        <div class="kv-row"><span>Total Taxable Amount</span><span>${formatAmount(taxReportQ.data?.totalTaxableAmount ?? 0)}</span></div>
+        <div class="kv-row"><span>Total Tax Amount</span><span>${formatAmount(taxReportQ.data?.totalTaxAmount ?? 0)}</span></div>
+        <div class="kv-row"><span>Total Additions</span><span>${formatAmount(taxReportQ.data?.totalAdditions ?? 0)}</span></div>
+        <div class="kv-row"><span>Total Deductions</span><span>${formatAmount(taxReportQ.data?.totalDeductions ?? 0)}</span></div>
+      </div>
+
+      <h2>Tax Summary by Type</h2>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Tax Type</th>
+              <th class="right">Count</th>
+              <th class="right">Taxable Amount</th>
+              <th class="right">Tax Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(taxReportQ.data?.byComponentKind ?? []).length === 0
+              ? '<tr><td colspan="4" class="muted">No tax activity was found for the selected filters.</td></tr>'
+              : (taxReportQ.data?.byComponentKind ?? []).map((item) => `
+                  <tr>
+                    <td>${taxComponentKindLabel(item.componentKind)}</td>
+                    <td class="right">${item.count}</td>
+                    <td class="right">${formatAmount(item.totalTaxableAmount)}</td>
+                    <td class="right">${formatAmount(item.totalTaxAmount)}</td>
+                  </tr>
+                `).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <h2>Tax Summary by Tax Code</h2>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Tax Code</th>
+              <th>Tax Name</th>
+              <th>Kind</th>
+              <th>Mode</th>
+              <th>Scope</th>
+              <th class="right">Rate %</th>
+              <th class="right">Count</th>
+              <th class="right">Taxable Amount</th>
+              <th class="right">Tax Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(taxReportQ.data?.byTaxCode ?? []).length === 0
+              ? '<tr><td colspan="9" class="muted">No tax-code activity was found for the selected filters.</td></tr>'
+              : (taxReportQ.data?.byTaxCode ?? []).map((item) => `
+                  <tr>
+                    <td>${item.taxCode || '—'}</td>
+                    <td>${item.taxCodeName || '—'}</td>
+                    <td>${taxComponentKindLabel(item.componentKind)}</td>
+                    <td>${taxApplicationModeLabel(item.applicationMode)}</td>
+                    <td>${taxTransactionScopeLabel(item.transactionScope)}</td>
+                    <td class="right">${formatAmount(item.ratePercent)}</td>
+                    <td class="right">${item.count}</td>
+                    <td class="right">${formatAmount(item.totalTaxableAmount)}</td>
+                    <td class="right">${formatAmount(item.totalTaxAmount)}</td>
+                  </tr>
+                `).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <h2>Tax Movement Details</h2>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Document</th>
+              <th>Counterparty</th>
+              <th>Tax Code</th>
+              <th>Kind</th>
+              <th>Mode</th>
+              <th>Scope</th>
+              <th class="right">Rate %</th>
+              <th class="right">Taxable Amount</th>
+              <th class="right">Tax Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(taxReportQ.data?.items ?? []).length === 0
+              ? '<tr><td colspan="10" class="muted">No tax movement lines were found for the selected filters.</td></tr>'
+              : (taxReportQ.data?.items ?? []).map((item) => `
+                  <tr>
+                    <td>${formatDateTime(item.transactionDateUtc)}</td>
+                    <td>
+                      <div>${item.sourceDocumentNumber}</div>
+                      <div class="muted">${item.sourceModule} / ${item.sourceDocumentType}</div>
+                    </td>
+                    <td>${
+                      item.counterpartyName || item.counterpartyCode
+                        ? `${item.counterpartyCode || ''} ${item.counterpartyName || ''}`.trim()
+                        : '—'
+                    }</td>
+                    <td>${item.taxCode || '—'}</td>
+                    <td>${taxComponentKindLabel(item.componentKind)}</td>
+                    <td>${taxApplicationModeLabel(item.applicationMode)}</td>
+                    <td>${taxTransactionScopeLabel(item.transactionScope)}</td>
+                    <td class="right">${formatAmount(item.ratePercent)}</td>
+                    <td class="right">${formatAmount(item.taxableAmount)}</td>
+                    <td class="right">${formatAmount(item.taxAmount)}</td>
+                  </tr>
+                `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    openStandalonePrint(buildStandaloneHtml({
+      title: 'VAT / WHT / Other Tax Report',
+      subtitle: periodText,
+      bodyHtml,
+    }));
+  }
+
+
   function printReceivablesSummaryStandalone() {
     const bodyHtml = `
       <div class="kv">
@@ -2050,6 +2234,7 @@ export function ReportsPage() {
     bankReconciliationsQ.isLoading ||
     bankStatementImportsQ.isLoading ||
     salesInvoicesQ.isLoading ||
+    taxReportQ.isLoading ||
     customerReceiptsQ.isLoading ||
     purchaseInvoicesQ.isLoading ||
     vendorPaymentsQ.isLoading
@@ -2069,6 +2254,7 @@ export function ReportsPage() {
     customerReceiptsQ.error ||
     purchaseInvoicesQ.error ||
     vendorPaymentsQ.error ||
+    taxReportQ.error ||
     !trialBalance.data ||
     !balanceSheet.data ||
     !incomeStatement.data ||
@@ -2077,6 +2263,7 @@ export function ReportsPage() {
     !bankReconciliationsQ.data ||
     !bankStatementImportsQ.data ||
     !salesInvoicesQ.data ||
+    !taxReportQ.data ||
     !customerReceiptsQ.data ||
     !purchaseInvoicesQ.data ||
     !vendorPaymentsQ.data
@@ -2556,6 +2743,240 @@ export function ReportsPage() {
         </table>
       </div>
     </section>
+
+
+    <section id="print-tax-report" className="panel printable-report">
+    <div className="section-heading no-print">
+    <div>
+      <h2>VAT / WHT / Other Tax Report</h2>
+      <span className="muted">
+        Date-range tax report for setup-driven VAT, withholding tax, and other levies.
+      </span>
+    </div>
+
+    <button className="button" onClick={printTaxReportStandalone}>
+      Print Tax Report
+    </button>
+  </div>
+
+    <ReportPrintHeader title="VAT / WHT / Other Tax Report" subtitle={periodText} />
+
+    <div className="form-grid two no-print" style={{ marginBottom: 16 }}>
+      <div className="form-row">
+        <label>Tax Type</label>
+        <select
+          className="select"
+          value={taxReportComponentKind}
+          onChange={(e) => setTaxReportComponentKind(e.target.value)}
+        >
+          <option value="all">All Tax Types</option>
+          <option value="1">VAT</option>
+          <option value="2">WHT</option>
+          <option value="3">Other</option>
+        </select>
+      </div>
+
+      <div className="form-row">
+        <label>Transaction Scope</label>
+        <select
+          className="select"
+          value={taxReportTransactionScope}
+          onChange={(e) => setTaxReportTransactionScope(e.target.value)}
+        >
+          <option value="all">All Scopes</option>
+          <option value="1">Sales</option>
+          <option value="2">Purchases</option>
+          <option value="3">Both</option>
+        </select>
+      </div>
+    </div>
+
+    <div className="kv" style={{ marginBottom: 16 }}>
+      <div className="kv-row">
+        <span>Reporting Period</span>
+        <span>{periodText.replace('Reporting Period: ', '')}</span>
+      </div>
+      <div className="kv-row">
+        <span>Tax Type Filter</span>
+        <span>
+          {taxReportComponentKind === 'all'
+            ? 'All Tax Types'
+            : taxComponentKindLabel(Number(taxReportComponentKind))}
+        </span>
+      </div>
+      <div className="kv-row">
+        <span>Transaction Scope Filter</span>
+        <span>
+          {taxReportTransactionScope === 'all'
+            ? 'All Scopes'
+            : taxTransactionScopeLabel(Number(taxReportTransactionScope))}
+        </span>
+      </div>
+      <div className="kv-row">
+        <span>Tax Line Count</span>
+        <span>{taxReportQ.data.count}</span>
+      </div>
+      <div className="kv-row">
+        <span>Total Taxable Amount</span>
+        <span>{formatAmount(taxReportQ.data.totalTaxableAmount)}</span>
+      </div>
+      <div className="kv-row">
+        <span>Total Tax Amount</span>
+        <span>{formatAmount(taxReportQ.data.totalTaxAmount)}</span>
+      </div>
+      <div className="kv-row">
+        <span>Total Additions</span>
+        <span>{formatAmount(taxReportQ.data.totalAdditions)}</span>
+      </div>
+      <div className="kv-row">
+        <span>Total Deductions</span>
+        <span>{formatAmount(taxReportQ.data.totalDeductions)}</span>
+      </div>
+    </div>
+
+    <div className="section-heading">
+      <div>
+        <h2>Tax Summary by Type</h2>
+        <span className="muted">Grouped VAT/WHT/Other tax totals</span>
+      </div>
+    </div>
+
+    <div className="table-wrap" style={{ marginBottom: 16 }}>
+      <table className="data-table report-print-table">
+        <thead>
+          <tr>
+            <th>Tax Type</th>
+            <th style={{ textAlign: 'right' }}>Count</th>
+            <th style={{ textAlign: 'right' }}>Taxable Amount</th>
+            <th style={{ textAlign: 'right' }}>Tax Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {taxReportQ.data.byComponentKind.length === 0 ? (
+            <tr>
+              <td colSpan={4} className="muted">
+                No tax activity was found for the selected filters.
+              </td>
+            </tr>
+          ) : (
+            taxReportQ.data.byComponentKind.map((item) => (
+              <tr key={item.componentKind}>
+                <td>{taxComponentKindLabel(item.componentKind)}</td>
+                <td style={{ textAlign: 'right' }}>{item.count}</td>
+                <td style={{ textAlign: 'right' }}>{formatAmount(item.totalTaxableAmount)}</td>
+                <td style={{ textAlign: 'right' }}>{formatAmount(item.totalTaxAmount)}</td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+
+    <div className="section-heading">
+      <div>
+        <h2>Tax Summary by Tax Code</h2>
+        <span className="muted">Grouped totals by configured tax code</span>
+      </div>
+    </div>
+
+    <div className="table-wrap" style={{ marginBottom: 16 }}>
+      <table className="data-table report-print-table">
+        <thead>
+          <tr>
+            <th>Tax Code</th>
+            <th>Tax Name</th>
+            <th>Kind</th>
+            <th>Mode</th>
+            <th>Scope</th>
+            <th style={{ textAlign: 'right' }}>Rate %</th>
+            <th style={{ textAlign: 'right' }}>Count</th>
+            <th style={{ textAlign: 'right' }}>Taxable Amount</th>
+            <th style={{ textAlign: 'right' }}>Tax Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {taxReportQ.data.byTaxCode.length === 0 ? (
+            <tr>
+              <td colSpan={9} className="muted">
+                No tax-code activity was found for the selected filters.
+              </td>
+            </tr>
+          ) : (
+            taxReportQ.data.byTaxCode.map((item) => (
+              <tr key={item.taxCodeId}>
+                <td>{item.taxCode || '—'}</td>
+                <td>{item.taxCodeName || '—'}</td>
+                <td>{taxComponentKindLabel(item.componentKind)}</td>
+                <td>{taxApplicationModeLabel(item.applicationMode)}</td>
+                <td>{taxTransactionScopeLabel(item.transactionScope)}</td>
+                <td style={{ textAlign: 'right' }}>{formatAmount(item.ratePercent)}</td>
+                <td style={{ textAlign: 'right' }}>{item.count}</td>
+                <td style={{ textAlign: 'right' }}>{formatAmount(item.totalTaxableAmount)}</td>
+                <td style={{ textAlign: 'right' }}>{formatAmount(item.totalTaxAmount)}</td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+
+    <div className="section-heading">
+      <div>
+        <h2>Tax Movement Details</h2>
+        <span className="muted">Line-level VAT/WHT/Other tax activity</span>
+      </div>
+    </div>
+
+    <div className="table-wrap">
+      <table className="data-table report-print-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Document</th>
+            <th>Counterparty</th>
+            <th>Tax Code</th>
+            <th>Kind</th>
+            <th>Mode</th>
+            <th>Scope</th>
+            <th style={{ textAlign: 'right' }}>Rate %</th>
+            <th style={{ textAlign: 'right' }}>Taxable Amount</th>
+            <th style={{ textAlign: 'right' }}>Tax Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {taxReportQ.data.items.length === 0 ? (
+            <tr>
+              <td colSpan={10} className="muted">
+                No tax movement lines were found for the selected filters.
+              </td>
+            </tr>
+          ) : (
+            taxReportQ.data.items.map((item) => (
+              <tr key={item.id}>
+                <td>{formatDateTime(item.transactionDateUtc)}</td>
+                <td>
+                  <div>{item.sourceDocumentNumber}</div>
+                  <div className="muted">{item.sourceModule} / {item.sourceDocumentType}</div>
+                </td>
+                <td>
+                  {item.counterpartyName || item.counterpartyCode
+                    ? `${item.counterpartyCode || ''} ${item.counterpartyName || ''}`.trim()
+                    : '—'}
+                </td>
+                <td>{item.taxCode || '—'}</td>
+                <td>{taxComponentKindLabel(item.componentKind)}</td>
+                <td>{taxApplicationModeLabel(item.applicationMode)}</td>
+                <td>{taxTransactionScopeLabel(item.transactionScope)}</td>
+                <td style={{ textAlign: 'right' }}>{formatAmount(item.ratePercent)}</td>
+                <td style={{ textAlign: 'right' }}>{formatAmount(item.taxableAmount)}</td>
+                <td style={{ textAlign: 'right' }}>{formatAmount(item.taxAmount)}</td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  </section>
 
 
     <section className="panel no-print">

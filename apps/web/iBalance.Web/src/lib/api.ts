@@ -811,6 +811,10 @@ export type SalesInvoiceDto = {
   description: string;
   status: number;
   totalAmount: number;
+  taxAdditionAmount: number;
+  taxDeductionAmount: number;
+  grossAmount: number;
+  netReceivableAmount: number;
   amountPaid: number;
   balanceAmount: number;
   journalEntryId?: string | null;
@@ -832,6 +836,7 @@ export type CreateSalesInvoiceRequest = {
   invoiceNumber: string;
   description: string;
   lines: SalesInvoiceLineDto[];
+  taxCodeIds?: string[] | null;
 };
 
 export type PostSalesInvoiceRequest = {
@@ -898,6 +903,10 @@ export type CustomerReceiptDetailResponse = {
     invoiceDescription: string;
     invoiceDateUtc?: string | null;
     invoiceTotalAmount: number;
+    invoiceTaxAdditionAmount: number;
+    invoiceTaxDeductionAmount: number;
+    invoiceGrossAmount: number;
+    invoiceNetReceivableAmount: number;
     invoiceAmountPaid: number;
     invoiceBalanceAmount: number;
     receiptDateUtc: string;
@@ -955,6 +964,10 @@ export type VendorStatementResponse = {
   totalInvoiced: number;
   totalPaid: number;
   closingBalance: number;
+  totalBaseAmount: number;
+  totalTaxAdditions: number;
+  totalTaxDeductions: number;
+  totalGrossAmount: number;
   count: number;
   items: {
     type: string;
@@ -964,6 +977,11 @@ export type VendorStatementResponse = {
     debitAmount: number;
     creditAmount: number;
     invoiceAmount: number;
+    baseAmount: number;
+    taxAdditionAmount: number;
+    taxDeductionAmount: number;
+    grossAmount: number;
+    netPayableAmount: number;
     paymentAmount: number;
     runningBalance: number;
     status: number;
@@ -1032,6 +1050,10 @@ export type PurchaseInvoiceDto = {
   description: string;
   status: number;
   totalAmount: number;
+  taxAdditionAmount: number;
+  taxDeductionAmount: number;
+  grossAmount: number;
+  netPayableAmount: number;
   amountPaid: number;
   balanceAmount: number;
   journalEntryId?: string | null;
@@ -1053,6 +1075,7 @@ export type CreatePurchaseInvoiceRequest = {
   invoiceNumber: string;
   description: string;
   lines: PurchaseInvoiceLineDto[];
+  taxCodeIds?: string[] | null;
 };
 
 export type PostPurchaseInvoiceRequest = {
@@ -1119,6 +1142,10 @@ export type VendorPaymentDetailResponse = {
     invoiceDescription: string;
     invoiceDateUtc?: string | null;
     invoiceTotalAmount: number;
+    invoiceTaxAdditionAmount: number;
+    invoiceTaxDeductionAmount: number;
+    invoiceGrossAmount: number;
+    invoiceNetPayableAmount: number;
     invoiceAmountPaid: number;
     invoiceBalanceAmount: number;
     paymentDateUtc: string;
@@ -1765,6 +1792,155 @@ export type UpdateLedgerAccountRequest = {
   isCashOrBankAccount: boolean;
 };
 
+export type TaxCodeDto = {
+  id: string;
+  tenantId: string;
+  code: string;
+  name: string;
+  description?: string | null;
+  componentKind: number;
+  applicationMode: number;
+  transactionScope: number;
+  ratePercent: number;
+  taxLedgerAccountId: string;
+  taxLedgerAccountCode?: string | null;
+  taxLedgerAccountName?: string | null;
+  isActive: boolean;
+  effectiveFromUtc: string;
+  effectiveToUtc?: string | null;
+};
+
+export type TaxCodesResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  count: number;
+  items: TaxCodeDto[];
+};
+
+export type CreateTaxCodeRequest = {
+  code: string;
+  name: string;
+  description?: string | null;
+  componentKind: number;
+  applicationMode: number;
+  transactionScope: number;
+  ratePercent: number;
+  taxLedgerAccountId: string;
+  isActive: boolean;
+  effectiveFromUtc: string;
+  effectiveToUtc?: string | null;
+};
+
+export type PreviewTaxCalculationRequest = {
+  transactionDateUtc: string;
+  transactionScope: number;
+  taxableAmount: number;
+  taxCodeIds: string[];
+};
+
+export type PreviewTaxCalculationLineDto = {
+  taxCodeId: string;
+  code: string;
+  name: string;
+  componentKind: number;
+  applicationMode: number;
+  transactionScope: number;
+  ratePercent: number;
+  taxLedgerAccountId: string;
+  taxLedgerAccountCode?: string | null;
+  taxLedgerAccountName?: string | null;
+  taxableAmount: number;
+  taxAmount: number;
+  isAddition: boolean;
+  isDeduction: boolean;
+};
+
+export type PreviewTaxCalculationResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  transactionDateUtc: string;
+  transactionScope: number;
+  taxableAmount: number;
+  totalAdditions: number;
+  totalDeductions: number;
+  grossAmount: number;
+  netAmount: number;
+  count: number;
+  items: PreviewTaxCalculationLineDto[];
+};
+
+
+export type TaxReportByComponentKindDto = {
+  componentKind: number;
+  count: number;
+  totalTaxableAmount: number;
+  totalTaxAmount: number;
+};
+
+export type TaxReportByTaxCodeDto = {
+  taxCodeId: string;
+  taxCode?: string | null;
+  taxCodeName?: string | null;
+  componentKind: number;
+  applicationMode: number;
+  transactionScope: number;
+  ratePercent: number;
+  taxLedgerAccountId: string;
+  taxLedgerAccountCode?: string | null;
+  taxLedgerAccountName?: string | null;
+  count: number;
+  totalTaxableAmount: number;
+  totalTaxAmount: number;
+};
+
+export type TaxReportLineDto = {
+  id: string;
+  tenantId: string;
+  taxCodeId: string;
+  taxCode?: string | null;
+  taxCodeName?: string | null;
+  transactionDateUtc: string;
+  sourceModule: string;
+  sourceDocumentType: string;
+  sourceDocumentId: string;
+  sourceDocumentNumber: string;
+  taxableAmount: number;
+  taxAmount: number;
+  componentKind: number;
+  applicationMode: number;
+  transactionScope: number;
+  ratePercent: number;
+  taxLedgerAccountId: string;
+  taxLedgerAccountCode?: string | null;
+  taxLedgerAccountName?: string | null;
+  counterpartyId?: string | null;
+  counterpartyCode?: string | null;
+  counterpartyName?: string | null;
+  description?: string | null;
+  journalEntryId?: string | null;
+};
+
+export type TaxReportResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  fromUtc: string | null;
+  toUtc: string | null;
+  componentKind?: number | null;
+  transactionScope?: number | null;
+  count: number;
+  totalTaxableAmount: number;
+  totalTaxAmount: number;
+  totalAdditions: number;
+  totalDeductions: number;
+  byComponentKind: TaxReportByComponentKindDto[];
+  byTaxCode: TaxReportByTaxCodeDto[];
+  items: TaxReportLineDto[];
+};
+
+
 export async function createLedgerAccount(payload: CreateLedgerAccountRequest) {
   const response = await api.post('/api/finance/accounts', payload);
   return response.data;
@@ -1777,6 +1953,57 @@ export async function updateLedgerAccount(ledgerAccountId: string, payload: Upda
   );
   return response.data;
 }
+
+export async function getTaxCodes(
+  componentKind?: number | null,
+  transactionScope?: number | null,
+  activeOnly?: boolean | null
+) {
+  const response = await api.get<TaxCodesResponse>('/api/finance/tax-codes', {
+    params: {
+      ...(componentKind ? { componentKind } : {}),
+      ...(transactionScope ? { transactionScope } : {}),
+      ...(activeOnly !== null && activeOnly !== undefined ? { activeOnly } : {}),
+    },
+  });
+
+  return response.data;
+}
+
+export async function createTaxCode(payload: CreateTaxCodeRequest) {
+  const response = await api.post('/api/finance/tax-codes', payload);
+  return response.data;
+}
+
+
+export async function previewTaxCalculation(payload: PreviewTaxCalculationRequest) {
+  const response = await api.post<PreviewTaxCalculationResponse>(
+    '/api/finance/tax-calculations/preview',
+    payload
+  );
+
+  return response.data;
+}
+
+
+export async function getTaxReport(
+  fromUtc?: string | null,
+  toUtc?: string | null,
+  componentKind?: number | null,
+  transactionScope?: number | null
+) {
+  const response = await api.get<TaxReportResponse>('/api/finance/reports/taxes', {
+    params: {
+      ...(fromUtc ? { fromUtc } : {}),
+      ...(toUtc ? { toUtc } : {}),
+      ...(componentKind ? { componentKind } : {}),
+      ...(transactionScope ? { transactionScope } : {}),
+    },
+  });
+
+  return response.data;
+}
+
 
 export type JournalLineRequest = {
   ledgerAccountId: string;

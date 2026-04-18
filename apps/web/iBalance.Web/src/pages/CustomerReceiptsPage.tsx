@@ -136,7 +136,7 @@ export function CustomerReceiptsPage() {
 
   const eligibleInvoices = useMemo(() => {
     const items = invoicesQ.data?.items || [];
-
+  
     return items
       .filter((x) => {
         const belongsToCustomer = !form.customerId || x.customerId === form.customerId;
@@ -307,7 +307,7 @@ export function CustomerReceiptsPage() {
     }
 
     if (selectedInvoice && amount > Number(selectedInvoice.balanceAmount || 0)) {
-      setMessage('Receipt amount cannot exceed the outstanding invoice balance.');
+      setMessage('Receipt amount cannot exceed the outstanding tax-adjusted invoice balance.');
       return;
     }
 
@@ -496,10 +496,10 @@ export function CustomerReceiptsPage() {
             >
               <option value="">— Select Sales Invoice —</option>
               {eligibleInvoices.map((invoice) => (
-                <option key={invoice.id} value={invoice.id}>
-                  {invoice.invoiceNumber} - {invoice.customerName} - Outstanding {formatAmount(invoice.balanceAmount)}
-                </option>
-              ))}
+              <option key={invoice.id} value={invoice.id}>
+                {invoice.invoiceNumber} - {invoice.customerName} - Outstanding {formatAmount(invoice.balanceAmount)}
+              </option>
+            ))}
             </select>
           </div>
 
@@ -556,8 +556,24 @@ export function CustomerReceiptsPage() {
               <span>{invoiceStatusLabel(selectedInvoice.status)}</span>
             </div>
             <div className="kv-row">
-              <span>Total Amount</span>
+              <span>Base Amount</span>
               <span>{formatAmount(selectedInvoice.totalAmount)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Tax Additions</span>
+              <span>{formatAmount(selectedInvoice.taxAdditionAmount || 0)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Tax Deductions</span>
+              <span>{formatAmount(selectedInvoice.taxDeductionAmount || 0)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Gross Amount</span>
+              <span>{formatAmount(selectedInvoice.grossAmount || selectedInvoice.totalAmount)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Net Receivable Amount</span>
+              <span>{formatAmount(selectedInvoice.netReceivableAmount || selectedInvoice.totalAmount)}</span>
             </div>
             <div className="kv-row">
               <span>Outstanding Balance</span>

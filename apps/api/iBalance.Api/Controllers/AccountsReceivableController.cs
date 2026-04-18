@@ -163,6 +163,10 @@ public sealed class AccountsReceivableController : ControllerBase
                 x.Description,
                 x.Status,
                 x.TotalAmount,
+                x.TaxAdditionAmount,
+                x.TaxDeductionAmount,
+                x.GrossAmount,
+                x.NetReceivableAmount,
                 x.AmountPaid,
                 x.BalanceAmount,
                 x.JournalEntryId,
@@ -283,10 +287,112 @@ public sealed class AccountsReceivableController : ControllerBase
             invoice.Lines.Add(invoiceLine);
         }
 
+        
         invoice.RecalculateTotals();
 
+        var selectedTaxCodeIds = request.TaxCodeIds?
+            .Where(x => x != Guid.Empty)
+            .Distinct()
+            .ToList() ?? [];
+
+        var salesInvoiceTaxLines = new List<SalesInvoiceTaxLine>();
+
+        if (selectedTaxCodeIds.Count > 0)
+        {
+            var taxCodes = await dbContext.TaxCodes
+                .AsNoTracking()
+                .Where(x => selectedTaxCodeIds.Contains(x.Id))
+                .OrderBy(x => x.ComponentKind)
+                .ThenBy(x => x.Code)
+                .ToListAsync(cancellationToken);
+
+            if (taxCodes.Count != selectedTaxCodeIds.Count)
+            {
+                return BadRequest(new { Message = "One or more selected tax codes were not found." });
+            }
+
+            var taxableAmount = request.Lines.Sum(x => x.Quantity * x.UnitPrice);
+
+            foreach (var taxCode in taxCodes)
+            {
+                if (!taxCode.IsActive)
+                {
+                    return BadRequest(new
+                    {
+                        Message = "Only active tax codes can be used on a sales invoice.",
+                        TaxCodeId = taxCode.Id,
+                        taxCode.Code
+                    });
+                }
+
+                if (!taxCode.IsEffectiveOn(request.InvoiceDateUtc))
+                {
+                    return BadRequest(new
+                    {
+                        Message = "One or more selected tax codes are not effective for the invoice date.",
+                        TaxCodeId = taxCode.Id,
+                        taxCode.Code,
+                        taxCode.EffectiveFromUtc,
+                        taxCode.EffectiveToUtc,
+                        request.InvoiceDateUtc
+                    });
+                }
+
+                if (taxCode.TransactionScope != TaxTransactionScope.Both &&
+                    taxCode.TransactionScope != TaxTransactionScope.Sales)
+                {
+                    return BadRequest(new
+                    {
+                        Message = "One or more selected tax codes cannot be used for sales invoices.",
+                        TaxCodeId = taxCode.Id,
+                        taxCode.Code,
+                        taxCode.TransactionScope
+                    });
+                }
+
+                var taxAmount = taxCode.CalculateTaxAmount(taxableAmount);
+
+                salesInvoiceTaxLines.Add(new SalesInvoiceTaxLine(
+                    Guid.NewGuid(),
+                    invoice.Id,
+                    taxCode.Id,
+                    taxCode.ComponentKind,
+                    taxCode.ApplicationMode,
+                    taxCode.TransactionScope,
+                    taxCode.RatePercent,
+                    taxableAmount,
+                    taxAmount,
+                    taxCode.TaxLedgerAccountId,
+                    $"{taxCode.Code} - {taxCode.Name}"));
+            }
+        }
+
+             var totalTaxAdditions = salesInvoiceTaxLines
+            .Where(x => x.ApplicationMode == TaxApplicationMode.AddToAmount)
+            .Sum(x => x.TaxAmount);
+
+        var totalTaxDeductions = salesInvoiceTaxLines
+            .Where(x => x.ApplicationMode == TaxApplicationMode.DeductFromAmount)
+            .Sum(x => x.TaxAmount);
+
+        invoice.RecalculateTotals(totalTaxAdditions, totalTaxDeductions);
+
         dbContext.SalesInvoices.Add(invoice);
+
+        if (salesInvoiceTaxLines.Count > 0)
+        {
+            dbContext.SalesInvoiceTaxLines.AddRange(salesInvoiceTaxLines);
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        // var totalTaxAdditions = salesInvoiceTaxLines
+        //     .Where(x => x.ApplicationMode == TaxApplicationMode.AddToAmount)
+        //     .Sum(x => x.TaxAmount);
+
+        // var totalTaxDeductions = salesInvoiceTaxLines
+        //     .Where(x => x.ApplicationMode == TaxApplicationMode.DeductFromAmount)
+        //     .Sum(x => x.TaxAmount);
 
         return Ok(new
         {
@@ -300,7 +406,12 @@ public sealed class AccountsReceivableController : ControllerBase
                 invoice.Status,
                 invoice.TotalAmount,
                 invoice.AmountPaid,
-                invoice.BalanceAmount
+                invoice.BalanceAmount,
+                TaxLineCount = salesInvoiceTaxLines.Count,
+                TotalTaxAdditions = totalTaxAdditions,
+                TotalTaxDeductions = totalTaxDeductions,
+                invoice.GrossAmount,
+                NetAmount = invoice.NetReceivableAmount
             }
         });
     }
@@ -369,6 +480,37 @@ public sealed class AccountsReceivableController : ControllerBase
             });
         }
 
+        var salesInvoiceTaxLines = await dbContext.SalesInvoiceTaxLines
+            .AsNoTracking()
+            .Where(x => x.SalesInvoiceId == invoice.Id)
+            .OrderBy(x => x.ComponentKind)
+            .ThenBy(x => x.TaxCodeId)
+            .ToListAsync(cancellationToken);
+
+        var totalTaxAdditions = salesInvoiceTaxLines
+            .Where(x => x.ApplicationMode == TaxApplicationMode.AddToAmount)
+            .Sum(x => x.TaxAmount);
+
+        var totalTaxDeductions = salesInvoiceTaxLines
+            .Where(x => x.ApplicationMode == TaxApplicationMode.DeductFromAmount)
+            .Sum(x => x.TaxAmount);
+
+        var grossInvoiceAmount = invoice.TotalAmount + totalTaxAdditions;
+        var netReceivableAmount = grossInvoiceAmount - totalTaxDeductions;
+
+        if (netReceivableAmount <= 0m)
+        {
+            return Conflict(new
+            {
+                Message = "Sales invoice net receivable amount must be greater than zero after tax additions and deductions.",
+                SalesInvoiceId = salesInvoiceId,
+                invoice.TotalAmount,
+                TotalTaxAdditions = totalTaxAdditions,
+                TotalTaxDeductions = totalTaxDeductions,
+                NetReceivableAmount = netReceivableAmount
+            });
+        }
+
         var postingPeriod = await GetOpenFiscalPeriodForDateAsync(
             dbContext,
             invoice.InvoiceDateUtc,
@@ -384,16 +526,19 @@ public sealed class AccountsReceivableController : ControllerBase
         }
 
         var requestedLedgerAccountIds = new[]
-        {
-            request.ReceivableLedgerAccountId,
-            request.RevenueLedgerAccountId
-        };
+            {
+                request.ReceivableLedgerAccountId,
+                request.RevenueLedgerAccountId
+            }
+            .Concat(salesInvoiceTaxLines.Select(x => x.TaxLedgerAccountId))
+            .Distinct()
+            .ToList();
 
         var ledgerAccounts = await dbContext.LedgerAccounts
             .Where(x => requestedLedgerAccountIds.Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, cancellationToken);
 
-        if (ledgerAccounts.Count != requestedLedgerAccountIds.Length)
+        if (ledgerAccounts.Count != requestedLedgerAccountIds.Count)
         {
             return BadRequest(new
             {
@@ -424,6 +569,21 @@ public sealed class AccountsReceivableController : ControllerBase
             });
         }
 
+        foreach (var taxLine in salesInvoiceTaxLines)
+        {
+            var taxLedgerAccount = ledgerAccounts[taxLine.TaxLedgerAccountId];
+
+            if (!IsPostingReady(taxLedgerAccount))
+            {
+                return BadRequest(new
+                {
+                    Message = "Each tax ledger account must be active, non-header, and posting-enabled.",
+                    taxLedgerAccount.Id,
+                    taxLedgerAccount.Code
+                });
+            }
+        }
+
         var reference = $"AR-{invoice.InvoiceNumber}";
 
         var referenceExists = await dbContext.JournalEntries
@@ -440,6 +600,44 @@ public sealed class AccountsReceivableController : ControllerBase
         }
 
         var customerName = invoice.Customer?.CustomerName ?? "Customer";
+
+        var journalLines = new List<JournalEntryLine>
+        {
+            new(
+                Guid.NewGuid(),
+                receivableAccount.Id,
+                $"Accounts receivable - {invoice.InvoiceNumber}",
+                netReceivableAmount,
+                0m),
+
+            new(
+                Guid.NewGuid(),
+                revenueAccount.Id,
+                $"Revenue - {invoice.InvoiceNumber}",
+                0m,
+                invoice.TotalAmount)
+        };
+
+        foreach (var taxLine in salesInvoiceTaxLines.Where(x => x.ApplicationMode == TaxApplicationMode.AddToAmount))
+        {
+            journalLines.Add(new JournalEntryLine(
+                Guid.NewGuid(),
+                taxLine.TaxLedgerAccountId,
+                $"Sales tax addition - {invoice.InvoiceNumber} - {taxLine.Description}",
+                0m,
+                taxLine.TaxAmount));
+        }
+
+        foreach (var taxLine in salesInvoiceTaxLines.Where(x => x.ApplicationMode == TaxApplicationMode.DeductFromAmount))
+        {
+            journalLines.Add(new JournalEntryLine(
+                Guid.NewGuid(),
+                taxLine.TaxLedgerAccountId,
+                $"Sales tax deduction - {invoice.InvoiceNumber} - {taxLine.Description}",
+                taxLine.TaxAmount,
+                0m));
+        }
+
         var journalEntry = new JournalEntry(
             Guid.NewGuid(),
             tenantContext.TenantId,
@@ -448,21 +646,7 @@ public sealed class AccountsReceivableController : ControllerBase
             $"Sales invoice posting - {invoice.InvoiceNumber} - {customerName}",
             JournalEntryStatus.Draft,
             JournalEntryType.Normal,
-            new[]
-            {
-                new JournalEntryLine(
-                    Guid.NewGuid(),
-                    receivableAccount.Id,
-                    $"Accounts receivable - {invoice.InvoiceNumber}",
-                    invoice.TotalAmount,
-                    0m),
-                new JournalEntryLine(
-                    Guid.NewGuid(),
-                    revenueAccount.Id,
-                    $"Revenue - {invoice.InvoiceNumber}",
-                    0m,
-                    invoice.TotalAmount)
-            });
+            journalLines);
 
         var postedAtUtc = DateTime.UtcNow;
         journalEntry.MarkPosted(postedAtUtc);
@@ -481,10 +665,40 @@ public sealed class AccountsReceivableController : ControllerBase
                 line.CreditAmount))
             .ToList();
 
+        var taxTransactionLines = salesInvoiceTaxLines
+            .Select(taxLine => new TaxTransactionLine(
+                Guid.NewGuid(),
+                tenantContext.TenantId,
+                taxLine.TaxCodeId,
+                invoice.InvoiceDateUtc,
+                "AR",
+                "SalesInvoice",
+                invoice.Id,
+                invoice.InvoiceNumber,
+                taxLine.TaxableAmount,
+                taxLine.TaxAmount,
+                taxLine.ComponentKind,
+                taxLine.ApplicationMode,
+                taxLine.TransactionScope,
+                taxLine.RatePercent,
+                taxLine.TaxLedgerAccountId,
+                invoice.CustomerId,
+                invoice.Customer?.CustomerCode,
+                invoice.Customer?.CustomerName,
+                taxLine.Description,
+                journalEntry.Id))
+            .ToList();
+
+        invoice.RecalculateTotals(totalTaxAdditions, totalTaxDeductions);
         invoice.MarkPosted(journalEntry.Id);
 
         dbContext.JournalEntries.Add(journalEntry);
         dbContext.LedgerMovements.AddRange(movements);
+
+        if (taxTransactionLines.Count > 0)
+        {
+            dbContext.TaxTransactionLines.AddRange(taxTransactionLines);
+        }
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -499,6 +713,11 @@ public sealed class AccountsReceivableController : ControllerBase
                 invoice.TotalAmount,
                 invoice.AmountPaid,
                 invoice.BalanceAmount,
+                TaxLineCount = salesInvoiceTaxLines.Count,
+                TotalTaxAdditions = totalTaxAdditions,
+                TotalTaxDeductions = totalTaxDeductions,
+                GrossInvoiceAmount = grossInvoiceAmount,
+                NetReceivableAmount = netReceivableAmount,
                 invoice.JournalEntryId,
                 invoice.PostedOnUtc
             },
@@ -673,6 +892,10 @@ public sealed class AccountsReceivableController : ControllerBase
                 InvoiceDescription = receipt.SalesInvoice?.Description ?? string.Empty,
                 InvoiceDateUtc = receipt.SalesInvoice?.InvoiceDateUtc,
                 InvoiceTotalAmount = receipt.SalesInvoice?.TotalAmount ?? 0m,
+                InvoiceTaxAdditionAmount = receipt.SalesInvoice?.TaxAdditionAmount ?? 0m,
+                InvoiceTaxDeductionAmount = receipt.SalesInvoice?.TaxDeductionAmount ?? 0m,
+                InvoiceGrossAmount = receipt.SalesInvoice?.GrossAmount ?? 0m,
+                InvoiceNetReceivableAmount = receipt.SalesInvoice?.NetReceivableAmount ?? 0m,
                 InvoiceAmountPaid = receipt.SalesInvoice?.AmountPaid ?? 0m,
                 InvoiceBalanceAmount = receipt.SalesInvoice?.BalanceAmount ?? 0m,
                 receipt.ReceiptDateUtc,
@@ -786,9 +1009,23 @@ public sealed class AccountsReceivableController : ControllerBase
             return BadRequest(new { Message = "Only posted or part-paid invoices can receive customer payments." });
         }
 
-        if (request.Amount > invoice.BalanceAmount)
+                var taxAwareBalanceAmount = await GetSalesInvoiceTaxAwareBalanceAsync(
+            dbContext,
+            invoice,
+            cancellationToken);
+
+        if (request.Amount > taxAwareBalanceAmount)
         {
-            return BadRequest(new { Message = "Receipt amount cannot exceed the outstanding invoice balance." });
+            return BadRequest(new
+            {
+                Message = "Receipt amount cannot exceed the outstanding tax-adjusted invoice balance.",
+                InvoiceNumber = invoice.InvoiceNumber,
+                invoice.TotalAmount,
+                invoice.AmountPaid,
+                BaseBalanceAmount = invoice.BalanceAmount,
+                TaxAdjustedBalanceAmount = taxAwareBalanceAmount,
+                RequestedReceiptAmount = request.Amount
+            });
         }
 
         var normalizedReceiptNumber = request.ReceiptNumber.Trim().ToUpperInvariant();
@@ -1123,9 +1360,23 @@ public sealed class AccountsReceivableController : ControllerBase
             return Conflict(new { Message = "The linked sales invoice is not eligible for receipt posting." });
         }
 
-        if (receipt.Amount > invoice.BalanceAmount)
+               var taxAwareBalanceAmount = await GetSalesInvoiceTaxAwareBalanceAsync(
+            dbContext,
+            invoice,
+            cancellationToken);
+
+        if (receipt.Amount > taxAwareBalanceAmount)
         {
-            return Conflict(new { Message = "Receipt amount cannot exceed the outstanding invoice balance." });
+            return Conflict(new
+            {
+                Message = "Receipt amount cannot exceed the outstanding tax-adjusted invoice balance.",
+                InvoiceNumber = invoice.InvoiceNumber,
+                invoice.TotalAmount,
+                invoice.AmountPaid,
+                BaseBalanceAmount = invoice.BalanceAmount,
+                TaxAdjustedBalanceAmount = taxAwareBalanceAmount,
+                ReceiptAmount = receipt.Amount
+            });
         }
 
         var postingPeriod = await GetOpenFiscalPeriodForDateAsync(
@@ -1270,7 +1521,8 @@ public sealed class AccountsReceivableController : ControllerBase
                 invoice.Status,
                 invoice.TotalAmount,
                 invoice.AmountPaid,
-                invoice.BalanceAmount
+                invoice.BalanceAmount,
+                TaxAdjustedBalanceAmount = Math.Max(0m, taxAwareBalanceAmount - receipt.Amount)
             },
             JournalEntry = new
             {
@@ -1291,6 +1543,34 @@ public sealed class AccountsReceivableController : ControllerBase
         return ledgerAccount.IsActive &&
                !ledgerAccount.IsHeader &&
                ledgerAccount.IsPostingAllowed;
+    }
+
+        private static async Task<decimal> GetSalesInvoiceTaxAwareBalanceAsync(
+        ApplicationDbContext dbContext,
+        SalesInvoice invoice,
+        CancellationToken cancellationToken)
+    {
+        var taxLines = await dbContext.SalesInvoiceTaxLines
+            .AsNoTracking()
+            .Where(x => x.SalesInvoiceId == invoice.Id)
+            .Select(x => new
+            {
+                x.ApplicationMode,
+                x.TaxAmount
+            })
+            .ToListAsync(cancellationToken);
+
+        var totalTaxAdditions = taxLines
+            .Where(x => x.ApplicationMode == TaxApplicationMode.AddToAmount)
+            .Sum(x => x.TaxAmount);
+
+        var totalTaxDeductions = taxLines
+            .Where(x => x.ApplicationMode == TaxApplicationMode.DeductFromAmount)
+            .Sum(x => x.TaxAmount);
+
+        var netReceivableAmount = invoice.TotalAmount + totalTaxAdditions - totalTaxDeductions;
+
+        return netReceivableAmount - invoice.AmountPaid;
     }
 
     private static async Task<FiscalPeriod?> GetOpenFiscalPeriodForDateAsync(
@@ -1368,12 +1648,13 @@ public sealed class AccountsReceivableController : ControllerBase
         decimal Quantity,
         decimal UnitPrice);
 
-    public sealed record CreateSalesInvoiceRequest(
-        Guid CustomerId,
-        DateTime InvoiceDateUtc,
-        string InvoiceNumber,
-        string Description,
-        List<CreateSalesInvoiceLineRequest> Lines);
+   public sealed record CreateSalesInvoiceRequest(
+    Guid CustomerId,
+    DateTime InvoiceDateUtc,
+    string InvoiceNumber,
+    string Description,
+    List<CreateSalesInvoiceLineRequest> Lines,
+    List<Guid>? TaxCodeIds);
 
     public sealed record PostSalesInvoiceRequest(
         Guid ReceivableLedgerAccountId,

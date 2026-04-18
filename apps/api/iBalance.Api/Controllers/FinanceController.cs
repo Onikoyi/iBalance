@@ -906,6 +906,506 @@ public sealed class FinanceController : ControllerBase
         }
     }
 
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+    [HttpPost("tax-codes")]
+    public async Task<IActionResult> CreateTaxCode(
+        [FromBody] CreateTaxCodeRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Code))
+        {
+            return BadRequest(new { Message = "Tax code is required." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Name))
+        {
+            return BadRequest(new { Message = "Tax code name is required." });
+        }
+
+        if (request.RatePercent < 0m || request.RatePercent > 100m)
+        {
+            return BadRequest(new { Message = "Tax rate must be between 0 and 100 percent." });
+        }
+
+        if (request.TaxLedgerAccountId == Guid.Empty)
+        {
+            return BadRequest(new { Message = "Tax ledger account is required." });
+        }
+
+        if (request.EffectiveToUtc.HasValue && request.EffectiveToUtc.Value < request.EffectiveFromUtc)
+        {
+            return BadRequest(new { Message = "Effective end date cannot be earlier than effective start date." });
+        }
+
+        var normalizedCode = request.Code.Trim().ToUpperInvariant();
+
+        var duplicateExists = await dbContext.TaxCodes
+            .AsNoTracking()
+            .AnyAsync(x => x.Code == normalizedCode, cancellationToken);
+
+        if (duplicateExists)
+        {
+            return Conflict(new
+            {
+                Message = "A tax code with the same code already exists for the current tenant.",
+                Code = normalizedCode
+            });
+        }
+
+        var taxLedgerAccount = await dbContext.LedgerAccounts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == request.TaxLedgerAccountId, cancellationToken);
+
+        if (taxLedgerAccount is null)
+        {
+            return BadRequest(new
+            {
+                Message = "Tax ledger account was not found for the current tenant.",
+                request.TaxLedgerAccountId
+            });
+        }
+
+        if (!taxLedgerAccount.IsActive || taxLedgerAccount.IsHeader || !taxLedgerAccount.IsPostingAllowed)
+        {
+            return BadRequest(new
+            {
+                Message = "Tax ledger account must be an active, non-header, posting-enabled account.",
+                request.TaxLedgerAccountId,
+                taxLedgerAccount.Code
+            });
+        }
+
+        try
+        {
+            var taxCode = new TaxCode(
+                Guid.NewGuid(),
+                tenantContext.TenantId,
+                normalizedCode,
+                request.Name,
+                request.ComponentKind,
+                request.ApplicationMode,
+                request.TransactionScope,
+                request.RatePercent,
+                request.TaxLedgerAccountId,
+                request.IsActive,
+                request.EffectiveFromUtc,
+                request.EffectiveToUtc,
+                request.Description);
+
+            dbContext.TaxCodes.Add(taxCode);
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return Ok(new
+            {
+                Message = "Tax code created successfully.",
+                taxCode.Id,
+                taxCode.TenantId,
+                taxCode.Code,
+                taxCode.Name,
+                taxCode.Description,
+                taxCode.ComponentKind,
+                taxCode.ApplicationMode,
+                taxCode.TransactionScope,
+                taxCode.RatePercent,
+                taxCode.TaxLedgerAccountId,
+                TaxLedgerAccountCode = taxLedgerAccount.Code,
+                TaxLedgerAccountName = taxLedgerAccount.Name,
+                taxCode.IsActive,
+                taxCode.EffectiveFromUtc,
+                taxCode.EffectiveToUtc
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceView)]
+    [HttpGet("tax-codes")]
+    public async Task<IActionResult> GetTaxCodes(
+        [FromQuery] TaxComponentKind? componentKind,
+        [FromQuery] TaxTransactionScope? transactionScope,
+        [FromQuery] bool? activeOnly,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        IQueryable<TaxCode> query = dbContext.TaxCodes.AsNoTracking();
+
+        if (componentKind.HasValue)
+        {
+            query = query.Where(x => x.ComponentKind == componentKind.Value);
+        }
+
+        if (transactionScope.HasValue)
+        {
+            query = query.Where(x =>
+                x.TransactionScope == transactionScope.Value ||
+                x.TransactionScope == TaxTransactionScope.Both);
+        }
+
+        if (activeOnly == true)
+        {
+            query = query.Where(x => x.IsActive);
+        }
+
+        var items = await query
+            .OrderBy(x => x.ComponentKind)
+            .ThenBy(x => x.Code)
+            .Select(x => new
+            {
+                x.Id,
+                x.TenantId,
+                x.Code,
+                x.Name,
+                x.Description,
+                x.ComponentKind,
+                x.ApplicationMode,
+                x.TransactionScope,
+                x.RatePercent,
+                x.TaxLedgerAccountId,
+                TaxLedgerAccountCode = x.TaxLedgerAccount != null ? x.TaxLedgerAccount.Code : null,
+                TaxLedgerAccountName = x.TaxLedgerAccount != null ? x.TaxLedgerAccount.Name : null,
+                x.IsActive,
+                x.EffectiveFromUtc,
+                x.EffectiveToUtc
+            })
+            .ToListAsync(cancellationToken);
+
+        return Ok(new
+        {
+            TenantContextAvailable = tenantContext.IsAvailable,
+            TenantId = tenantContext.IsAvailable ? tenantContext.TenantId : (Guid?)null,
+            TenantKey = tenantContext.IsAvailable ? tenantContext.TenantKey : null,
+            Count = items.Count,
+            Items = items
+        });
+    }
+
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceView)]
+    [HttpPost("tax-calculations/preview")]
+    public async Task<IActionResult> PreviewTaxCalculation(
+        [FromBody] PreviewTaxCalculationRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        if (request.TaxableAmount < 0m)
+        {
+            return BadRequest(new { Message = "Taxable amount cannot be negative." });
+        }
+
+        if (request.TransactionDateUtc == default)
+        {
+            return BadRequest(new { Message = "Transaction date is required." });
+        }
+
+        if (request.TaxCodeIds is null || request.TaxCodeIds.Count == 0)
+        {
+            return Ok(new
+            {
+                TenantContextAvailable = tenantContext.IsAvailable,
+                TenantId = tenantContext.TenantId,
+                TenantKey = tenantContext.TenantKey,
+                request.TransactionDateUtc,
+                request.TransactionScope,
+                request.TaxableAmount,
+                TotalAdditions = 0m,
+                TotalDeductions = 0m,
+                GrossAmount = request.TaxableAmount,
+                NetAmount = request.TaxableAmount,
+                Count = 0,
+                Items = Array.Empty<object>()
+            });
+        }
+
+        var distinctTaxCodeIds = request.TaxCodeIds
+            .Where(x => x != Guid.Empty)
+            .Distinct()
+            .ToList();
+
+        if (distinctTaxCodeIds.Count != request.TaxCodeIds.Count)
+        {
+            return BadRequest(new { Message = "One or more tax code ids are invalid." });
+        }
+
+        var taxCodes = await dbContext.TaxCodes
+            .AsNoTracking()
+            .Where(x => distinctTaxCodeIds.Contains(x.Id))
+            .OrderBy(x => x.ComponentKind)
+            .ThenBy(x => x.Code)
+            .ToListAsync(cancellationToken);
+
+        if (taxCodes.Count != distinctTaxCodeIds.Count)
+        {
+            return BadRequest(new { Message = "One or more tax codes were not found for the current tenant." });
+        }
+
+        foreach (var taxCode in taxCodes)
+        {
+            if (!taxCode.IsActive)
+            {
+                return BadRequest(new
+                {
+                    Message = "Only active tax codes can be used for tax calculation.",
+                    TaxCodeId = taxCode.Id,
+                    taxCode.Code
+                });
+            }
+
+            if (!taxCode.IsEffectiveOn(request.TransactionDateUtc))
+            {
+                return BadRequest(new
+                {
+                    Message = "One or more tax codes are not effective for the transaction date.",
+                    TaxCodeId = taxCode.Id,
+                    taxCode.Code,
+                    taxCode.EffectiveFromUtc,
+                    taxCode.EffectiveToUtc,
+                    request.TransactionDateUtc
+                });
+            }
+
+            if (taxCode.TransactionScope != TaxTransactionScope.Both &&
+                taxCode.TransactionScope != request.TransactionScope)
+            {
+                return BadRequest(new
+                {
+                    Message = "One or more tax codes cannot be used for the selected transaction scope.",
+                    TaxCodeId = taxCode.Id,
+                    taxCode.Code,
+                    taxCode.TransactionScope,
+                    RequestedScope = request.TransactionScope
+                });
+            }
+        }
+
+        var items = taxCodes
+            .Select(taxCode =>
+            {
+                var taxAmount = taxCode.CalculateTaxAmount(request.TaxableAmount);
+
+                return new
+                {
+                    TaxCodeId = taxCode.Id,
+                    taxCode.Code,
+                    taxCode.Name,
+                    taxCode.ComponentKind,
+                    taxCode.ApplicationMode,
+                    taxCode.TransactionScope,
+                    taxCode.RatePercent,
+                    taxCode.TaxLedgerAccountId,
+                    TaxLedgerAccountCode = taxCode.TaxLedgerAccount != null ? taxCode.TaxLedgerAccount.Code : null,
+                    TaxLedgerAccountName = taxCode.TaxLedgerAccount != null ? taxCode.TaxLedgerAccount.Name : null,
+                    TaxableAmount = request.TaxableAmount,
+                    TaxAmount = taxAmount,
+                    IsAddition = taxCode.ApplicationMode == TaxApplicationMode.AddToAmount,
+                    IsDeduction = taxCode.ApplicationMode == TaxApplicationMode.DeductFromAmount
+                };
+            })
+            .ToList();
+
+        var totalAdditions = items
+            .Where(x => x.IsAddition)
+            .Sum(x => x.TaxAmount);
+
+        var totalDeductions = items
+            .Where(x => x.IsDeduction)
+            .Sum(x => x.TaxAmount);
+
+        var grossAmount = request.TaxableAmount + totalAdditions;
+        var netAmount = grossAmount - totalDeductions;
+
+        return Ok(new
+        {
+            TenantContextAvailable = tenantContext.IsAvailable,
+            TenantId = tenantContext.TenantId,
+            TenantKey = tenantContext.TenantKey,
+            request.TransactionDateUtc,
+            request.TransactionScope,
+            request.TaxableAmount,
+            TotalAdditions = totalAdditions,
+            TotalDeductions = totalDeductions,
+            GrossAmount = grossAmount,
+            NetAmount = netAmount,
+            Count = items.Count,
+            Items = items
+        });
+    }
+
+
+        [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+    [HttpGet("reports/taxes")]
+    public async Task<IActionResult> GetTaxReport(
+        [FromQuery] DateTime? fromUtc,
+        [FromQuery] DateTime? toUtc,
+        [FromQuery] TaxComponentKind? componentKind,
+        [FromQuery] TaxTransactionScope? transactionScope,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        IQueryable<TaxTransactionLine> query = dbContext.TaxTransactionLines
+            .AsNoTracking();
+
+        if (fromUtc.HasValue)
+        {
+            query = query.Where(x => x.TransactionDateUtc >= fromUtc.Value);
+        }
+
+        if (toUtc.HasValue)
+        {
+            query = query.Where(x => x.TransactionDateUtc <= toUtc.Value);
+        }
+
+        if (componentKind.HasValue)
+        {
+            query = query.Where(x => x.ComponentKind == componentKind.Value);
+        }
+
+        if (transactionScope.HasValue)
+        {
+            query = query.Where(x => x.TransactionScope == transactionScope.Value);
+        }
+
+        var rows = await query
+            .OrderByDescending(x => x.TransactionDateUtc)
+            .ThenBy(x => x.SourceDocumentNumber)
+            .Select(x => new
+            {
+                x.Id,
+                x.TenantId,
+                x.TaxCodeId,
+                TaxCode = x.TaxCode != null ? x.TaxCode.Code : null,
+                TaxCodeName = x.TaxCode != null ? x.TaxCode.Name : null,
+                x.TransactionDateUtc,
+                x.SourceModule,
+                x.SourceDocumentType,
+                x.SourceDocumentId,
+                x.SourceDocumentNumber,
+                x.TaxableAmount,
+                x.TaxAmount,
+                x.ComponentKind,
+                x.ApplicationMode,
+                x.TransactionScope,
+                x.RatePercent,
+                x.TaxLedgerAccountId,
+                TaxLedgerAccountCode = x.TaxLedgerAccount != null ? x.TaxLedgerAccount.Code : null,
+                TaxLedgerAccountName = x.TaxLedgerAccount != null ? x.TaxLedgerAccount.Name : null,
+                x.CounterpartyId,
+                x.CounterpartyCode,
+                x.CounterpartyName,
+                x.Description,
+                x.JournalEntryId
+            })
+            .ToListAsync(cancellationToken);
+
+        var byTaxCode = rows
+            .GroupBy(x => new
+            {
+                x.TaxCodeId,
+                x.TaxCode,
+                x.TaxCodeName,
+                x.ComponentKind,
+                x.ApplicationMode,
+                x.TransactionScope,
+                x.RatePercent,
+                x.TaxLedgerAccountId,
+                x.TaxLedgerAccountCode,
+                x.TaxLedgerAccountName
+            })
+            .Select(group => new
+            {
+                group.Key.TaxCodeId,
+                group.Key.TaxCode,
+                group.Key.TaxCodeName,
+                group.Key.ComponentKind,
+                group.Key.ApplicationMode,
+                group.Key.TransactionScope,
+                group.Key.RatePercent,
+                group.Key.TaxLedgerAccountId,
+                group.Key.TaxLedgerAccountCode,
+                group.Key.TaxLedgerAccountName,
+                Count = group.Count(),
+                TotalTaxableAmount = group.Sum(x => x.TaxableAmount),
+                TotalTaxAmount = group.Sum(x => x.TaxAmount)
+            })
+            .OrderBy(x => x.ComponentKind)
+            .ThenBy(x => x.TaxCode)
+            .ToList();
+
+        var byComponentKind = rows
+            .GroupBy(x => x.ComponentKind)
+            .Select(group => new
+            {
+                ComponentKind = group.Key,
+                Count = group.Count(),
+                TotalTaxableAmount = group.Sum(x => x.TaxableAmount),
+                TotalTaxAmount = group.Sum(x => x.TaxAmount)
+            })
+            .OrderBy(x => x.ComponentKind)
+            .ToList();
+
+        var totalAdditions = rows
+            .Where(x => x.ApplicationMode == TaxApplicationMode.AddToAmount)
+            .Sum(x => x.TaxAmount);
+
+        var totalDeductions = rows
+            .Where(x => x.ApplicationMode == TaxApplicationMode.DeductFromAmount)
+            .Sum(x => x.TaxAmount);
+
+        return Ok(new
+        {
+            TenantContextAvailable = tenantContext.IsAvailable,
+            TenantId = tenantContext.IsAvailable ? tenantContext.TenantId : (Guid?)null,
+            TenantKey = tenantContext.IsAvailable ? tenantContext.TenantKey : null,
+            FromUtc = fromUtc,
+            ToUtc = toUtc,
+            ComponentKind = componentKind,
+            TransactionScope = transactionScope,
+            Count = rows.Count,
+            TotalTaxableAmount = rows.Sum(x => x.TaxableAmount),
+            TotalTaxAmount = rows.Sum(x => x.TaxAmount),
+            TotalAdditions = totalAdditions,
+            TotalDeductions = totalDeductions,
+            ByComponentKind = byComponentKind,
+            ByTaxCode = byTaxCode,
+            Items = rows
+        });
+    }
+
+
     [Authorize(Policy = AuthorizationPolicies.FinanceView)]
     [HttpGet("accounts")]
     public async Task<IActionResult> GetLedgerAccounts(
@@ -3762,6 +4262,26 @@ public sealed class FinanceController : ControllerBase
         string? Purpose,
         bool IsActive,
         bool IsCashOrBankAccount);
+
+    public sealed record CreateTaxCodeRequest(
+        string Code,
+        string Name,
+        string? Description,
+        TaxComponentKind ComponentKind,
+        TaxApplicationMode ApplicationMode,
+        TaxTransactionScope TransactionScope,
+        decimal RatePercent,
+        Guid TaxLedgerAccountId,
+        bool IsActive,
+        DateTime EffectiveFromUtc,
+        DateTime? EffectiveToUtc);
+
+
+    public sealed record PreviewTaxCalculationRequest(
+        DateTime TransactionDateUtc,
+        TaxTransactionScope TransactionScope,
+        decimal TaxableAmount,
+        IReadOnlyCollection<Guid> TaxCodeIds);
 
     public sealed record CreateBankReconciliationRequest(
         Guid LedgerAccountId,

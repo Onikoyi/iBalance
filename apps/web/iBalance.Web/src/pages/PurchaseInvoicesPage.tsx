@@ -4,11 +4,14 @@ import {
   createPurchaseInvoice,
   getAccounts,
   getPurchaseInvoices,
+  getTaxCodes,
   getTenantReadableError,
   getVendors,
   postPurchaseInvoice,
+  previewTaxCalculation,
   type CreatePurchaseInvoiceRequest,
   type PurchaseInvoiceLineDto,
+  type TaxCodeDto,
 } from '../lib/api';
 import { canManageFinanceSetup, canViewFinance } from '../lib/auth';
 
@@ -24,6 +27,7 @@ const emptyForm: CreatePurchaseInvoiceRequest = {
   invoiceNumber: '',
   description: '',
   lines: [{ ...emptyLine }],
+  taxCodeIds: [],
 };
 
 function formatDateTime(value?: string | null) {
@@ -47,6 +51,23 @@ function purchaseInvoiceStatusLabel(value: number) {
     case 3: return 'Part Paid';
     case 4: return 'Paid';
     case 5: return 'Cancelled';
+    default: return 'Unknown';
+  }
+}
+
+function taxComponentKindLabel(value: number) {
+  switch (value) {
+    case 1: return 'VAT';
+    case 2: return 'WHT';
+    case 3: return 'Other';
+    default: return 'Unknown';
+  }
+}
+
+function taxApplicationModeLabel(value: number) {
+  switch (value) {
+    case 1: return 'Add to Amount';
+    case 2: return 'Deduct from Amount';
     default: return 'Unknown';
   }
 }
@@ -85,6 +106,13 @@ export function PurchaseInvoicesPage() {
   const accountsQ = useQuery({
     queryKey: ['accounts'],
     queryFn: getAccounts,
+    enabled: canView,
+  });
+
+
+  const taxCodesQ = useQuery({
+    queryKey: ['tax-codes', 'purchases', 'active'],
+    queryFn: () => getTaxCodes(null, 2, true),
     enabled: canView,
   });
 
@@ -131,7 +159,10 @@ export function PurchaseInvoicesPage() {
     const items = invoicesQ.data?.items ?? [];
     return {
       total: items.length,
-      totalAmount: items.reduce((sum, x) => sum + x.totalAmount, 0),
+      totalBaseAmount: items.reduce((sum, x) => sum + x.totalAmount, 0),
+      totalTaxAdditions: items.reduce((sum, x) => sum + (x.taxAdditionAmount || 0), 0),
+      totalTaxDeductions: items.reduce((sum, x) => sum + (x.taxDeductionAmount || 0), 0),
+      totalNetPayable: items.reduce((sum, x) => sum + (x.netPayableAmount || x.totalAmount), 0),
       totalPaid: items.reduce((sum, x) => sum + x.amountPaid, 0),
       totalOutstanding: items.reduce((sum, x) => sum + x.balanceAmount, 0),
       drafts: items.filter((x) => x.status === 1).length,
@@ -144,6 +175,39 @@ export function PurchaseInvoicesPage() {
   const postingAccounts = useMemo(() => {
     return (accountsQ.data?.items ?? []).filter((x) => x.isActive && !x.isHeader && x.isPostingAllowed);
   }, [accountsQ.data?.items]);
+
+  const invoiceBaseAmount = useMemo(() => {
+    return form.lines.reduce((sum, line) => {
+      return sum + Number(line.quantity || 0) * Number(line.unitPrice || 0);
+    }, 0);
+  }, [form.lines]);
+
+  const taxPreviewQ = useQuery({
+    queryKey: [
+      'purchase-tax-preview',
+      form.invoiceDateUtc,
+      invoiceBaseAmount,
+      form.taxCodeIds,
+    ],
+    queryFn: () =>
+      previewTaxCalculation({
+        transactionDateUtc: form.invoiceDateUtc,
+        transactionScope: 2,
+        taxableAmount: invoiceBaseAmount,
+        taxCodeIds: form.taxCodeIds ?? [],
+      }),
+    enabled:
+      canView &&
+      !!form.invoiceDateUtc &&
+      invoiceBaseAmount > 0 &&
+      !!form.taxCodeIds &&
+      form.taxCodeIds.length > 0,
+  });
+
+  const totalTaxAdditions = taxPreviewQ.data?.totalAdditions ?? 0;
+  const totalTaxDeductions = taxPreviewQ.data?.totalDeductions ?? 0;
+  const grossAmount = taxPreviewQ.data?.grossAmount ?? invoiceBaseAmount;
+  const netPayableAmount = taxPreviewQ.data?.netAmount ?? invoiceBaseAmount;
 
   function update<K extends keyof CreatePurchaseInvoiceRequest>(key: K, value: CreatePurchaseInvoiceRequest[K]) {
     setForm((s) => ({ ...s, [key]: value }));
@@ -171,6 +235,15 @@ export function PurchaseInvoicesPage() {
     setForm((s) => ({
       ...s,
       lines: s.lines.filter((_, i) => i !== index),
+    }));
+  }
+
+  function toggleTaxCode(taxCodeId: string, checked: boolean) {
+    setForm((state) => ({
+      ...state,
+      taxCodeIds: checked
+        ? [...(state.taxCodeIds ?? []), taxCodeId]
+        : (state.taxCodeIds ?? []).filter((id) => id !== taxCodeId),
     }));
   }
 
@@ -283,6 +356,7 @@ export function PurchaseInvoicesPage() {
         quantity: Number(x.quantity),
         unitPrice: Number(x.unitPrice),
       })),
+      taxCodeIds: form.taxCodeIds ?? [],
     });
   }
 
@@ -307,11 +381,20 @@ export function PurchaseInvoicesPage() {
     return <div className="panel error-panel">You do not have access to view purchase invoices.</div>;
   }
 
-  if (invoicesQ.isLoading || vendorsQ.isLoading || accountsQ.isLoading) {
+  if (invoicesQ.isLoading || vendorsQ.isLoading || accountsQ.isLoading || taxCodesQ.isLoading) {
     return <div className="panel">Loading purchase invoices...</div>;
   }
 
-  if (invoicesQ.isError || vendorsQ.isError || accountsQ.isError || !invoicesQ.data || !vendorsQ.data || !accountsQ.data) {
+  if (
+    invoicesQ.isError ||
+    vendorsQ.isError ||
+    accountsQ.isError ||
+    taxCodesQ.isError ||
+    !invoicesQ.data ||
+    !vendorsQ.data ||
+    !accountsQ.data ||
+    !taxCodesQ.data
+  ) {
     return <div className="panel error-panel">We could not load purchase invoices at this time.</div>;
   }
 
@@ -333,7 +416,10 @@ export function PurchaseInvoicesPage() {
 
         <div className="kv">
           <div className="kv-row"><span>Total Purchase Invoices</span><span>{summary.total}</span></div>
-          <div className="kv-row"><span>Total Amount</span><span>{formatAmount(summary.totalAmount)}</span></div>
+          <div className="kv-row"><span>Total Base Amount</span><span>{formatAmount(summary.totalBaseAmount)}</span></div>
+          <div className="kv-row"><span>Total Tax Additions</span><span>{formatAmount(summary.totalTaxAdditions)}</span></div>
+          <div className="kv-row"><span>Total Tax Deductions</span><span>{formatAmount(summary.totalTaxDeductions)}</span></div>
+          <div className="kv-row"><span>Total Net Payable</span><span>{formatAmount(summary.totalNetPayable)}</span></div>
           <div className="kv-row"><span>Total Paid</span><span>{formatAmount(summary.totalPaid)}</span></div>
           <div className="kv-row"><span>Total Outstanding</span><span>{formatAmount(summary.totalOutstanding)}</span></div>
           <div className="kv-row"><span>Draft</span><span>{summary.drafts}</span></div>
@@ -370,7 +456,10 @@ export function PurchaseInvoicesPage() {
                 <th>Description</th>
                 <th>Invoice Date</th>
                 <th>Status</th>
-                <th style={{ textAlign: 'right' }}>Total</th>
+                <th style={{ textAlign: 'right' }}>Base</th>
+                <th style={{ textAlign: 'right' }}>Tax +</th>
+                <th style={{ textAlign: 'right' }}>Tax -</th>
+                <th style={{ textAlign: 'right' }}>Net Payable</th>
                 <th style={{ textAlign: 'right' }}>Paid</th>
                 <th style={{ textAlign: 'right' }}>Balance</th>
                 <th>Posted On</th>
@@ -380,7 +469,7 @@ export function PurchaseInvoicesPage() {
             <tbody>
               {invoicesQ.data.items.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="muted">
+                  <td colSpan={13} className="muted">
                     No purchase invoices have been created yet.
                   </td>
                 </tr>
@@ -393,6 +482,9 @@ export function PurchaseInvoicesPage() {
                     <td>{formatDateTime(item.invoiceDateUtc)}</td>
                     <td>{purchaseInvoiceStatusLabel(item.status)}</td>
                     <td style={{ textAlign: 'right' }}>{formatAmount(item.totalAmount)}</td>
+                    <td style={{ textAlign: 'right' }}>{formatAmount(item.taxAdditionAmount || 0)}</td>
+                    <td style={{ textAlign: 'right' }}>{formatAmount(item.taxDeductionAmount || 0)}</td>
+                    <td style={{ textAlign: 'right' }}>{formatAmount(item.netPayableAmount || item.totalAmount)}</td>
                     <td style={{ textAlign: 'right' }}>{formatAmount(item.amountPaid)}</td>
                     <td style={{ textAlign: 'right' }}>{formatAmount(item.balanceAmount)}</td>
                     <td>{formatDateTime(item.postedOnUtc)}</td>
@@ -529,6 +621,101 @@ export function PurchaseInvoicesPage() {
                 </tbody>
               </table>
             </div>
+
+            <div className="section-heading" style={{ marginTop: 16 }}>
+              <div>
+                <h2>VAT / WHT / Other Taxes</h2>
+                <span className="muted">Select setup-driven purchase tax codes for this invoice</span>
+              </div>
+            </div>
+
+            <div className="panel" style={{ marginBottom: 16 }}>
+              {taxCodesQ.data.items.length === 0 ? (
+                <div className="muted">No active purchase tax codes have been configured.</div>
+              ) : (
+                <div className="detail-stack">
+                  {taxCodesQ.data.items.map((taxCode: TaxCodeDto) => {
+                    const checked = (form.taxCodeIds ?? []).includes(taxCode.id);
+
+                    return (
+                      <label
+                        key={taxCode.id}
+                        className="muted"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          marginBottom: 8,
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => toggleTaxCode(taxCode.id, e.target.checked)}
+                        />
+                        <span>
+                          {taxCode.code} - {taxCode.name}
+                          {' '}({taxComponentKindLabel(taxCode.componentKind)}, {taxApplicationModeLabel(taxCode.applicationMode)}, {formatAmount(taxCode.ratePercent)}%)
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="kv" style={{ marginBottom: 16 }}>
+              <div className="kv-row">
+                <span>Base Invoice Amount</span>
+                <span>{formatAmount(invoiceBaseAmount)}</span>
+              </div>
+              <div className="kv-row">
+                <span>Tax Additions</span>
+                <span>{formatAmount(totalTaxAdditions)}</span>
+              </div>
+              <div className="kv-row">
+                <span>Tax Deductions</span>
+                <span>{formatAmount(totalTaxDeductions)}</span>
+              </div>
+              <div className="kv-row">
+                <span>Gross Amount</span>
+                <span>{formatAmount(grossAmount)}</span>
+              </div>
+              <div className="kv-row">
+                <span>Net Payable Amount</span>
+                <span>{formatAmount(netPayableAmount)}</span>
+              </div>
+            </div>
+
+            {taxPreviewQ.data?.items?.length ? (
+              <div className="table-wrap" style={{ marginBottom: 16 }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Tax Code</th>
+                      <th>Kind</th>
+                      <th>Mode</th>
+                      <th style={{ textAlign: 'right' }}>Rate %</th>
+                      <th style={{ textAlign: 'right' }}>Tax Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {taxPreviewQ.data.items.map((item) => (
+                      <tr key={item.taxCodeId}>
+                        <td>{item.code}</td>
+                        <td>{taxComponentKindLabel(item.componentKind)}</td>
+                        <td>{taxApplicationModeLabel(item.applicationMode)}</td>
+                        <td style={{ textAlign: 'right' }}>{formatAmount(item.ratePercent)}</td>
+                        <td style={{ textAlign: 'right' }}>{formatAmount(item.taxAmount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+
+
+
 
             <div className="modal-footer">
               <button className="button" onClick={closeCreateModal} disabled={createMut.isPending}>Cancel</button>

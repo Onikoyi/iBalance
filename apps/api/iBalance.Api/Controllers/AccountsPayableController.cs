@@ -121,10 +121,15 @@ public sealed class AccountsPayableController : ControllerBase
                 Reference = x.InvoiceNumber,
                 x.Description,
                 DebitAmount = 0m,
-                CreditAmount = x.TotalAmount,
-                InvoiceAmount = x.TotalAmount,
+                CreditAmount = x.NetPayableAmount > 0m ? x.NetPayableAmount : x.TotalAmount,
+                InvoiceAmount = x.NetPayableAmount > 0m ? x.NetPayableAmount : x.TotalAmount,
+                BaseAmount = x.TotalAmount,
+                TaxAdditionAmount = x.TaxAdditionAmount,
+                TaxDeductionAmount = x.TaxDeductionAmount,
+                GrossAmount = x.GrossAmount > 0m ? x.GrossAmount : x.TotalAmount,
+                NetPayableAmount = x.NetPayableAmount > 0m ? x.NetPayableAmount : x.TotalAmount,
                 PaymentAmount = 0m,
-                BalanceImpact = x.TotalAmount,
+                BalanceImpact = x.NetPayableAmount > 0m ? x.NetPayableAmount : x.TotalAmount,
                 x.Status
             })
             .ToListAsync(cancellationToken);
@@ -141,6 +146,11 @@ public sealed class AccountsPayableController : ControllerBase
                 DebitAmount = x.Amount,
                 CreditAmount = 0m,
                 InvoiceAmount = 0m,
+                BaseAmount = 0m,
+                TaxAdditionAmount = 0m,
+                TaxDeductionAmount = 0m,
+                GrossAmount = 0m,
+                NetPayableAmount = 0m,
                 PaymentAmount = x.Amount,
                 BalanceImpact = -x.Amount,
                 x.Status
@@ -160,21 +170,30 @@ public sealed class AccountsPayableController : ControllerBase
         {
             runningBalance += (decimal)x.BalanceImpact;
 
-            return new
-            {
-                x.Type,
-                x.DateUtc,
-                x.Reference,
-                x.Description,
-                x.DebitAmount,
-                x.CreditAmount,
-                x.InvoiceAmount,
-                x.PaymentAmount,
-                RunningBalance = runningBalance,
-                x.Status
-            };
+           return new
+                    {
+                        x.Type,
+                        x.DateUtc,
+                        x.Reference,
+                        x.Description,
+                        x.DebitAmount,
+                        x.CreditAmount,
+                        x.InvoiceAmount,
+                        x.BaseAmount,
+                        x.TaxAdditionAmount,
+                        x.TaxDeductionAmount,
+                        x.GrossAmount,
+                        x.NetPayableAmount,
+                        x.PaymentAmount,
+                        RunningBalance = runningBalance,
+                        x.Status
+                    };
         }).ToList();
 
+        var totalBaseAmount = invoices.Sum(x => x.BaseAmount);
+        var totalTaxAdditions = invoices.Sum(x => x.TaxAdditionAmount);
+        var totalTaxDeductions = invoices.Sum(x => x.TaxDeductionAmount);
+        var totalGrossAmount = invoices.Sum(x => x.GrossAmount);
         var totalInvoiced = invoices.Sum(x => x.InvoiceAmount);
         var totalPaid = payments.Sum(x => x.PaymentAmount);
         var closingBalance = totalInvoiced - totalPaid;
@@ -198,6 +217,10 @@ public sealed class AccountsPayableController : ControllerBase
             ToUtc = toUtc,
             TotalInvoices = invoices.Count,
             TotalPayments = payments.Count,
+            TotalBaseAmount = totalBaseAmount,
+            TotalTaxAdditions = totalTaxAdditions,
+            TotalTaxDeductions = totalTaxDeductions,
+            TotalGrossAmount = totalGrossAmount,
             TotalInvoiced = totalInvoiced,
             TotalPaid = totalPaid,
             ClosingBalance = closingBalance,
@@ -311,6 +334,10 @@ public sealed class AccountsPayableController : ControllerBase
                 x.Description,
                 x.Status,
                 x.TotalAmount,
+                x.TaxAdditionAmount,
+                x.TaxDeductionAmount,
+                x.GrossAmount,
+                x.NetPayableAmount,
                 x.AmountPaid,
                 x.BalanceAmount,
                 x.JournalEntryId,
@@ -431,10 +458,111 @@ public sealed class AccountsPayableController : ControllerBase
             invoice.Lines.Add(invoiceLine);
         }
 
-        invoice.RecalculateTotals();
+                // invoice.RecalculateTotals();
+
+        var selectedTaxCodeIds = request.TaxCodeIds?
+            .Where(x => x != Guid.Empty)
+            .Distinct()
+            .ToList() ?? [];
+
+        var purchaseInvoiceTaxLines = new List<PurchaseInvoiceTaxLine>();
+
+        if (selectedTaxCodeIds.Count > 0)
+        {
+            var taxCodes = await dbContext.TaxCodes
+                .AsNoTracking()
+                .Where(x => selectedTaxCodeIds.Contains(x.Id))
+                .OrderBy(x => x.ComponentKind)
+                .ThenBy(x => x.Code)
+                .ToListAsync(cancellationToken);
+
+            if (taxCodes.Count != selectedTaxCodeIds.Count)
+            {
+                return BadRequest(new { Message = "One or more selected tax codes were not found." });
+            }
+
+            var taxableAmount = request.Lines.Sum(x => x.Quantity * x.UnitPrice);
+
+            foreach (var taxCode in taxCodes)
+            {
+                if (!taxCode.IsActive)
+                {
+                    return BadRequest(new
+                    {
+                        Message = "Only active tax codes can be used on a purchase invoice.",
+                        TaxCodeId = taxCode.Id,
+                        taxCode.Code
+                    });
+                }
+
+                if (!taxCode.IsEffectiveOn(request.InvoiceDateUtc))
+                {
+                    return BadRequest(new
+                    {
+                        Message = "One or more selected tax codes are not effective for the invoice date.",
+                        TaxCodeId = taxCode.Id,
+                        taxCode.Code,
+                        taxCode.EffectiveFromUtc,
+                        taxCode.EffectiveToUtc,
+                        request.InvoiceDateUtc
+                    });
+                }
+
+                if (taxCode.TransactionScope != TaxTransactionScope.Both &&
+                    taxCode.TransactionScope != TaxTransactionScope.Purchases)
+                {
+                    return BadRequest(new
+                    {
+                        Message = "One or more selected tax codes cannot be used for purchase invoices.",
+                        TaxCodeId = taxCode.Id,
+                        taxCode.Code,
+                        taxCode.TransactionScope
+                    });
+                }
+
+                var taxAmount = taxCode.CalculateTaxAmount(taxableAmount);
+
+                purchaseInvoiceTaxLines.Add(new PurchaseInvoiceTaxLine(
+                    Guid.NewGuid(),
+                    invoice.Id,
+                    taxCode.Id,
+                    taxCode.ComponentKind,
+                    taxCode.ApplicationMode,
+                    taxCode.TransactionScope,
+                    taxCode.RatePercent,
+                    taxableAmount,
+                    taxAmount,
+                    taxCode.TaxLedgerAccountId,
+                    $"{taxCode.Code} - {taxCode.Name}"));
+            }
+        }
+
+            var totalTaxAdditions = purchaseInvoiceTaxLines
+            .Where(x => x.ApplicationMode == TaxApplicationMode.AddToAmount)
+            .Sum(x => x.TaxAmount);
+
+        var totalTaxDeductions = purchaseInvoiceTaxLines
+            .Where(x => x.ApplicationMode == TaxApplicationMode.DeductFromAmount)
+            .Sum(x => x.TaxAmount);
+
+        invoice.RecalculateTotals(totalTaxAdditions, totalTaxDeductions);
 
         dbContext.PurchaseInvoices.Add(invoice);
+
+        if (purchaseInvoiceTaxLines.Count > 0)
+        {
+            dbContext.PurchaseInvoiceTaxLines.AddRange(purchaseInvoiceTaxLines);
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        //         var totalTaxAdditions = purchaseInvoiceTaxLines
+        //     .Where(x => x.ApplicationMode == TaxApplicationMode.AddToAmount)
+        //     .Sum(x => x.TaxAmount);
+
+        // var totalTaxDeductions = purchaseInvoiceTaxLines
+        //     .Where(x => x.ApplicationMode == TaxApplicationMode.DeductFromAmount)
+        //     .Sum(x => x.TaxAmount);
 
         return Ok(new
         {
@@ -448,12 +576,17 @@ public sealed class AccountsPayableController : ControllerBase
                 invoice.Status,
                 invoice.TotalAmount,
                 invoice.AmountPaid,
-                invoice.BalanceAmount
+                invoice.BalanceAmount,
+                TaxLineCount = purchaseInvoiceTaxLines.Count,
+                TotalTaxAdditions = totalTaxAdditions,
+                TotalTaxDeductions = totalTaxDeductions,
+                invoice.GrossAmount,
+                invoice.NetPayableAmount
             }
         });
     }
 
-    [HttpPost("purchase-invoices/{purchaseInvoiceId:guid}/post")]
+      [HttpPost("purchase-invoices/{purchaseInvoiceId:guid}/post")]
     [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
     public async Task<IActionResult> PostPurchaseInvoice(
         Guid purchaseInvoiceId,
@@ -517,6 +650,37 @@ public sealed class AccountsPayableController : ControllerBase
             });
         }
 
+        var purchaseInvoiceTaxLines = await dbContext.PurchaseInvoiceTaxLines
+            .AsNoTracking()
+            .Where(x => x.PurchaseInvoiceId == invoice.Id)
+            .OrderBy(x => x.ComponentKind)
+            .ThenBy(x => x.TaxCodeId)
+            .ToListAsync(cancellationToken);
+
+        var totalTaxAdditions = purchaseInvoiceTaxLines
+            .Where(x => x.ApplicationMode == TaxApplicationMode.AddToAmount)
+            .Sum(x => x.TaxAmount);
+
+        var totalTaxDeductions = purchaseInvoiceTaxLines
+            .Where(x => x.ApplicationMode == TaxApplicationMode.DeductFromAmount)
+            .Sum(x => x.TaxAmount);
+
+        var grossInvoiceAmount = invoice.TotalAmount + totalTaxAdditions;
+        var netPayableAmount = grossInvoiceAmount - totalTaxDeductions;
+
+        if (netPayableAmount <= 0m)
+        {
+            return Conflict(new
+            {
+                Message = "Purchase invoice net payable amount must be greater than zero after tax additions and deductions.",
+                PurchaseInvoiceId = purchaseInvoiceId,
+                invoice.TotalAmount,
+                TotalTaxAdditions = totalTaxAdditions,
+                TotalTaxDeductions = totalTaxDeductions,
+                NetPayableAmount = netPayableAmount
+            });
+        }
+
         var postingPeriod = await GetOpenFiscalPeriodForDateAsync(
             dbContext,
             invoice.InvoiceDateUtc,
@@ -532,16 +696,19 @@ public sealed class AccountsPayableController : ControllerBase
         }
 
         var requestedLedgerAccountIds = new[]
-        {
-            request.PayableLedgerAccountId,
-            request.ExpenseLedgerAccountId
-        };
+            {
+                request.PayableLedgerAccountId,
+                request.ExpenseLedgerAccountId
+            }
+            .Concat(purchaseInvoiceTaxLines.Select(x => x.TaxLedgerAccountId))
+            .Distinct()
+            .ToList();
 
         var ledgerAccounts = await dbContext.LedgerAccounts
             .Where(x => requestedLedgerAccountIds.Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, cancellationToken);
 
-        if (ledgerAccounts.Count != requestedLedgerAccountIds.Length)
+        if (ledgerAccounts.Count != requestedLedgerAccountIds.Count)
         {
             return BadRequest(new
             {
@@ -572,6 +739,21 @@ public sealed class AccountsPayableController : ControllerBase
             });
         }
 
+        foreach (var taxLine in purchaseInvoiceTaxLines)
+        {
+            var taxLedgerAccount = ledgerAccounts[taxLine.TaxLedgerAccountId];
+
+            if (!IsPostingReady(taxLedgerAccount))
+            {
+                return BadRequest(new
+                {
+                    Message = "Each tax ledger account must be active, non-header, and posting-enabled.",
+                    taxLedgerAccount.Id,
+                    taxLedgerAccount.Code
+                });
+            }
+        }
+
         var reference = $"AP-{invoice.InvoiceNumber}";
 
         var referenceExists = await dbContext.JournalEntries
@@ -588,6 +770,44 @@ public sealed class AccountsPayableController : ControllerBase
         }
 
         var vendorName = invoice.Vendor?.VendorName ?? "Vendor";
+
+        var journalLines = new List<JournalEntryLine>
+        {
+            new(
+                Guid.NewGuid(),
+                expenseAccount.Id,
+                $"Expense recognition - {invoice.InvoiceNumber}",
+                invoice.TotalAmount,
+                0m)
+        };
+
+        foreach (var taxLine in purchaseInvoiceTaxLines.Where(x => x.ApplicationMode == TaxApplicationMode.AddToAmount))
+        {
+            journalLines.Add(new JournalEntryLine(
+                Guid.NewGuid(),
+                taxLine.TaxLedgerAccountId,
+                $"Purchase tax addition - {invoice.InvoiceNumber} - {taxLine.Description}",
+                taxLine.TaxAmount,
+                0m));
+        }
+
+        foreach (var taxLine in purchaseInvoiceTaxLines.Where(x => x.ApplicationMode == TaxApplicationMode.DeductFromAmount))
+        {
+            journalLines.Add(new JournalEntryLine(
+                Guid.NewGuid(),
+                taxLine.TaxLedgerAccountId,
+                $"Purchase tax deduction - {invoice.InvoiceNumber} - {taxLine.Description}",
+                0m,
+                taxLine.TaxAmount));
+        }
+
+        journalLines.Add(new JournalEntryLine(
+            Guid.NewGuid(),
+            payableAccount.Id,
+            $"Accounts payable - {invoice.InvoiceNumber}",
+            0m,
+            netPayableAmount));
+
         var journalEntry = new JournalEntry(
             Guid.NewGuid(),
             tenantContext.TenantId,
@@ -596,21 +816,7 @@ public sealed class AccountsPayableController : ControllerBase
             $"Purchase invoice posting - {invoice.InvoiceNumber} - {vendorName}",
             JournalEntryStatus.Draft,
             JournalEntryType.Normal,
-            new[]
-            {
-                new JournalEntryLine(
-                    Guid.NewGuid(),
-                    expenseAccount.Id,
-                    $"Expense recognition - {invoice.InvoiceNumber}",
-                    invoice.TotalAmount,
-                    0m),
-                new JournalEntryLine(
-                    Guid.NewGuid(),
-                    payableAccount.Id,
-                    $"Accounts payable - {invoice.InvoiceNumber}",
-                    0m,
-                    invoice.TotalAmount)
-            });
+            journalLines);
 
         var postedAtUtc = DateTime.UtcNow;
         journalEntry.MarkPosted(postedAtUtc);
@@ -629,10 +835,40 @@ public sealed class AccountsPayableController : ControllerBase
                 line.CreditAmount))
             .ToList();
 
+        var taxTransactionLines = purchaseInvoiceTaxLines
+            .Select(taxLine => new TaxTransactionLine(
+                Guid.NewGuid(),
+                tenantContext.TenantId,
+                taxLine.TaxCodeId,
+                invoice.InvoiceDateUtc,
+                "AP",
+                "PurchaseInvoice",
+                invoice.Id,
+                invoice.InvoiceNumber,
+                taxLine.TaxableAmount,
+                taxLine.TaxAmount,
+                taxLine.ComponentKind,
+                taxLine.ApplicationMode,
+                taxLine.TransactionScope,
+                taxLine.RatePercent,
+                taxLine.TaxLedgerAccountId,
+                invoice.VendorId,
+                invoice.Vendor?.VendorCode,
+                invoice.Vendor?.VendorName,
+                taxLine.Description,
+                journalEntry.Id))
+            .ToList();
+
+        invoice.RecalculateTotals(totalTaxAdditions, totalTaxDeductions);
         invoice.MarkPosted(journalEntry.Id);
 
         dbContext.JournalEntries.Add(journalEntry);
         dbContext.LedgerMovements.AddRange(movements);
+
+        if (taxTransactionLines.Count > 0)
+        {
+            dbContext.TaxTransactionLines.AddRange(taxTransactionLines);
+        }
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -647,6 +883,11 @@ public sealed class AccountsPayableController : ControllerBase
                 invoice.TotalAmount,
                 invoice.AmountPaid,
                 invoice.BalanceAmount,
+                TaxLineCount = purchaseInvoiceTaxLines.Count,
+                TotalTaxAdditions = totalTaxAdditions,
+                TotalTaxDeductions = totalTaxDeductions,
+                GrossInvoiceAmount = grossInvoiceAmount,
+                NetPayableAmount = netPayableAmount,
                 invoice.JournalEntryId,
                 invoice.PostedOnUtc
             },
@@ -817,6 +1058,10 @@ public sealed class AccountsPayableController : ControllerBase
                 InvoiceDescription = payment.PurchaseInvoice != null ? payment.PurchaseInvoice.Description : string.Empty,
                 InvoiceDateUtc = payment.PurchaseInvoice != null ? payment.PurchaseInvoice.InvoiceDateUtc : (DateTime?)null,
                 InvoiceTotalAmount = payment.PurchaseInvoice != null ? payment.PurchaseInvoice.TotalAmount : 0m,
+                InvoiceTaxAdditionAmount = payment.PurchaseInvoice != null ? payment.PurchaseInvoice.TaxAdditionAmount : 0m,
+                InvoiceTaxDeductionAmount = payment.PurchaseInvoice != null ? payment.PurchaseInvoice.TaxDeductionAmount : 0m,
+                InvoiceGrossAmount = payment.PurchaseInvoice != null ? payment.PurchaseInvoice.GrossAmount : 0m,
+                InvoiceNetPayableAmount = payment.PurchaseInvoice != null ? payment.PurchaseInvoice.NetPayableAmount : 0m,
                 InvoiceAmountPaid = payment.PurchaseInvoice != null ? payment.PurchaseInvoice.AmountPaid : 0m,
                 InvoiceBalanceAmount = payment.PurchaseInvoice != null ? payment.PurchaseInvoice.BalanceAmount : 0m,
                 payment.PaymentDateUtc,
@@ -932,9 +1177,23 @@ public sealed class AccountsPayableController : ControllerBase
             return BadRequest(new { Message = "Only posted or part-paid purchase invoices can receive vendor payments." });
         }
 
-        if (request.Amount > invoice.BalanceAmount)
+               var taxAwareBalanceAmount = await GetPurchaseInvoiceTaxAwareBalanceAsync(
+            dbContext,
+            invoice,
+            cancellationToken);
+
+        if (request.Amount > taxAwareBalanceAmount)
         {
-            return BadRequest(new { Message = "Payment amount cannot exceed the outstanding invoice balance." });
+            return BadRequest(new
+            {
+                Message = "Payment amount cannot exceed the outstanding tax-adjusted purchase invoice balance.",
+                InvoiceNumber = invoice.InvoiceNumber,
+                invoice.TotalAmount,
+                invoice.AmountPaid,
+                BaseBalanceAmount = invoice.BalanceAmount,
+                TaxAdjustedBalanceAmount = taxAwareBalanceAmount,
+                RequestedPaymentAmount = request.Amount
+            });
         }
 
         var normalizedPaymentNumber = request.PaymentNumber.Trim().ToUpperInvariant();
@@ -1265,9 +1524,23 @@ public sealed class AccountsPayableController : ControllerBase
             return Conflict(new { Message = "The linked purchase invoice is not eligible for payment posting." });
         }
 
-        if (payment.Amount > invoice.BalanceAmount)
+               var taxAwareBalanceAmount = await GetPurchaseInvoiceTaxAwareBalanceAsync(
+            dbContext,
+            invoice,
+            cancellationToken);
+
+        if (payment.Amount > taxAwareBalanceAmount)
         {
-            return Conflict(new { Message = "Payment amount cannot exceed the outstanding invoice balance." });
+            return Conflict(new
+            {
+                Message = "Payment amount cannot exceed the outstanding tax-adjusted purchase invoice balance.",
+                InvoiceNumber = invoice.InvoiceNumber,
+                invoice.TotalAmount,
+                invoice.AmountPaid,
+                BaseBalanceAmount = invoice.BalanceAmount,
+                TaxAdjustedBalanceAmount = taxAwareBalanceAmount,
+                PaymentAmount = payment.Amount
+            });
         }
 
         var postingPeriod = await GetOpenFiscalPeriodForDateAsync(
@@ -1411,7 +1684,8 @@ public sealed class AccountsPayableController : ControllerBase
                 invoice.Status,
                 invoice.TotalAmount,
                 invoice.AmountPaid,
-                invoice.BalanceAmount
+                invoice.BalanceAmount,
+                TaxAdjustedBalanceAmount = Math.Max(0m, taxAwareBalanceAmount - payment.Amount)
             },
             JournalEntry = new
             {
@@ -1433,6 +1707,37 @@ public sealed class AccountsPayableController : ControllerBase
                !ledgerAccount.IsHeader &&
                ledgerAccount.IsPostingAllowed;
     }
+
+
+    private static async Task<decimal> GetPurchaseInvoiceTaxAwareBalanceAsync(
+        ApplicationDbContext dbContext,
+        PurchaseInvoice invoice,
+        CancellationToken cancellationToken)
+    {
+        var taxLines = await dbContext.PurchaseInvoiceTaxLines
+            .AsNoTracking()
+            .Where(x => x.PurchaseInvoiceId == invoice.Id)
+            .Select(x => new
+            {
+                x.ApplicationMode,
+                x.TaxAmount
+            })
+            .ToListAsync(cancellationToken);
+
+        var totalTaxAdditions = taxLines
+            .Where(x => x.ApplicationMode == TaxApplicationMode.AddToAmount)
+            .Sum(x => x.TaxAmount);
+
+        var totalTaxDeductions = taxLines
+            .Where(x => x.ApplicationMode == TaxApplicationMode.DeductFromAmount)
+            .Sum(x => x.TaxAmount);
+
+        var netPayableAmount = invoice.TotalAmount + totalTaxAdditions - totalTaxDeductions;
+
+        return netPayableAmount - invoice.AmountPaid;
+    }
+
+
 
     private static async Task<FiscalPeriod?> GetOpenFiscalPeriodForDateAsync(
         ApplicationDbContext dbContext,
@@ -1510,11 +1815,12 @@ public sealed class AccountsPayableController : ControllerBase
         decimal UnitPrice);
 
     public sealed record CreatePurchaseInvoiceRequest(
-        Guid VendorId,
-        DateTime InvoiceDateUtc,
-        string InvoiceNumber,
-        string Description,
-        List<CreatePurchaseInvoiceLineRequest> Lines);
+    Guid VendorId,
+    DateTime InvoiceDateUtc,
+    string InvoiceNumber,
+    string Description,
+    List<CreatePurchaseInvoiceLineRequest> Lines,
+    List<Guid>? TaxCodeIds);
 
     public sealed record PostPurchaseInvoiceRequest(
         Guid PayableLedgerAccountId,

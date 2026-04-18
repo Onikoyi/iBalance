@@ -2,15 +2,18 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createLedgerAccount,
+  createTaxCode,
   getAccounts,
   getCompanyLogoDataUrl,
   getLedgerAccountStatement,
+  getTaxCodes,
   getTenantKey,
   getTenantLogoDataUrl,
   getTenantReadableError,
   updateLedgerAccount,
   type LedgerAccountDto,
   type LedgerAccountStatementResponse,
+  type TaxCodeDto,
 } from '../lib/api';
 import { canManageFinanceSetup, canViewFinance } from '../lib/auth';
 
@@ -28,6 +31,33 @@ function categoryLabel(value: number) {
 function normalBalanceLabel(value: number) {
   return value === 1 ? 'Debit' : 'Credit';
 }
+
+function taxComponentKindLabel(value: number) {
+  switch (value) {
+    case 1: return 'VAT';
+    case 2: return 'WHT';
+    case 3: return 'Other';
+    default: return 'Unknown';
+  }
+}
+
+function taxApplicationModeLabel(value: number) {
+  switch (value) {
+    case 1: return 'Add to Amount';
+    case 2: return 'Deduct from Amount';
+    default: return 'Unknown';
+  }
+}
+
+function taxTransactionScopeLabel(value: number) {
+  switch (value) {
+    case 1: return 'Sales';
+    case 2: return 'Purchases';
+    case 3: return 'Both';
+    default: return 'Unknown';
+  }
+}
+
 
 function formatAmount(value: number) {
   return new Intl.NumberFormat('en-NG', {
@@ -84,6 +114,21 @@ type EditFormState = {
   isHeader: boolean;
 };
 
+type TaxCodeFormState = {
+  code: string;
+  name: string;
+  description: string;
+  componentKind: number;
+  applicationMode: number;
+  transactionScope: number;
+  ratePercent: string;
+  taxLedgerAccountId: string;
+  isActive: boolean;
+  effectiveFromDate: string;
+  effectiveToDate: string;
+};
+
+
 type UploadRow = {
   code: string;
   name: string;
@@ -117,6 +162,22 @@ const emptyEditForm: EditFormState = {
   isCashOrBankAccount: false,
   isHeader: false,
 };
+
+
+const emptyTaxCodeForm: TaxCodeFormState = {
+  code: '',
+  name: '',
+  description: '',
+  componentKind: 1,
+  applicationMode: 1,
+  transactionScope: 3,
+  ratePercent: '',
+  taxLedgerAccountId: '',
+  isActive: true,
+  effectiveFromDate: new Date().toISOString().slice(0, 10),
+  effectiveToDate: '',
+};
+
 
 function csvEscape(value: string) {
   if (value.includes(',') || value.includes('"') || value.includes('\n')) {
@@ -596,7 +657,8 @@ export function AccountsPage() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [editForm, setEditForm] = useState<EditFormState>(emptyEditForm);
   const [isUploading, setIsUploading] = useState(false);
-
+  const [showCreateTaxCode, setShowCreateTaxCode] = useState(false);
+  const [taxCodeForm, setTaxCodeForm] = useState<TaxCodeFormState>(emptyTaxCodeForm);
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [statementFromDate, setStatementFromDate] = useState('');
   const [statementToDate, setStatementToDate] = useState('');
@@ -624,10 +686,25 @@ export function AccountsPage() {
     enabled: canView,
   });
 
+  const taxCodesQ = useQuery({
+    queryKey: ['tax-codes'],
+    queryFn: () => getTaxCodes(null, null, null),
+    enabled: canView,
+  });
+
   const headerAccounts = useMemo(() => {
     const items = data?.items ?? [];
     return items.filter((x) => x.isHeader).sort((a, b) => a.code.localeCompare(b.code));
   }, [data?.items]);
+
+
+  const postingAccounts = useMemo(() => {
+    const items = data?.items ?? [];
+    return items
+      .filter((x) => x.isActive && !x.isHeader && x.isPostingAllowed)
+      .sort((a, b) => a.code.localeCompare(b.code));
+  }, [data?.items]);
+
 
   const accountSummary = useMemo(() => {
     const items = data?.items ?? [];
@@ -750,12 +827,31 @@ export function AccountsPage() {
     },
   });
 
+  const createTaxCodeMut = useMutation({
+    mutationFn: createTaxCode,
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['tax-codes'] });
+      setShowCreateTaxCode(false);
+      setTaxCodeForm(emptyTaxCodeForm);
+      setErrorText('');
+      setInfoText('The tax code has been created successfully.');
+    },
+    onError: (e) => {
+      setErrorText(getTenantReadableError(e, 'We could not create the tax code at this time.'));
+      setInfoText('');
+    },
+  });
+
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((s) => ({ ...s, [key]: value }));
   }
 
   function updateEdit<K extends keyof EditFormState>(key: K, value: EditFormState[K]) {
     setEditForm((s) => ({ ...s, [key]: value }));
+  }
+
+  function updateTaxCodeForm<K extends keyof TaxCodeFormState>(key: K, value: TaxCodeFormState[K]) {
+    setTaxCodeForm((s) => ({ ...s, [key]: value }));
   }
 
   function openModal() {
@@ -804,6 +900,27 @@ export function AccountsPage() {
       setShowEdit(false);
       setErrorText('');
       setEditForm(emptyEditForm);
+    }
+  }
+
+  function openTaxCodeModal() {
+    if (!canManage) {
+      setErrorText('You have view access only on this page.');
+      setInfoText('');
+      return;
+    }
+
+    setErrorText('');
+    setInfoText('');
+    setTaxCodeForm(emptyTaxCodeForm);
+    setShowCreateTaxCode(true);
+  }
+
+  function closeTaxCodeModal() {
+    if (!createTaxCodeMut.isPending) {
+      setShowCreateTaxCode(false);
+      setErrorText('');
+      setTaxCodeForm(emptyTaxCodeForm);
     }
   }
 
@@ -878,6 +995,56 @@ export function AccountsPage() {
       },
     });
   }
+
+
+  async function submitTaxCode() {
+    setErrorText('');
+    setInfoText('');
+
+    if (!canManage) {
+      setErrorText('You have view access only on this page.');
+      return;
+    }
+
+    if (!taxCodeForm.code.trim() || !taxCodeForm.name.trim()) {
+      setErrorText('Please enter both the tax code and tax name.');
+      return;
+    }
+
+    if (!taxCodeForm.taxLedgerAccountId) {
+      setErrorText('Please select the ledger account that will hold this tax.');
+      return;
+    }
+
+    const ratePercent = Number(taxCodeForm.ratePercent);
+
+    if (Number.isNaN(ratePercent) || ratePercent < 0 || ratePercent > 100) {
+      setErrorText('Tax rate must be a number between 0 and 100.');
+      return;
+    }
+
+    if (!taxCodeForm.effectiveFromDate) {
+      setErrorText('Effective From date is required.');
+      return;
+    }
+
+    await createTaxCodeMut.mutateAsync({
+      code: taxCodeForm.code.trim(),
+      name: taxCodeForm.name.trim(),
+      description: taxCodeForm.description.trim() || null,
+      componentKind: taxCodeForm.componentKind,
+      applicationMode: taxCodeForm.applicationMode,
+      transactionScope: taxCodeForm.transactionScope,
+      ratePercent,
+      taxLedgerAccountId: taxCodeForm.taxLedgerAccountId,
+      isActive: taxCodeForm.isActive,
+      effectiveFromUtc: new Date(`${taxCodeForm.effectiveFromDate}T00:00:00`).toISOString(),
+      effectiveToUtc: taxCodeForm.effectiveToDate
+        ? new Date(`${taxCodeForm.effectiveToDate}T23:59:59`).toISOString()
+        : null,
+    });
+  }
+
 
   function downloadTemplate() {
     const content = buildTemplateCsv();
@@ -1085,12 +1252,12 @@ export function AccountsPage() {
     return <div className="panel error-panel">You do not have access to view the chart of accounts.</div>;
   }
 
-  if (isLoading) {
-    return <div className="panel">Loading chart of accounts...</div>;
+  if (isLoading || taxCodesQ.isLoading) {
+    return <div className="panel">Loading finance setup...</div>;
   }
 
-  if (error || !data) {
-    return <div className="panel error-panel">We could not load the chart of accounts at this time.</div>;
+  if (error || taxCodesQ.error || !data || !taxCodesQ.data) {
+    return <div className="panel error-panel">We could not load finance setup at this time.</div>;
   }
 
   return (
@@ -1166,6 +1333,76 @@ export function AccountsPage() {
           </div>
         ) : null}
       </section>
+
+
+      <section className="panel no-print">
+        <div className="section-heading">
+          <div>
+            <h2>VAT / WHT / Other Tax Setup</h2>
+            <span className="muted">
+              Configure setup-driven tax codes for VAT, withholding tax, and other levies.
+            </span>
+          </div>
+
+          {canManage ? (
+            <button className="button primary" onClick={openTaxCodeModal}>
+              New Tax Code
+            </button>
+          ) : null}
+        </div>
+
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Name</th>
+                <th>Kind</th>
+                <th>Mode</th>
+                <th>Scope</th>
+                <th style={{ textAlign: 'right' }}>Rate %</th>
+                <th>Tax Ledger</th>
+                <th>Effective From</th>
+                <th>Effective To</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {taxCodesQ.data.items.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="muted">
+                    No tax codes have been configured yet.
+                  </td>
+                </tr>
+              ) : (
+                taxCodesQ.data.items.map((item: TaxCodeDto) => (
+                  <tr key={item.id}>
+                    <td>{item.code}</td>
+                    <td>
+                      <div>{item.name}</div>
+                      <div className="muted">{item.description || '—'}</div>
+                    </td>
+                    <td>{taxComponentKindLabel(item.componentKind)}</td>
+                    <td>{taxApplicationModeLabel(item.applicationMode)}</td>
+                    <td>{taxTransactionScopeLabel(item.transactionScope)}</td>
+                    <td style={{ textAlign: 'right' }}>{formatAmount(item.ratePercent)}</td>
+                    <td>
+                      {item.taxLedgerAccountCode
+                        ? `${item.taxLedgerAccountCode} - ${item.taxLedgerAccountName}`
+                        : '—'}
+                    </td>
+                    <td>{formatDisplayDate(item.effectiveFromUtc)}</td>
+                    <td>{formatDisplayDate(item.effectiveToUtc)}</td>
+                    <td>{item.isActive ? 'Active' : 'Inactive'}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+
 
       <section className="panel no-print">
       <div className="section-heading">
@@ -1801,6 +2038,159 @@ export function AccountsPage() {
           </div>
         </div>
       ) : null}
+
+      {showCreateTaxCode ? (
+        <div className="modal-backdrop" onMouseDown={closeTaxCodeModal}>
+          <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Create tax code</h2>
+              <button className="button ghost" onClick={closeTaxCodeModal} aria-label="Close">✕</button>
+            </div>
+
+            {errorText ? <div className="error-panel">{errorText}</div> : null}
+
+            <div className="form-grid two">
+              <div className="form-row">
+                <label>Tax Code</label>
+                <input
+                  className="input"
+                  value={taxCodeForm.code}
+                  onChange={(e) => updateTaxCodeForm('code', e.target.value)}
+                  placeholder="Example: VAT7.5"
+                />
+              </div>
+
+              <div className="form-row">
+                <label>Tax Name</label>
+                <input
+                  className="input"
+                  value={taxCodeForm.name}
+                  onChange={(e) => updateTaxCodeForm('name', e.target.value)}
+                  placeholder="Example: VAT 7.5%"
+                />
+              </div>
+
+              <div className="form-row" style={{ gridColumn: '1 / -1' }}>
+                <label>Description</label>
+                <input
+                  className="input"
+                  value={taxCodeForm.description}
+                  onChange={(e) => updateTaxCodeForm('description', e.target.value)}
+                  placeholder="Optional description"
+                />
+              </div>
+
+              <div className="form-row">
+                <label>Tax Kind</label>
+                <select
+                  className="select"
+                  value={taxCodeForm.componentKind}
+                  onChange={(e) => updateTaxCodeForm('componentKind', Number(e.target.value))}
+                >
+                  <option value={1}>VAT</option>
+                  <option value={2}>WHT</option>
+                  <option value={3}>Other</option>
+                </select>
+              </div>
+
+              <div className="form-row">
+                <label>Application Mode</label>
+                <select
+                  className="select"
+                  value={taxCodeForm.applicationMode}
+                  onChange={(e) => updateTaxCodeForm('applicationMode', Number(e.target.value))}
+                >
+                  <option value={1}>Add to Amount</option>
+                  <option value={2}>Deduct from Amount</option>
+                </select>
+              </div>
+
+              <div className="form-row">
+                <label>Transaction Scope</label>
+                <select
+                  className="select"
+                  value={taxCodeForm.transactionScope}
+                  onChange={(e) => updateTaxCodeForm('transactionScope', Number(e.target.value))}
+                >
+                  <option value={1}>Sales</option>
+                  <option value={2}>Purchases</option>
+                  <option value={3}>Both</option>
+                </select>
+              </div>
+
+              <div className="form-row">
+                <label>Rate Percent</label>
+                <input
+                  className="input"
+                  type="number"
+                  step="0.0001"
+                  value={taxCodeForm.ratePercent}
+                  onChange={(e) => updateTaxCodeForm('ratePercent', e.target.value)}
+                  placeholder="Example: 7.5"
+                />
+              </div>
+
+              <div className="form-row" style={{ gridColumn: '1 / -1' }}>
+                <label>Tax Ledger Account</label>
+                <select
+                  className="select"
+                  value={taxCodeForm.taxLedgerAccountId}
+                  onChange={(e) => updateTaxCodeForm('taxLedgerAccountId', e.target.value)}
+                >
+                  <option value="">— Select Tax Ledger Account —</option>
+                  {postingAccounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.code} - {account.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-row">
+                <label>Effective From</label>
+                <input
+                  className="input"
+                  type="date"
+                  value={taxCodeForm.effectiveFromDate}
+                  onChange={(e) => updateTaxCodeForm('effectiveFromDate', e.target.value)}
+                />
+              </div>
+
+              <div className="form-row">
+                <label>Effective To</label>
+                <input
+                  className="input"
+                  type="date"
+                  value={taxCodeForm.effectiveToDate}
+                  onChange={(e) => updateTaxCodeForm('effectiveToDate', e.target.value)}
+                />
+              </div>
+
+              <div className="form-row">
+                <label>Status</label>
+                <label className="muted" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={taxCodeForm.isActive}
+                    onChange={(e) => updateTaxCodeForm('isActive', e.target.checked)}
+                  />
+                  Active
+                </label>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button className="button" onClick={closeTaxCodeModal} disabled={createTaxCodeMut.isPending}>
+                Cancel
+              </button>
+              <button className="button primary" onClick={submitTaxCode} disabled={createTaxCodeMut.isPending}>
+                {createTaxCodeMut.isPending ? 'Creating…' : 'Create Tax Code'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
     </div>
   );
 }

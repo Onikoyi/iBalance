@@ -5,9 +5,12 @@ import {
   getAccounts,
   getCustomers,
   getSalesInvoices,
+  getTaxCodes,
   getTenantReadableError,
   postSalesInvoice,
+  previewTaxCalculation,
   type CreateSalesInvoiceRequest,
+  type TaxCodeDto,
 } from '../lib/api';
 import { canCreateJournals, canViewFinance } from '../lib/auth';
 
@@ -23,6 +26,7 @@ type InvoiceFormState = {
   invoiceNumber: string;
   description: string;
   lines: LineForm[];
+  taxCodeIds: string[];
 };
 
 const emptyForm: InvoiceFormState = {
@@ -37,6 +41,7 @@ const emptyForm: InvoiceFormState = {
       unitPrice: '',
     },
   ],
+  taxCodeIds: [],
 };
 
 function formatUtcDate(value?: string | null) {
@@ -70,6 +75,31 @@ function invoiceStatusLabel(value: number) {
   }
 }
 
+function taxComponentKindLabel(value: number) {
+  switch (value) {
+    case 1:
+      return 'VAT';
+    case 2:
+      return 'WHT';
+    case 3:
+      return 'Other';
+    default:
+      return 'Unknown';
+  }
+}
+
+function taxApplicationModeLabel(value: number) {
+  switch (value) {
+    case 1:
+      return 'Add to Amount';
+    case 2:
+      return 'Deduct from Amount';
+    default:
+      return 'Unknown';
+  }
+}
+
+
 function parseDecimal(value: string) {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
@@ -102,6 +132,12 @@ export function SalesInvoicesPage() {
   const accountsQ = useQuery({
     queryKey: ['accounts'],
     queryFn: getAccounts,
+    enabled: canView,
+  });
+
+  const taxCodesQ = useQuery({
+    queryKey: ['tax-codes', 'sales', 'active'],
+    queryFn: () => getTaxCodes(null, 1, true),
     enabled: canView,
   });
 
@@ -148,6 +184,32 @@ export function SalesInvoicesPage() {
       invoiceTotal,
     };
   }, [form.lines]);
+
+const taxPreviewQ = useQuery({
+    queryKey: [
+      'sales-tax-preview',
+      form.invoiceDateUtc,
+      totals.invoiceTotal,
+      form.taxCodeIds,
+    ],
+    queryFn: () =>
+      previewTaxCalculation({
+        transactionDateUtc: new Date(`${form.invoiceDateUtc}T00:00:00`).toISOString(),
+        transactionScope: 1,
+        taxableAmount: totals.invoiceTotal,
+        taxCodeIds: form.taxCodeIds,
+      }),
+    enabled:
+      canView &&
+      !!form.invoiceDateUtc &&
+      totals.invoiceTotal > 0 &&
+      form.taxCodeIds.length > 0,
+  });
+
+  const totalTaxAdditions = taxPreviewQ.data?.totalAdditions ?? 0;
+  const totalTaxDeductions = taxPreviewQ.data?.totalDeductions ?? 0;
+  const grossAmount = taxPreviewQ.data?.grossAmount ?? totals.invoiceTotal;
+  const netReceivableAmount = taxPreviewQ.data?.netAmount ?? totals.invoiceTotal;
 
   const createMut = useMutation({
     mutationFn: (payload: CreateSalesInvoiceRequest) => createSalesInvoice(payload),
@@ -221,6 +283,15 @@ export function SalesInvoicesPage() {
     });
   }
 
+  function toggleTaxCode(taxCodeId: string, checked: boolean) {
+    setForm((state) => ({
+      ...state,
+      taxCodeIds: checked
+        ? [...state.taxCodeIds, taxCodeId]
+        : state.taxCodeIds.filter((id) => id !== taxCodeId),
+    }));
+  }
+
   function submit() {
     setMessage('');
 
@@ -283,6 +354,7 @@ export function SalesInvoicesPage() {
         quantity: parseDecimal(line.quantity),
         unitPrice: parseDecimal(line.unitPrice),
       })),
+      taxCodeIds: form.taxCodeIds,
     });
   }
 
@@ -498,6 +570,103 @@ export function SalesInvoicesPage() {
           </div>
         </div>
 
+
+                <div style={{ marginTop: 16 }}>
+          <div className="section-heading">
+            <h2>VAT / WHT / Other Taxes</h2>
+            <span className="muted">Select setup-driven tax codes for this sales invoice</span>
+          </div>
+
+          <div className="panel" style={{ marginBottom: 16 }}>
+            {taxCodesQ.isLoading ? (
+              <div className="muted">Loading tax codes...</div>
+            ) : taxCodesQ.isError || !taxCodesQ.data ? (
+              <div className="error-panel">Unable to load tax codes.</div>
+            ) : taxCodesQ.data.items.length === 0 ? (
+              <div className="muted">No active sales tax codes have been configured.</div>
+            ) : (
+              <div className="detail-stack">
+                {taxCodesQ.data.items.map((taxCode: TaxCodeDto) => {
+                  const checked = form.taxCodeIds.includes(taxCode.id);
+
+                  return (
+                    <label
+                      key={taxCode.id}
+                      className="muted"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        marginBottom: 8,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => toggleTaxCode(taxCode.id, e.target.checked)}
+                      />
+                      <span>
+                        {taxCode.code} - {taxCode.name}
+                        {' '}({taxComponentKindLabel(taxCode.componentKind)}, {taxApplicationModeLabel(taxCode.applicationMode)}, {formatAmount(taxCode.ratePercent)}%)
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="kv">
+            <div className="kv-row">
+              <span>Base Invoice Amount</span>
+              <span>{formatAmount(totals.invoiceTotal)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Tax Additions</span>
+              <span>{formatAmount(totalTaxAdditions)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Tax Deductions</span>
+              <span>{formatAmount(totalTaxDeductions)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Gross Amount</span>
+              <span>{formatAmount(grossAmount)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Net Receivable Amount</span>
+              <span>{formatAmount(netReceivableAmount)}</span>
+            </div>
+          </div>
+
+          {taxPreviewQ.data?.items?.length ? (
+            <div className="table-wrap" style={{ marginTop: 12 }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Tax Code</th>
+                    <th>Kind</th>
+                    <th>Mode</th>
+                    <th style={{ textAlign: 'right' }}>Rate %</th>
+                    <th style={{ textAlign: 'right' }}>Tax Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {taxPreviewQ.data.items.map((item) => (
+                    <tr key={item.taxCodeId}>
+                      <td>{item.code}</td>
+                      <td>{taxComponentKindLabel(item.componentKind)}</td>
+                      <td>{taxApplicationModeLabel(item.applicationMode)}</td>
+                      <td style={{ textAlign: 'right' }}>{formatAmount(item.ratePercent)}</td>
+                      <td style={{ textAlign: 'right' }}>{formatAmount(item.taxAmount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </div>
+
         <div className="inline-actions" style={{ justifyContent: 'space-between', marginTop: 16 }}>
           <button className="button" onClick={() => setForm(emptyForm)}>
             Reset Form
@@ -589,8 +758,24 @@ export function SalesInvoicesPage() {
                   <span>{invoiceStatusLabel(invoice.status)}</span>
                 </div>
                 <div className="kv-row">
-                  <span>Total Amount</span>
+                  <span>Base Amount</span>
                   <span>{formatAmount(invoice.totalAmount)}</span>
+                </div>
+                <div className="kv-row">
+                  <span>Tax Additions</span>
+                  <span>{formatAmount(invoice.taxAdditionAmount || 0)}</span>
+                </div>
+                <div className="kv-row">
+                  <span>Tax Deductions</span>
+                  <span>{formatAmount(invoice.taxDeductionAmount || 0)}</span>
+                </div>
+                <div className="kv-row">
+                  <span>Gross Amount</span>
+                  <span>{formatAmount(invoice.grossAmount || invoice.totalAmount)}</span>
+                </div>
+                <div className="kv-row">
+                  <span>Net Receivable Amount</span>
+                  <span>{formatAmount(invoice.netReceivableAmount || invoice.totalAmount)}</span>
                 </div>
                 <div className="kv-row">
                   <span>Amount Paid</span>

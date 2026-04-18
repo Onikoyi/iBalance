@@ -51,6 +51,17 @@ function vendorPaymentStatusLabel(value: number) {
   }
 }
 
+function purchaseInvoiceStatusLabel(value: number) {
+  switch (value) {
+    case 1: return 'Draft';
+    case 2: return 'Posted';
+    case 3: return 'Part Paid';
+    case 4: return 'Paid';
+    case 5: return 'Cancelled';
+    default: return 'Unknown';
+  }
+}
+
 export function VendorPaymentsPage() {
   const qc = useQueryClient();
   const canView = canViewFinance();
@@ -206,7 +217,7 @@ export function VendorPaymentsPage() {
 
   const eligibleInvoices = useMemo(() => {
     return (purchaseInvoicesQ.data?.items ?? []).filter(
-      (x) => x.status === 2 || x.status === 3
+      (x) => (x.status === 2 || x.status === 3) && Number(x.balanceAmount || 0) > 0
     );
   }, [purchaseInvoicesQ.data?.items]);
 
@@ -214,6 +225,11 @@ export function VendorPaymentsPage() {
     if (!form.vendorId) return eligibleInvoices;
     return eligibleInvoices.filter((x) => x.vendorId === form.vendorId);
   }, [eligibleInvoices, form.vendorId]);
+
+
+  const selectedInvoice = useMemo(() => {
+    return (purchaseInvoicesQ.data?.items ?? []).find((x) => x.id === form.purchaseInvoiceId) ?? null;
+  }, [purchaseInvoicesQ.data?.items, form.purchaseInvoiceId]);
 
   function update<K extends keyof CreateVendorPaymentRequest>(key: K, value: CreateVendorPaymentRequest[K]) {
     setForm((s) => ({ ...s, [key]: value }));
@@ -347,6 +363,11 @@ export function VendorPaymentsPage() {
 
     if (!form.paymentDateUtc) {
       setErrorText('Payment date is required.');
+      return;
+    }
+
+    if (selectedInvoice && Number(form.amount || 0) > Number(selectedInvoice.balanceAmount || 0)) {
+      setErrorText('Payment amount cannot exceed the outstanding tax-adjusted purchase invoice balance.');
       return;
     }
 
@@ -614,7 +635,7 @@ export function VendorPaymentsPage() {
                   <option value="">— Select Purchase Invoice —</option>
                   {filteredEligibleInvoices.map((invoice) => (
                     <option key={invoice.id} value={invoice.id}>
-                      {invoice.invoiceNumber} - {invoice.vendorName} - Balance {formatAmount(invoice.balanceAmount)}
+                      {invoice.invoiceNumber} - {invoice.vendorName} - Outstanding {formatAmount(invoice.balanceAmount)}
                     </option>
                   ))}
                 </select>
@@ -661,6 +682,52 @@ export function VendorPaymentsPage() {
                 />
               </div>
             </div>
+
+
+
+            {selectedInvoice ? (
+          <div className="kv" style={{ marginTop: 16, marginBottom: 16 }}>
+            <div className="kv-row">
+              <span>Selected Invoice</span>
+              <span>{selectedInvoice.invoiceNumber}</span>
+            </div>
+            <div className="kv-row">
+              <span>Invoice Status</span>
+              <span>{purchaseInvoiceStatusLabel(selectedInvoice.status)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Base Amount</span>
+              <span>{formatAmount(selectedInvoice.totalAmount)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Tax Additions</span>
+              <span>{formatAmount(selectedInvoice.taxAdditionAmount || 0)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Tax Deductions</span>
+              <span>{formatAmount(selectedInvoice.taxDeductionAmount || 0)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Gross Amount</span>
+              <span>{formatAmount(selectedInvoice.grossAmount || selectedInvoice.totalAmount)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Net Payable Amount</span>
+              <span>{formatAmount(selectedInvoice.netPayableAmount || selectedInvoice.totalAmount)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Amount Paid</span>
+              <span>{formatAmount(selectedInvoice.amountPaid)}</span>
+            </div>
+            <div className="kv-row">
+              <span>Outstanding Balance</span>
+              <span>{formatAmount(selectedInvoice.balanceAmount)}</span>
+            </div>
+          </div>
+        ) : null}
+
+
+
 
             <div className="modal-footer">
               <button className="button" onClick={closeCreateModal} disabled={createMut.isPending}>Cancel</button>
