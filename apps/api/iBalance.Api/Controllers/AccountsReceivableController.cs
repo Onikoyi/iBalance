@@ -171,6 +171,13 @@ public sealed class AccountsReceivableController : ControllerBase
                 x.BalanceAmount,
                 x.JournalEntryId,
                 x.PostedOnUtc,
+                x.SubmittedBy,
+                x.SubmittedOnUtc,
+                x.ApprovedBy,
+                x.ApprovedOnUtc,
+                x.RejectedBy,
+                x.RejectedOnUtc,
+                x.RejectionReason,
                 LineCount = x.Lines.Count
             })
             .ToListAsync(cancellationToken);
@@ -416,6 +423,739 @@ public sealed class AccountsReceivableController : ControllerBase
         });
     }
 
+        [HttpPost("sales-invoices/{salesInvoiceId:guid}/submit")]
+    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    public async Task<IActionResult> SubmitSalesInvoiceForApproval(
+        Guid salesInvoiceId,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] ICurrentUserService currentUserService,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        var invoice = await dbContext.SalesInvoices
+            .Include(x => x.Lines)
+            .FirstOrDefaultAsync(x => x.Id == salesInvoiceId, cancellationToken);
+
+        if (invoice is null)
+        {
+            return NotFound(new
+            {
+                Message = "Sales invoice was not found for the current tenant.",
+                SalesInvoiceId = salesInvoiceId
+            });
+        }
+
+        var submittedByUserId = EnsureAuthenticatedUserId(currentUserService);
+
+        try
+        {
+            invoice.RecalculateTotals();
+            invoice.SubmitForApproval(submittedByUserId);
+            invoice.SetAudit(invoice.CreatedBy, submittedByUserId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new
+            {
+                Message = ex.Message,
+                SalesInvoiceId = salesInvoiceId,
+                invoice.Status
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Sales invoice submitted for approval successfully.",
+            Invoice = new
+            {
+                invoice.Id,
+                invoice.InvoiceNumber,
+                invoice.Status,
+                invoice.SubmittedBy,
+                invoice.SubmittedOnUtc
+            }
+        });
+    }
+
+    [HttpPost("sales-invoices/{salesInvoiceId:guid}/approve")]
+    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
+    public async Task<IActionResult> ApproveSalesInvoice(
+        Guid salesInvoiceId,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] ICurrentUserService currentUserService,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        var invoice = await dbContext.SalesInvoices
+            .FirstOrDefaultAsync(x => x.Id == salesInvoiceId, cancellationToken);
+
+        if (invoice is null)
+        {
+            return NotFound(new
+            {
+                Message = "Sales invoice was not found for the current tenant.",
+                SalesInvoiceId = salesInvoiceId
+            });
+        }
+
+        var approvedByUserId = EnsureAuthenticatedUserId(currentUserService);
+
+        try
+        {
+            invoice.Approve(approvedByUserId);
+            invoice.SetAudit(invoice.CreatedBy, approvedByUserId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new
+            {
+                Message = ex.Message,
+                SalesInvoiceId = salesInvoiceId,
+                invoice.Status
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Sales invoice approved successfully.",
+            Invoice = new
+            {
+                invoice.Id,
+                invoice.InvoiceNumber,
+                invoice.Status,
+                invoice.ApprovedBy,
+                invoice.ApprovedOnUtc
+            }
+        });
+    }
+
+    [HttpPost("sales-invoices/{salesInvoiceId:guid}/reject")]
+    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
+    public async Task<IActionResult> RejectSalesInvoice(
+        Guid salesInvoiceId,
+        [FromBody] RejectSalesInvoiceRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] ICurrentUserService currentUserService,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            return BadRequest(new { Message = "Rejection reason is required." });
+        }
+
+        var invoice = await dbContext.SalesInvoices
+            .FirstOrDefaultAsync(x => x.Id == salesInvoiceId, cancellationToken);
+
+        if (invoice is null)
+        {
+            return NotFound(new
+            {
+                Message = "Sales invoice was not found for the current tenant.",
+                SalesInvoiceId = salesInvoiceId
+            });
+        }
+
+        var rejectedByUserId = EnsureAuthenticatedUserId(currentUserService);
+
+        try
+        {
+            invoice.Reject(rejectedByUserId, request.Reason);
+            invoice.SetAudit(invoice.CreatedBy, rejectedByUserId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new
+            {
+                Message = ex.Message,
+                SalesInvoiceId = salesInvoiceId,
+                invoice.Status
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Sales invoice rejected successfully.",
+            Invoice = new
+            {
+                invoice.Id,
+                invoice.InvoiceNumber,
+                invoice.Status,
+                invoice.RejectedBy,
+                invoice.RejectedOnUtc,
+                invoice.RejectionReason
+            }
+        });
+    }
+
+
+    [HttpGet("sales-invoices/rejected")]
+public async Task<IActionResult> GetRejectedSalesInvoices(
+    [FromServices] ApplicationDbContext dbContext,
+    [FromServices] ITenantContextAccessor tenantContextAccessor,
+    CancellationToken cancellationToken)
+{
+    var tenantContext = tenantContextAccessor.Current;
+
+    if (!tenantContext.IsAvailable)
+    {
+        return BadRequest(new
+        {
+            Message = "Tenant context is required.",
+            RequiredHeader = "X-Tenant-Key"
+        });
+    }
+
+    var invoices = await dbContext.SalesInvoices
+        .AsNoTracking()
+        .Include(x => x.Customer)
+        .Include(x => x.Lines)
+        .Where(x => x.Status == SalesInvoiceStatus.Rejected)
+        .OrderByDescending(x => x.RejectedOnUtc)
+        .ThenByDescending(x => x.CreatedOnUtc)
+        .ToListAsync(cancellationToken);
+
+    var userNames = await GetUserDisplayNamesAsync(
+        dbContext,
+        invoices.SelectMany(invoice => new[]
+        {
+            invoice.CreatedBy,
+            invoice.LastModifiedBy,
+            invoice.SubmittedBy,
+            invoice.ApprovedBy,
+            invoice.RejectedBy
+        }),
+        cancellationToken);
+
+    var invoiceIds = invoices.Select(x => x.Id).ToList();
+
+    var taxLines = await dbContext.SalesInvoiceTaxLines
+        .AsNoTracking()
+        .Where(x => invoiceIds.Contains(x.SalesInvoiceId))
+        .OrderBy(x => x.ComponentKind)
+        .ThenBy(x => x.Description)
+        .ToListAsync(cancellationToken);
+
+    var taxLinesByInvoiceId = taxLines
+        .GroupBy(x => x.SalesInvoiceId)
+        .ToDictionary(x => x.Key, x => x.ToList());
+
+    var items = invoices.Select(x =>
+    {
+        taxLinesByInvoiceId.TryGetValue(x.Id, out var invoiceTaxLines);
+
+        return new
+        {
+            x.Id,
+            x.CustomerId,
+            CustomerCode = x.Customer != null ? x.Customer.CustomerCode : string.Empty,
+            CustomerName = x.Customer != null ? x.Customer.CustomerName : string.Empty,
+            x.InvoiceDateUtc,
+            x.InvoiceNumber,
+            x.Description,
+            x.Status,
+            x.TotalAmount,
+            x.TaxAdditionAmount,
+            x.TaxDeductionAmount,
+            x.GrossAmount,
+            x.NetReceivableAmount,
+            x.AmountPaid,
+            x.BalanceAmount,
+            x.JournalEntryId,
+            x.PostedOnUtc,
+            x.SubmittedBy,
+            SubmittedByDisplayName = ResolveUserDisplayName(x.SubmittedBy, userNames),
+            x.SubmittedOnUtc,
+            x.ApprovedBy,
+            ApprovedByDisplayName = ResolveUserDisplayName(x.ApprovedBy, userNames),
+            x.ApprovedOnUtc,
+            x.RejectedBy,
+            RejectedByDisplayName = ResolveUserDisplayName(x.RejectedBy, userNames),
+            x.RejectedOnUtc,
+            x.RejectionReason,
+            x.CreatedOnUtc,
+            x.CreatedBy,
+            CreatedByDisplayName = ResolveUserDisplayName(x.CreatedBy, userNames),
+            PreparedByDisplayName = ResolveUserDisplayName(x.CreatedBy, userNames),
+            x.LastModifiedOnUtc,
+            x.LastModifiedBy,
+            LastModifiedByDisplayName = ResolveUserDisplayName(x.LastModifiedBy, userNames),
+            Lines = x.Lines
+                .OrderBy(line => line.CreatedOnUtc)
+                .Select(line => new
+                {
+                    line.Id,
+                    line.Description,
+                    line.Quantity,
+                    line.UnitPrice,
+                    line.LineTotal
+                })
+                .ToList(),
+            TaxLines = (invoiceTaxLines ?? new List<SalesInvoiceTaxLine>())
+                .Select(taxLine => new
+                {
+                    taxLine.Id,
+                    taxLine.TaxCodeId,
+                    taxLine.ComponentKind,
+                    taxLine.ApplicationMode,
+                    taxLine.TransactionScope,
+                    taxLine.RatePercent,
+                    taxLine.TaxableAmount,
+                    taxLine.TaxAmount,
+                    taxLine.TaxLedgerAccountId,
+                    taxLine.Description
+                })
+                .ToList()
+        };
+    }).ToList();
+
+    return Ok(new
+    {
+        TenantContextAvailable = true,
+        TenantId = tenantContext.TenantId,
+        TenantKey = tenantContext.TenantKey,
+        Count = items.Count,
+        Items = items
+    });
+}
+
+
+[HttpPut("sales-invoices/{salesInvoiceId:guid}")]
+[Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+public async Task<IActionResult> UpdateRejectedSalesInvoice(
+    Guid salesInvoiceId,
+    [FromBody] UpdateSalesInvoiceRequest request,
+    [FromServices] ApplicationDbContext dbContext,
+    [FromServices] ITenantContextAccessor tenantContextAccessor,
+    [FromServices] ICurrentUserService currentUserService,
+    CancellationToken cancellationToken)
+{
+    var tenantContext = tenantContextAccessor.Current;
+
+    if (!tenantContext.IsAvailable)
+    {
+        return BadRequest(new
+        {
+            Message = "Tenant context is required.",
+            RequiredHeader = "X-Tenant-Key"
+        });
+    }
+
+    var invoice = await dbContext.SalesInvoices
+        .Include(x => x.Lines)
+        .FirstOrDefaultAsync(x => x.Id == salesInvoiceId, cancellationToken);
+
+    if (invoice is null)
+    {
+        return NotFound(new
+        {
+            Message = "Sales invoice was not found for the current tenant.",
+            SalesInvoiceId = salesInvoiceId
+        });
+    }
+
+    if (invoice.Status != SalesInvoiceStatus.Rejected)
+    {
+        return Conflict(new
+        {
+            Message = "Only rejected sales invoices can be edited.",
+            SalesInvoiceId = salesInvoiceId,
+            invoice.Status
+        });
+    }
+
+    if (invoice.JournalEntryId.HasValue || invoice.PostedOnUtc.HasValue)
+    {
+        return Conflict(new
+        {
+            Message = "Posted sales invoices cannot be edited.",
+            SalesInvoiceId = salesInvoiceId,
+            invoice.JournalEntryId,
+            invoice.PostedOnUtc
+        });
+    }
+
+    if (request.CustomerId == Guid.Empty)
+    {
+        return BadRequest(new { Message = "Customer is required." });
+    }
+
+    if (string.IsNullOrWhiteSpace(request.InvoiceNumber))
+    {
+        return BadRequest(new { Message = "Invoice number is required." });
+    }
+
+    if (string.IsNullOrWhiteSpace(request.Description))
+    {
+        return BadRequest(new { Message = "Invoice description is required." });
+    }
+
+    if (request.Lines is null || request.Lines.Count == 0)
+    {
+        return BadRequest(new { Message = "At least one sales invoice line is required." });
+    }
+
+    foreach (var line in request.Lines)
+    {
+        if (string.IsNullOrWhiteSpace(line.Description))
+        {
+            return BadRequest(new { Message = "Each sales invoice line must have a description." });
+        }
+
+        if (line.Quantity <= 0)
+        {
+            return BadRequest(new { Message = "Each sales invoice line quantity must be greater than zero." });
+        }
+
+        if (line.UnitPrice < 0)
+        {
+            return BadRequest(new { Message = "Sales invoice line unit price cannot be negative." });
+        }
+    }
+
+    var customer = await dbContext.Customers
+        .FirstOrDefaultAsync(x => x.Id == request.CustomerId, cancellationToken);
+
+    if (customer is null)
+    {
+        return NotFound(new { Message = "The selected customer was not found." });
+    }
+
+    if (!customer.IsActive)
+    {
+        return BadRequest(new { Message = "The selected customer is inactive." });
+    }
+
+    var normalizedInvoiceNumber = request.InvoiceNumber.Trim().ToUpperInvariant();
+
+    var duplicateExists = await dbContext.SalesInvoices
+        .AnyAsync(
+            x => x.Id != salesInvoiceId &&
+                 x.InvoiceNumber == normalizedInvoiceNumber,
+            cancellationToken);
+
+    if (duplicateExists)
+    {
+        return Conflict(new { Message = "A sales invoice with the same number already exists." });
+    }
+
+    var selectedTaxCodeIds = request.TaxCodeIds?
+        .Where(x => x != Guid.Empty)
+        .Distinct()
+        .ToList() ?? new List<Guid>();
+
+    var salesInvoiceTaxLines = new List<SalesInvoiceTaxLine>();
+
+    if (selectedTaxCodeIds.Count > 0)
+    {
+        var taxCodes = await dbContext.TaxCodes
+            .AsNoTracking()
+            .Where(x => selectedTaxCodeIds.Contains(x.Id))
+            .OrderBy(x => x.ComponentKind)
+            .ThenBy(x => x.Code)
+            .ToListAsync(cancellationToken);
+
+        if (taxCodes.Count != selectedTaxCodeIds.Count)
+        {
+            return BadRequest(new { Message = "One or more selected tax codes were not found." });
+        }
+
+        var taxableAmount = request.Lines.Sum(x => x.Quantity * x.UnitPrice);
+
+        foreach (var taxCode in taxCodes)
+        {
+            if (!taxCode.IsActive)
+            {
+                return BadRequest(new
+                {
+                    Message = "Only active tax codes can be used on a sales invoice.",
+                    TaxCodeId = taxCode.Id,
+                    taxCode.Code
+                });
+            }
+
+            if (!taxCode.IsEffectiveOn(request.InvoiceDateUtc))
+            {
+                return BadRequest(new
+                {
+                    Message = "One or more selected tax codes are not effective for the invoice date.",
+                    TaxCodeId = taxCode.Id,
+                    taxCode.Code,
+                    taxCode.EffectiveFromUtc,
+                    taxCode.EffectiveToUtc,
+                    request.InvoiceDateUtc
+                });
+            }
+
+            if (taxCode.TransactionScope != TaxTransactionScope.Both &&
+                taxCode.TransactionScope != TaxTransactionScope.Sales)
+            {
+                return BadRequest(new
+                {
+                    Message = "One or more selected tax codes cannot be used for sales invoices.",
+                    TaxCodeId = taxCode.Id,
+                    taxCode.Code,
+                    taxCode.TransactionScope
+                });
+            }
+
+            var taxAmount = taxCode.CalculateTaxAmount(taxableAmount);
+
+            salesInvoiceTaxLines.Add(new SalesInvoiceTaxLine(
+                Guid.NewGuid(),
+                invoice.Id,
+                taxCode.Id,
+                taxCode.ComponentKind,
+                taxCode.ApplicationMode,
+                taxCode.TransactionScope,
+                taxCode.RatePercent,
+                taxableAmount,
+                taxAmount,
+                taxCode.TaxLedgerAccountId,
+                $"{taxCode.Code} - {taxCode.Name}"));
+        }
+    }
+
+    try
+    {
+        invoice.CorrectRejectedInvoice(
+            request.CustomerId,
+            request.InvoiceDateUtc,
+            normalizedInvoiceNumber,
+            request.Description,
+            currentUserService.UserId);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Conflict(new
+        {
+            Message = ex.Message,
+            SalesInvoiceId = salesInvoiceId,
+            invoice.Status
+        });
+    }
+    catch (ArgumentException ex)
+    {
+        return BadRequest(new { Message = ex.Message });
+    }
+
+    var existingInvoiceLines = invoice.Lines.ToList();
+
+    if (existingInvoiceLines.Count > 0)
+    {
+        dbContext.SalesInvoiceLines.RemoveRange(existingInvoiceLines);
+        invoice.Lines.Clear();
+    }
+
+    foreach (var line in request.Lines)
+    {
+        var invoiceLine = new SalesInvoiceLine(
+            Guid.NewGuid(),
+            tenantContext.TenantId,
+            invoice.Id,
+            line.Description.Trim(),
+            line.Quantity,
+            line.UnitPrice);
+
+        invoiceLine.SetAudit(currentUserService.UserId, currentUserService.UserId);
+
+        dbContext.SalesInvoiceLines.Add(invoiceLine);
+        invoice.Lines.Add(invoiceLine);
+    }
+
+    var existingTaxLines = await dbContext.SalesInvoiceTaxLines
+        .Where(x => x.SalesInvoiceId == invoice.Id)
+        .ToListAsync(cancellationToken);
+
+    if (existingTaxLines.Count > 0)
+    {
+        dbContext.SalesInvoiceTaxLines.RemoveRange(existingTaxLines);
+    }
+
+    if (salesInvoiceTaxLines.Count > 0)
+    {
+        dbContext.SalesInvoiceTaxLines.AddRange(salesInvoiceTaxLines);
+    }
+
+    var totalTaxAdditions = salesInvoiceTaxLines
+        .Where(x => x.ApplicationMode == TaxApplicationMode.AddToAmount)
+        .Sum(x => x.TaxAmount);
+
+    var totalTaxDeductions = salesInvoiceTaxLines
+        .Where(x => x.ApplicationMode == TaxApplicationMode.DeductFromAmount)
+        .Sum(x => x.TaxAmount);
+
+    invoice.RecalculateTotals(totalTaxAdditions, totalTaxDeductions);
+
+    try
+    {
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+    catch (DbUpdateException ex)
+    {
+        return Conflict(new
+        {
+            Message = "Rejected sales invoice could not be updated because of a database constraint or relationship issue.",
+            Detail = ex.InnerException?.Message ?? ex.Message,
+            SalesInvoiceId = salesInvoiceId
+        });
+    }
+
+    return Ok(new
+    {
+        Message = "Rejected sales invoice updated successfully.",
+        Invoice = new
+        {
+            invoice.Id,
+            invoice.InvoiceNumber,
+            invoice.Description,
+            invoice.InvoiceDateUtc,
+            invoice.Status,
+            invoice.TotalAmount,
+            invoice.TaxAdditionAmount,
+            invoice.TaxDeductionAmount,
+            invoice.GrossAmount,
+            invoice.NetReceivableAmount,
+            invoice.AmountPaid,
+            invoice.BalanceAmount,
+            invoice.RejectionReason,
+            invoice.LastModifiedBy,
+            invoice.LastModifiedOnUtc,
+            TaxLineCount = salesInvoiceTaxLines.Count
+        }
+    });
+}
+
+
+[HttpDelete("sales-invoices/{salesInvoiceId:guid}")]
+[Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+public async Task<IActionResult> DeleteRejectedSalesInvoice(
+    Guid salesInvoiceId,
+    [FromServices] ApplicationDbContext dbContext,
+    [FromServices] ITenantContextAccessor tenantContextAccessor,
+    CancellationToken cancellationToken)
+{
+    var tenantContext = tenantContextAccessor.Current;
+
+    if (!tenantContext.IsAvailable)
+    {
+        return BadRequest(new
+        {
+            Message = "Tenant context is required.",
+            RequiredHeader = "X-Tenant-Key"
+        });
+    }
+
+    var invoice = await dbContext.SalesInvoices
+        .Include(x => x.Lines)
+        .FirstOrDefaultAsync(x => x.Id == salesInvoiceId, cancellationToken);
+
+    if (invoice is null)
+    {
+        return NotFound(new
+        {
+            Message = "Sales invoice was not found for the current tenant.",
+            SalesInvoiceId = salesInvoiceId
+        });
+    }
+
+    if (invoice.Status != SalesInvoiceStatus.Rejected)
+    {
+        return Conflict(new
+        {
+            Message = "Only rejected sales invoices can be deleted.",
+            SalesInvoiceId = salesInvoiceId,
+            invoice.Status
+        });
+    }
+
+    if (invoice.JournalEntryId.HasValue || invoice.PostedOnUtc.HasValue)
+    {
+        return Conflict(new
+        {
+            Message = "Posted sales invoices cannot be deleted.",
+            SalesInvoiceId = salesInvoiceId,
+            invoice.JournalEntryId,
+            invoice.PostedOnUtc
+        });
+    }
+
+    var taxLines = await dbContext.SalesInvoiceTaxLines
+        .Where(x => x.SalesInvoiceId == invoice.Id)
+        .ToListAsync(cancellationToken);
+
+    if (taxLines.Count > 0)
+    {
+        dbContext.SalesInvoiceTaxLines.RemoveRange(taxLines);
+    }
+
+    dbContext.SalesInvoiceLines.RemoveRange(invoice.Lines);
+    dbContext.SalesInvoices.Remove(invoice);
+
+    await dbContext.SaveChangesAsync(cancellationToken);
+
+    return Ok(new
+    {
+        Message = "Rejected sales invoice deleted successfully.",
+        SalesInvoiceId = salesInvoiceId
+    });
+}
+
+
+
+
+
     [HttpPost("sales-invoices/{salesInvoiceId:guid}/post")]
     [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
     public async Task<IActionResult> PostSalesInvoice(
@@ -460,15 +1200,15 @@ public sealed class AccountsReceivableController : ControllerBase
             });
         }
 
-        if (invoice.Status != SalesInvoiceStatus.Draft)
-        {
-            return Conflict(new
+        if (invoice.Status != SalesInvoiceStatus.Approved)
             {
-                Message = "Only draft sales invoices can be posted.",
-                SalesInvoiceId = salesInvoiceId,
-                invoice.Status
-            });
-        }
+                return Conflict(new
+                {
+                    Message = "Only approved sales invoices can be posted.",
+                    SalesInvoiceId = salesInvoiceId,
+                    invoice.Status
+                });
+            }
 
         if (invoice.TotalAmount <= 0m)
         {
@@ -644,7 +1384,7 @@ public sealed class AccountsReceivableController : ControllerBase
             invoice.InvoiceDateUtc,
             reference,
             $"Sales invoice posting - {invoice.InvoiceNumber} - {customerName}",
-            JournalEntryStatus.Draft,
+            JournalEntryStatus.Approved,
             JournalEntryType.Normal,
             journalLines);
 
@@ -937,6 +1677,356 @@ public sealed class AccountsReceivableController : ControllerBase
             }
         });
     }
+
+    [HttpGet("customer-receipts/rejected")]
+public async Task<IActionResult> GetRejectedCustomerReceipts(
+    [FromServices] ApplicationDbContext dbContext,
+    [FromServices] ITenantContextAccessor tenantContextAccessor,
+    CancellationToken cancellationToken)
+{
+    var tenantContext = tenantContextAccessor.Current;
+
+    if (!tenantContext.IsAvailable)
+    {
+        return BadRequest(new
+        {
+            Message = "Tenant context is required.",
+            RequiredHeader = "X-Tenant-Key"
+        });
+    }
+
+    var receipts = await dbContext.CustomerReceipts
+        .AsNoTracking()
+        .Include(x => x.Customer)
+        .Include(x => x.SalesInvoice)
+        .Where(x => x.Status == CustomerReceiptStatus.Rejected)
+        .OrderByDescending(x => x.RejectedOnUtc)
+        .ThenByDescending(x => x.CreatedOnUtc)
+        .ToListAsync(cancellationToken);
+
+    var userNames = await GetUserDisplayNamesAsync(
+        dbContext,
+        receipts.SelectMany(receipt => new[]
+        {
+            receipt.CreatedBy,
+            receipt.LastModifiedBy,
+            receipt.SubmittedBy,
+            receipt.ApprovedBy,
+            receipt.RejectedBy
+        }),
+        cancellationToken);
+
+    var items = receipts.Select(x => new
+    {
+        x.Id,
+        x.CustomerId,
+        CustomerCode = x.Customer != null ? x.Customer.CustomerCode : string.Empty,
+        CustomerName = x.Customer != null ? x.Customer.CustomerName : string.Empty,
+        x.SalesInvoiceId,
+        InvoiceNumber = x.SalesInvoice != null ? x.SalesInvoice.InvoiceNumber : string.Empty,
+        InvoiceDescription = x.SalesInvoice != null ? x.SalesInvoice.Description : string.Empty,
+        InvoiceDateUtc = x.SalesInvoice != null ? x.SalesInvoice.InvoiceDateUtc : (DateTime?)null,
+        InvoiceTotalAmount = x.SalesInvoice != null ? x.SalesInvoice.TotalAmount : 0m,
+        InvoiceTaxAdditionAmount = x.SalesInvoice != null ? x.SalesInvoice.TaxAdditionAmount : 0m,
+        InvoiceTaxDeductionAmount = x.SalesInvoice != null ? x.SalesInvoice.TaxDeductionAmount : 0m,
+        InvoiceGrossAmount = x.SalesInvoice != null ? x.SalesInvoice.GrossAmount : 0m,
+        InvoiceNetReceivableAmount = x.SalesInvoice != null ? x.SalesInvoice.NetReceivableAmount : 0m,
+        InvoiceAmountPaid = x.SalesInvoice != null ? x.SalesInvoice.AmountPaid : 0m,
+        InvoiceBalanceAmount = x.SalesInvoice != null ? x.SalesInvoice.BalanceAmount : 0m,
+        x.ReceiptDateUtc,
+        x.ReceiptNumber,
+        x.Description,
+        x.Amount,
+        x.Status,
+        x.PostingRequiresApproval,
+        x.SubmittedBy,
+        SubmittedByDisplayName = ResolveUserDisplayName(x.SubmittedBy, userNames),
+        x.SubmittedOnUtc,
+        x.ApprovedBy,
+        ApprovedByDisplayName = ResolveUserDisplayName(x.ApprovedBy, userNames),
+        x.ApprovedOnUtc,
+        x.RejectedBy,
+        RejectedByDisplayName = ResolveUserDisplayName(x.RejectedBy, userNames),
+        x.RejectedOnUtc,
+        x.RejectionReason,
+        x.CreatedOnUtc,
+        x.CreatedBy,
+        CreatedByDisplayName = ResolveUserDisplayName(x.CreatedBy, userNames),
+        PreparedByDisplayName = ResolveUserDisplayName(x.CreatedBy, userNames),
+        x.LastModifiedOnUtc,
+        x.LastModifiedBy,
+        LastModifiedByDisplayName = ResolveUserDisplayName(x.LastModifiedBy, userNames),
+        x.JournalEntryId,
+        x.PostedOnUtc
+    }).ToList();
+
+    return Ok(new
+    {
+        TenantContextAvailable = true,
+        TenantId = tenantContext.TenantId,
+        TenantKey = tenantContext.TenantKey,
+        Count = items.Count,
+        Items = items
+    });
+}
+
+
+
+    [HttpPut("customer-receipts/{customerReceiptId:guid}")]
+[Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+public async Task<IActionResult> UpdateRejectedCustomerReceipt(
+    Guid customerReceiptId,
+    [FromBody] UpdateCustomerReceiptRequest request,
+    [FromServices] ApplicationDbContext dbContext,
+    [FromServices] ITenantContextAccessor tenantContextAccessor,
+    [FromServices] ICurrentUserService currentUserService,
+    CancellationToken cancellationToken)
+{
+    var tenantContext = tenantContextAccessor.Current;
+
+    if (!tenantContext.IsAvailable)
+    {
+        return BadRequest(new
+        {
+            Message = "Tenant context is required.",
+            RequiredHeader = "X-Tenant-Key"
+        });
+    }
+
+    var receipt = await dbContext.CustomerReceipts
+        .FirstOrDefaultAsync(x => x.Id == customerReceiptId, cancellationToken);
+
+    if (receipt is null)
+    {
+        return NotFound(new
+        {
+            Message = "Customer receipt was not found for the current tenant.",
+            CustomerReceiptId = customerReceiptId
+        });
+    }
+
+    if (receipt.Status != CustomerReceiptStatus.Rejected)
+    {
+        return Conflict(new
+        {
+            Message = "Only rejected customer receipts can be edited.",
+            CustomerReceiptId = customerReceiptId,
+            receipt.Status
+        });
+    }
+
+    if (receipt.JournalEntryId.HasValue || receipt.PostedOnUtc.HasValue)
+    {
+        return Conflict(new
+        {
+            Message = "Posted customer receipts cannot be edited.",
+            CustomerReceiptId = customerReceiptId,
+            receipt.JournalEntryId,
+            receipt.PostedOnUtc
+        });
+    }
+
+    if (request.CustomerId == Guid.Empty)
+    {
+        return BadRequest(new { Message = "Customer is required." });
+    }
+
+    if (request.SalesInvoiceId == Guid.Empty)
+    {
+        return BadRequest(new { Message = "Sales invoice is required." });
+    }
+
+    if (string.IsNullOrWhiteSpace(request.ReceiptNumber))
+    {
+        return BadRequest(new { Message = "Receipt number is required." });
+    }
+
+    if (string.IsNullOrWhiteSpace(request.Description))
+    {
+        return BadRequest(new { Message = "Receipt description is required." });
+    }
+
+    if (request.Amount <= 0m)
+    {
+        return BadRequest(new { Message = "Receipt amount must be greater than zero." });
+    }
+
+    var customer = await dbContext.Customers
+        .FirstOrDefaultAsync(x => x.Id == request.CustomerId, cancellationToken);
+
+    if (customer is null)
+    {
+        return NotFound(new { Message = "The selected customer was not found." });
+    }
+
+    if (!customer.IsActive)
+    {
+        return BadRequest(new { Message = "The selected customer is inactive." });
+    }
+
+    var invoice = await dbContext.SalesInvoices
+        .FirstOrDefaultAsync(x => x.Id == request.SalesInvoiceId, cancellationToken);
+
+    if (invoice is null)
+    {
+        return NotFound(new { Message = "The selected sales invoice was not found." });
+    }
+
+    if (invoice.CustomerId != request.CustomerId)
+    {
+        return BadRequest(new { Message = "The selected sales invoice does not belong to the selected customer." });
+    }
+
+    if (invoice.Status != SalesInvoiceStatus.Posted && invoice.Status != SalesInvoiceStatus.PartPaid)
+    {
+        return BadRequest(new { Message = "Only posted or part-paid sales invoices can be used for customer receipts." });
+    }
+
+    var normalizedReceiptNumber = request.ReceiptNumber.Trim().ToUpperInvariant();
+
+    var duplicateExists = await dbContext.CustomerReceipts
+        .AnyAsync(
+            x => x.Id != customerReceiptId &&
+                 x.ReceiptNumber == normalizedReceiptNumber,
+            cancellationToken);
+
+    if (duplicateExists)
+    {
+        return Conflict(new { Message = "A customer receipt with the same number already exists." });
+    }
+
+    var taxAwareBalanceAmount = await GetSalesInvoiceTaxAwareBalanceAsync(
+        dbContext,
+        invoice,
+        cancellationToken);
+
+    if (request.Amount > taxAwareBalanceAmount)
+    {
+        return BadRequest(new
+        {
+            Message = "Receipt amount cannot exceed the outstanding tax-adjusted sales invoice balance.",
+            InvoiceNumber = invoice.InvoiceNumber,
+            invoice.TotalAmount,
+            invoice.AmountPaid,
+            BaseBalanceAmount = invoice.BalanceAmount,
+            TaxAdjustedBalanceAmount = taxAwareBalanceAmount,
+            RequestedReceiptAmount = request.Amount
+        });
+    }
+
+    try
+    {
+        receipt.CorrectRejectedReceipt(
+            request.CustomerId,
+            request.SalesInvoiceId,
+            request.ReceiptDateUtc,
+            normalizedReceiptNumber,
+            request.Description,
+            request.Amount,
+            currentUserService.UserId);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Conflict(new
+        {
+            Message = ex.Message,
+            CustomerReceiptId = customerReceiptId,
+            receipt.Status
+        });
+    }
+    catch (ArgumentException ex)
+    {
+        return BadRequest(new { Message = ex.Message });
+    }
+
+    await dbContext.SaveChangesAsync(cancellationToken);
+
+    return Ok(new
+    {
+        Message = "Rejected customer receipt updated successfully.",
+        Receipt = new
+        {
+            receipt.Id,
+            receipt.ReceiptNumber,
+            receipt.Description,
+            receipt.ReceiptDateUtc,
+            receipt.Amount,
+            receipt.Status,
+            receipt.RejectionReason,
+            receipt.LastModifiedBy,
+            receipt.LastModifiedOnUtc
+        }
+    });
+}
+
+
+[HttpDelete("customer-receipts/{customerReceiptId:guid}")]
+[Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+public async Task<IActionResult> DeleteRejectedCustomerReceipt(
+    Guid customerReceiptId,
+    [FromServices] ApplicationDbContext dbContext,
+    [FromServices] ITenantContextAccessor tenantContextAccessor,
+    CancellationToken cancellationToken)
+{
+    var tenantContext = tenantContextAccessor.Current;
+
+    if (!tenantContext.IsAvailable)
+    {
+        return BadRequest(new
+        {
+            Message = "Tenant context is required.",
+            RequiredHeader = "X-Tenant-Key"
+        });
+    }
+
+    var receipt = await dbContext.CustomerReceipts
+        .FirstOrDefaultAsync(x => x.Id == customerReceiptId, cancellationToken);
+
+    if (receipt is null)
+    {
+        return NotFound(new
+        {
+            Message = "Customer receipt was not found for the current tenant.",
+            CustomerReceiptId = customerReceiptId
+        });
+    }
+
+    if (receipt.Status != CustomerReceiptStatus.Rejected)
+    {
+        return Conflict(new
+        {
+            Message = "Only rejected customer receipts can be deleted.",
+            CustomerReceiptId = customerReceiptId,
+            receipt.Status
+        });
+    }
+
+    if (receipt.JournalEntryId.HasValue || receipt.PostedOnUtc.HasValue)
+    {
+        return Conflict(new
+        {
+            Message = "Posted customer receipts cannot be deleted.",
+            CustomerReceiptId = customerReceiptId,
+            receipt.JournalEntryId,
+            receipt.PostedOnUtc
+        });
+    }
+
+    dbContext.CustomerReceipts.Remove(receipt);
+    await dbContext.SaveChangesAsync(cancellationToken);
+
+    return Ok(new
+    {
+        Message = "Rejected customer receipt deleted successfully.",
+        CustomerReceiptId = customerReceiptId
+    });
+}
+
+
+
+
+
+
 
     [HttpPost("customer-receipts")]
     [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
@@ -1458,7 +2548,7 @@ public sealed class AccountsReceivableController : ControllerBase
             receipt.ReceiptDateUtc,
             reference,
             $"Customer receipt posting - {receipt.ReceiptNumber} - {customerName} - {invoiceNumber}",
-            JournalEntryStatus.Draft,
+            JournalEntryStatus.Approved,
             JournalEntryType.Normal,
             new[]
             {
@@ -1674,4 +2764,23 @@ public sealed class AccountsReceivableController : ControllerBase
 
     public sealed record RejectCustomerReceiptRequest(
         string Reason);
+
+    public sealed record RejectSalesInvoiceRequest(
+    string Reason);
+
+    public sealed record UpdateCustomerReceiptRequest(
+    Guid CustomerId,
+    Guid SalesInvoiceId,
+    DateTime ReceiptDateUtc,
+    string ReceiptNumber,
+    string Description,
+    decimal Amount);
+
+    public sealed record UpdateSalesInvoiceRequest(
+    Guid CustomerId,
+    DateTime InvoiceDateUtc,
+    string InvoiceNumber,
+    string Description,
+    List<CreateSalesInvoiceLineRequest> Lines,
+    List<Guid>? TaxCodeIds);
 }

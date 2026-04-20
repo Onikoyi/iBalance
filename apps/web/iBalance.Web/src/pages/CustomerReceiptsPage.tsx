@@ -45,7 +45,7 @@ function formatAmount(value: number) {
   return new Intl.NumberFormat('en-NG', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(value);
+  }).format(value || 0);
 }
 
 function receiptStatusLabel(value: number) {
@@ -72,12 +72,18 @@ function invoiceStatusLabel(value: number) {
     case 1:
       return 'Draft';
     case 2:
-      return 'Posted';
+      return 'Submitted for Approval';
     case 3:
-      return 'Part Paid';
+      return 'Approved';
     case 4:
-      return 'Paid';
+      return 'Posted';
     case 5:
+      return 'Part Paid';
+    case 6:
+      return 'Paid';
+    case 7:
+      return 'Rejected';
+    case 8:
       return 'Cancelled';
     default:
       return 'Unknown';
@@ -136,11 +142,16 @@ export function CustomerReceiptsPage() {
 
   const eligibleInvoices = useMemo(() => {
     const items = invoicesQ.data?.items || [];
-  
+
     return items
       .filter((x) => {
         const belongsToCustomer = !form.customerId || x.customerId === form.customerId;
-        const receivableEligible = x.status === 2 || x.status === 3;
+
+        // SalesInvoiceStatus:
+        // Posted = 4
+        // PartPaid = 5
+        const receivableEligible = x.status === 4 || x.status === 5;
+
         const hasOutstandingBalance = Number(x.balanceAmount || 0) > 0;
         return belongsToCustomer && receivableEligible && hasOutstandingBalance;
       })
@@ -153,11 +164,14 @@ export function CustomerReceiptsPage() {
       .sort((a, b) => `${a.code} ${a.name}`.localeCompare(`${b.code} ${b.name}`));
   }, [accountsQ.data?.items]);
 
+  const visibleReceipts = useMemo(() => {
+    return (receiptsQ.data?.items || []).filter((item) => item.status !== 4);
+  }, [receiptsQ.data?.items]);
+
   const filteredReceipts = useMemo(() => {
-    const items = receiptsQ.data?.items || [];
     const searchText = search.trim().toLowerCase();
 
-    return items.filter((item) => {
+    return visibleReceipts.filter((item) => {
       const matchesSearch =
         !searchText ||
         item.receiptNumber.toLowerCase().includes(searchText) ||
@@ -172,7 +186,7 @@ export function CustomerReceiptsPage() {
 
       return matchesSearch && matchesStatus;
     });
-  }, [receiptsQ.data?.items, search, statusFilter]);
+  }, [visibleReceipts, search, statusFilter]);
 
   const selectedInvoice = useMemo(() => {
     return (invoicesQ.data?.items || []).find((x) => x.id === form.salesInvoiceId) || null;
@@ -180,6 +194,7 @@ export function CustomerReceiptsPage() {
 
   const refreshAll = async () => {
     await qc.invalidateQueries({ queryKey: ['ar-customer-receipts'] });
+    await qc.invalidateQueries({ queryKey: ['ar-rejected-customer-receipts'] });
     await qc.invalidateQueries({ queryKey: ['ar-sales-invoices'] });
     await qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
     await qc.invalidateQueries({ queryKey: ['journal-entries'] });
@@ -411,8 +426,16 @@ export function CustomerReceiptsPage() {
     <div className="page-grid">
       <section className="panel">
         <div className="section-heading">
-          <h2>Customer Receipts</h2>
-          <span className="muted">Receipt register and receivable settlement tracking</span>
+          <div>
+            <h2>Customer Receipts</h2>
+            <span className="muted">Receipt register and receivable settlement tracking</span>
+          </div>
+
+          <div className="inline-actions">
+            <Link to="/customer-receipts/rejected" className="button">
+              Rejected Customer Receipts
+            </Link>
+          </div>
         </div>
 
         {message ? (
@@ -423,7 +446,7 @@ export function CustomerReceiptsPage() {
 
         <div className="inline-actions" style={{ justifyContent: 'space-between', marginBottom: 16 }}>
           <div className="muted">
-            {(receiptsQ.data?.count || 0).toLocaleString()} receipt(s)
+            {visibleReceipts.length.toLocaleString()} active receipt(s)
           </div>
           {!canCreate ? (
             <div className="muted">Read-only access</div>
@@ -448,11 +471,10 @@ export function CustomerReceiptsPage() {
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
-              <option value="all">All Receipts</option>
+              <option value="all">All Active Receipts</option>
               <option value="1">Draft</option>
               <option value="2">Submitted for Approval</option>
               <option value="3">Approved</option>
-              <option value="4">Rejected</option>
               <option value="5">Posted</option>
               <option value="6">Cancelled</option>
             </select>
@@ -496,10 +518,10 @@ export function CustomerReceiptsPage() {
             >
               <option value="">— Select Sales Invoice —</option>
               {eligibleInvoices.map((invoice) => (
-              <option key={invoice.id} value={invoice.id}>
-                {invoice.invoiceNumber} - {invoice.customerName} - Outstanding {formatAmount(invoice.balanceAmount)}
-              </option>
-            ))}
+                <option key={invoice.id} value={invoice.id}>
+                  {invoice.invoiceNumber} - {invoice.customerName} - Outstanding {formatAmount(invoice.balanceAmount)}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -659,7 +681,7 @@ export function CustomerReceiptsPage() {
           {receiptsQ.isLoading ? (
             <div className="muted">Loading customer receipts...</div>
           ) : filteredReceipts.length === 0 ? (
-            <div className="muted">No customer receipts found for the current filter.</div>
+            <div className="muted">No active customer receipts found for the current filter.</div>
           ) : (
             filteredReceipts.map((receipt) => (
               <div key={receipt.id} className="kv" style={{ marginBottom: 12 }}>
@@ -707,16 +729,10 @@ export function CustomerReceiptsPage() {
                   <span>Posted On</span>
                   <span>{formatUtcDate(receipt.postedOnUtc)}</span>
                 </div>
-                {receipt.status === 4 && receipt.rejectionReason ? (
-                  <div className="kv-row">
-                    <span>Rejection Reason</span>
-                    <span>{receipt.rejectionReason}</span>
-                  </div>
-                ) : null}
 
                 <div className="inline-actions" style={{ marginTop: 12, justifyContent: 'space-between' }}>
                   <div className="inline-actions">
-                    {(receipt.status === 1 || receipt.status === 4) ? (
+                    {receipt.status === 1 ? (
                       <button
                         className="button"
                         onClick={() => submitForApproval(receipt.id)}
@@ -736,7 +752,7 @@ export function CustomerReceiptsPage() {
                           {approveMut.isPending && selectedReceiptId === receipt.id ? 'Approving…' : 'Approve'}
                         </button>
                         <button
-                          className="button"
+                          className="button danger"
                           onClick={() => reject(receipt.id)}
                           disabled={rejectMut.isPending || !canApprove}
                         >

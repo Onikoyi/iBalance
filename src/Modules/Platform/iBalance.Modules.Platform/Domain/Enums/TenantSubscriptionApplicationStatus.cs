@@ -4,6 +4,6 @@ public enum TenantSubscriptionApplicationStatus
 {
     PendingPayment = 1,
     PendingVerification = 2,
-    Activated = 3,
-    Rejected = 4
+    Rejected = 3,
+    Activated = 4
 }

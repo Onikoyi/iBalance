@@ -7,11 +7,15 @@ import { JournalsPage } from './pages/JournalsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { CustomersPage } from './pages/CustomersPage';
 import { SalesInvoicesPage } from './pages/SalesInvoicesPage';
+import { RejectedSalesInvoicesPage } from './pages/RejectedSalesInvoicesPage';
 import { CustomerReceiptsPage } from './pages/CustomerReceiptsPage';
 import { CustomerReceiptPrintPage } from './pages/CustomerReceiptPrintPage';
+import { RejectedCustomerReceiptsPage } from './pages/RejectedCustomerReceiptsPage';
 import { VendorsPage } from './pages/VendorsPage';
 import { PurchaseInvoicesPage } from './pages/PurchaseInvoicesPage';
+import { RejectedPurchaseInvoicesPage } from './pages/RejectedPurchaseInvoicesPage';
 import { VendorPaymentsPage } from './pages/VendorPaymentsPage';
+import { RejectedVendorPaymentsPage } from './pages/RejectedVendorPaymentsPage';
 import { VendorPaymentVoucherPrintPage } from './pages/VendorPaymentVoucherPrintPage';
 import { VendorStatementPage } from './pages/VendorStatementPage';
 
@@ -130,6 +134,16 @@ export default function App() {
         }
       />
       <Route
+        path="/sales-invoices/rejected"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <RejectedSalesInvoicesPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
         path="/customer-receipts"
         element={
           <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
@@ -139,6 +153,17 @@ export default function App() {
           </RequireAuth>
         }
       />
+        <Route
+          path="/customer-receipts/rejected"
+          element={
+            <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+              <AppShell>
+                <RejectedCustomerReceiptsPage />
+              </AppShell>
+            </RequireAuth>
+          }
+        />
+
       <Route
         path="/customer-receipts/:customerReceiptId/print"
         element={
@@ -180,6 +205,17 @@ export default function App() {
           </RequireAuth>
         }
       />
+
+      <Route
+        path="/purchase-invoices/rejected"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <RejectedPurchaseInvoicesPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
       <Route
         path="/vendor-payments"
         element={
@@ -190,6 +226,19 @@ export default function App() {
           </RequireAuth>
         }
       />
+
+        <Route
+        path="/vendor-payments/rejected"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <RejectedVendorPaymentsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+
       <Route
         path="/vendor-payments/:vendorPaymentId/voucher"
         element={

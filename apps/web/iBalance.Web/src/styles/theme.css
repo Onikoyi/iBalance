@@ -70,6 +70,68 @@ textarea {
   gap: 28px;
 }
 
+.sidebar-brand {
+  display: grid;
+  gap: 4px;
+  padding: 0 4px 6px;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-width: 0;
+}
+
+.sidebar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sidebar-section > .muted {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 12px !important;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.25;
+  margin-bottom: 4px !important;
+  text-transform: uppercase;
+}
+
+.sidebar-link {
+  display: flex !important;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  transition: 140ms ease;
+}
+
+.sidebar-link:hover,
+.sidebar-link.active {
+  background: rgba(255, 255, 255, 0.13);
+  color: #ffffff;
+}
+
+.sidebar .panel {
+  background: rgba(255, 255, 255, 0.10);
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: none;
+}
+
+.sidebar .panel .muted {
+  color: rgba(255, 255, 255, 0.72);
+}
+
 .brand {
   display: flex;
   align-items: center;

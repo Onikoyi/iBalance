@@ -93,6 +93,20 @@ public sealed class PurchaseInvoice : TenantOwnedEntity
 
     public DateTime? PostedOnUtc { get; private set; }
 
+    public string? SubmittedBy { get; private set; }
+
+    public DateTime? SubmittedOnUtc { get; private set; }
+
+    public string? ApprovedBy { get; private set; }
+
+    public DateTime? ApprovedOnUtc { get; private set; }
+
+    public string? RejectedBy { get; private set; }
+
+    public DateTime? RejectedOnUtc { get; private set; }
+
+    public string? RejectionReason { get; private set; }
+
     public ICollection<PurchaseInvoiceLine> Lines { get; } = new List<PurchaseInvoiceLine>();
 
     public void SetAudit(string? createdBy, string? lastModifiedBy)
@@ -100,6 +114,46 @@ public sealed class PurchaseInvoice : TenantOwnedEntity
         SetCreated(createdBy);
         SetModified(lastModifiedBy);
     }
+
+    public void CorrectRejectedInvoice(
+    Guid vendorId,
+    DateTime invoiceDateUtc,
+    string invoiceNumber,
+    string description,
+    string? modifiedBy)
+{
+    if (Status != PurchaseInvoiceStatus.Rejected)
+    {
+        throw new InvalidOperationException("Only rejected purchase invoices can be corrected.");
+    }
+
+    if (JournalEntryId.HasValue || PostedOnUtc.HasValue)
+    {
+        throw new InvalidOperationException("Posted purchase invoices cannot be corrected.");
+    }
+
+    if (vendorId == Guid.Empty)
+    {
+        throw new ArgumentException("Vendor is required.", nameof(vendorId));
+    }
+
+    if (string.IsNullOrWhiteSpace(invoiceNumber))
+    {
+        throw new ArgumentException("Invoice number is required.", nameof(invoiceNumber));
+    }
+
+    if (string.IsNullOrWhiteSpace(description))
+    {
+        throw new ArgumentException("Invoice description is required.", nameof(description));
+    }
+
+    VendorId = vendorId;
+    InvoiceDateUtc = invoiceDateUtc;
+    InvoiceNumber = invoiceNumber.Trim().ToUpperInvariant();
+    Description = description.Trim();
+
+    SetModified(modifiedBy);
+}
 
     public void RecalculateTotals()
     {
@@ -136,6 +190,77 @@ public sealed class PurchaseInvoice : TenantOwnedEntity
         }
     }
 
+
+public void SubmitForApproval(string submittedBy)
+{
+    if (string.IsNullOrWhiteSpace(submittedBy))
+    {
+        throw new ArgumentException("Submitted by user is required.", nameof(submittedBy));
+    }
+
+    if (Status != PurchaseInvoiceStatus.Draft && Status != PurchaseInvoiceStatus.Rejected)
+    {
+        throw new InvalidOperationException("Only draft or rejected purchase invoices can be submitted for approval.");
+    }
+
+    if (NetPayableAmount <= 0m)
+    {
+        throw new InvalidOperationException("Only purchase invoices with a positive net payable amount can be submitted for approval.");
+    }
+
+    Status = PurchaseInvoiceStatus.SubmittedForApproval;
+    SubmittedBy = submittedBy.Trim();
+    SubmittedOnUtc = DateTime.UtcNow;
+
+    RejectedBy = null;
+    RejectedOnUtc = null;
+    RejectionReason = null;
+}
+
+public void Approve(string approvedBy)
+{
+    if (string.IsNullOrWhiteSpace(approvedBy))
+    {
+        throw new ArgumentException("Approved by user is required.", nameof(approvedBy));
+    }
+
+    if (Status != PurchaseInvoiceStatus.SubmittedForApproval)
+    {
+        throw new InvalidOperationException("Only submitted purchase invoices can be approved.");
+    }
+
+    Status = PurchaseInvoiceStatus.Approved;
+    ApprovedBy = approvedBy.Trim();
+    ApprovedOnUtc = DateTime.UtcNow;
+}
+
+public void Reject(string rejectedBy, string reason)
+{
+    if (string.IsNullOrWhiteSpace(rejectedBy))
+    {
+        throw new ArgumentException("Rejected by user is required.", nameof(rejectedBy));
+    }
+
+    if (string.IsNullOrWhiteSpace(reason))
+    {
+        throw new ArgumentException("Rejection reason is required.", nameof(reason));
+    }
+
+    if (Status != PurchaseInvoiceStatus.SubmittedForApproval)
+    {
+        throw new InvalidOperationException("Only submitted purchase invoices can be rejected.");
+    }
+
+    Status = PurchaseInvoiceStatus.Rejected;
+    RejectedBy = rejectedBy.Trim();
+    RejectedOnUtc = DateTime.UtcNow;
+    RejectionReason = reason.Trim();
+
+    ApprovedBy = null;
+    ApprovedOnUtc = null;
+}
+
+
     public void MarkPosted(Guid journalEntryId)
     {
         if (journalEntryId == Guid.Empty)
@@ -143,9 +268,9 @@ public sealed class PurchaseInvoice : TenantOwnedEntity
             throw new ArgumentException("Journal entry id is required.", nameof(journalEntryId));
         }
 
-        if (Status != PurchaseInvoiceStatus.Draft)
+        if (Status != PurchaseInvoiceStatus.Approved)
         {
-            throw new InvalidOperationException("Only draft purchase invoices can be posted.");
+            throw new InvalidOperationException("Only approved purchase invoices can be posted.");
         }
 
         if (NetPayableAmount <= 0m)

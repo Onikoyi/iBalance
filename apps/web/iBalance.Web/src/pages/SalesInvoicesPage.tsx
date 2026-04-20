@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createSalesInvoice,
@@ -8,6 +9,9 @@ import {
   getTaxCodes,
   getTenantReadableError,
   postSalesInvoice,
+  approveSalesInvoice,
+  rejectSalesInvoice,
+  submitSalesInvoiceForApproval,
   previewTaxCalculation,
   type CreateSalesInvoiceRequest,
   type TaxCodeDto,
@@ -63,12 +67,18 @@ function invoiceStatusLabel(value: number) {
     case 1:
       return 'Draft';
     case 2:
-      return 'Posted';
+      return 'Submitted for Approval';
     case 3:
-      return 'Part Paid';
+      return 'Approved';
     case 4:
-      return 'Paid';
+      return 'Posted';
     case 5:
+      return 'Part Paid';
+    case 6:
+      return 'Paid';
+    case 7:
+      return 'Rejected';
+    case 8:
       return 'Cancelled';
     default:
       return 'Unknown';
@@ -116,6 +126,7 @@ export function SalesInvoicesPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | string>('all');
   const [receivableLedgerAccountId, setReceivableLedgerAccountId] = useState('');
   const [revenueLedgerAccountId, setRevenueLedgerAccountId] = useState('');
+  const [rejectReason, setRejectReason] = useState('');
 
   const customersQ = useQuery({
     queryKey: ['ar-customers'],
@@ -153,6 +164,10 @@ export function SalesInvoicesPage() {
       .sort((a, b) => `${a.code} ${a.name}`.localeCompare(`${b.code} ${b.name}`));
   }, [accountsQ.data?.items]);
 
+  const visibleInvoices = useMemo(() => {
+    return (invoicesQ.data?.items ?? []).filter((item) => item.status !== 7);
+  }, [invoicesQ.data?.items]);
+
   const filteredInvoices = useMemo(() => {
     const items = invoicesQ.data?.items || [];
     const searchText = search.trim().toLowerCase();
@@ -171,7 +186,7 @@ export function SalesInvoicesPage() {
 
       return matchesSearch && matchesStatus;
     });
-  }, [invoicesQ.data?.items, search, statusFilter]);
+  }, [visibleInvoices, search, statusFilter]);
 
   const totals = useMemo(() => {
     const invoiceTotal = form.lines.reduce((sum, line) => {
@@ -220,6 +235,41 @@ const taxPreviewQ = useQuery({
     },
     onError: (error) => {
       setMessage(getTenantReadableError(error, 'Unable to create sales invoice.'));
+    },
+  });
+
+  const submitApprovalMut = useMutation({
+    mutationFn: (salesInvoiceId: string) => submitSalesInvoiceForApproval(salesInvoiceId),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['ar-sales-invoices'] });
+      setMessage('Sales invoice submitted for approval successfully.');
+    },
+    onError: (error) => {
+      setMessage(getTenantReadableError(error, 'Unable to submit sales invoice for approval.'));
+    },
+  });
+  
+  const approveMut = useMutation({
+    mutationFn: (salesInvoiceId: string) => approveSalesInvoice(salesInvoiceId),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['ar-sales-invoices'] });
+      setMessage('Sales invoice approved successfully.');
+    },
+    onError: (error) => {
+      setMessage(getTenantReadableError(error, 'Unable to approve sales invoice.'));
+    },
+  });
+  
+  const rejectMut = useMutation({
+    mutationFn: (salesInvoiceId: string) =>
+      rejectSalesInvoice(salesInvoiceId, { reason: rejectReason.trim() }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['ar-sales-invoices'] });
+      setMessage('Sales invoice rejected successfully.');
+      setRejectReason('');
+    },
+    onError: (error) => {
+      setMessage(getTenantReadableError(error, 'Unable to reject sales invoice.'));
     },
   });
 
@@ -358,6 +408,35 @@ const taxPreviewQ = useQuery({
     });
   }
 
+
+  function submitForApproval(salesInvoiceId: string) {
+    setMessage('');
+  
+    if (!canCreate) {
+      setMessage('You do not have permission to submit sales invoices for approval.');
+      return;
+    }
+  
+    submitApprovalMut.mutate(salesInvoiceId);
+  }
+  
+  function approveInvoice(salesInvoiceId: string) {
+    setMessage('');
+    approveMut.mutate(salesInvoiceId);
+  }
+  
+  function rejectInvoice(salesInvoiceId: string) {
+    setMessage('');
+  
+    if (!rejectReason.trim()) {
+      setMessage('Please enter a rejection reason before rejecting the invoice.');
+      return;
+    }
+  
+    rejectMut.mutate(salesInvoiceId);
+  }
+
+
   function submitPosting(salesInvoiceId: string) {
     setMessage('');
 
@@ -442,15 +521,18 @@ const taxPreviewQ = useQuery({
             >
               <option value="all">All Invoices</option>
               <option value="1">Draft</option>
-              <option value="2">Posted</option>
-              <option value="3">Part Paid</option>
-              <option value="4">Paid</option>
-              <option value="5">Cancelled</option>
+              <option value="2">Submitted for Approval</option>
+              <option value="3">Approved</option>
+              <option value="4">Posted</option>
+              <option value="5">Part Paid</option>
+              <option value="6">Paid</option>
+              <option value="8">Cancelled</option>
             </select>
           </div>
         </div>
       </section>
 
+        
       <section className="panel">
         <div className="section-heading">
           <h2>Create Sales Invoice</h2>
@@ -672,6 +754,11 @@ const taxPreviewQ = useQuery({
             Reset Form
           </button>
 
+          <Link to="/sales-invoices/rejected" className="button">
+           Rejected Sales Invoices
+           </Link>
+
+
           <button
             className="button primary"
             onClick={submit}
@@ -722,6 +809,21 @@ const taxPreviewQ = useQuery({
           </div>
         </div>
       </section>
+
+        
+
+      <div className="form-row" style={{ marginTop: 16, marginBottom: 16 }}>
+          <label>Rejection Reason</label>
+          <input
+            className="input"
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            placeholder="Required only when rejecting a submitted invoice"
+          />
+        </div>
+
+       
+
 
       <section className="panel">
         <div className="section-heading">
@@ -794,17 +896,51 @@ const taxPreviewQ = useQuery({
                   <span>{formatUtcDate(invoice.postedOnUtc)}</span>
                 </div>
 
-                {invoice.status === 1 ? (
-                  <div className="inline-actions" style={{ marginTop: 12 }}>
-                    <button
-                      className="button primary"
-                      onClick={() => submitPosting(invoice.id)}
-                      disabled={postMut.isPending || !canCreate}
-                    >
-                      {postMut.isPending ? 'Posting…' : 'Post Invoice'}
-                    </button>
-                  </div>
-                ) : null}
+                {[1, 2, 3].includes(invoice.status) ? (
+  <div className="inline-actions" style={{ marginTop: 12 }}>
+    {invoice.status === 1 && canCreate ? (
+      <button
+        className="button"
+        onClick={() => submitForApproval(invoice.id)}
+        disabled={submitApprovalMut.isPending}
+      >
+        {submitApprovalMut.isPending ? 'Submitting…' : 'Submit'}
+      </button>
+    ) : null}
+
+    {invoice.status === 2 ? (
+      <>
+        <button
+          className="button"
+          onClick={() => approveInvoice(invoice.id)}
+          disabled={approveMut.isPending}
+        >
+          {approveMut.isPending ? 'Approving…' : 'Approve'}
+        </button>
+
+        <button
+          className="button danger"
+          onClick={() => rejectInvoice(invoice.id)}
+          disabled={rejectMut.isPending}
+        >
+          {rejectMut.isPending ? 'Rejecting…' : 'Reject'}
+        </button>
+      </>
+    ) : null}
+
+    {invoice.status === 3 && canCreate ? (
+      <button
+        className="button primary"
+        onClick={() => submitPosting(invoice.id)}
+        disabled={postMut.isPending || !canCreate}
+      >
+        {postMut.isPending ? 'Posting…' : 'Post Invoice'}
+      </button>
+    ) : null}
+  </div>
+) : null}
+
+
               </div>
             ))
           )}

@@ -132,12 +132,28 @@ export function Sidebar() {
               </NavLink>
 
               <NavLink
+                to="/sales-invoices/rejected"
+                className={({ isActive }) => linkClassName(isActive)}
+                style={linkStyle}
+              >
+                Rejected Sales Invoices
+              </NavLink>
+
+              <NavLink
                 to="/customer-receipts"
                 className={({ isActive }) => linkClassName(isActive)}
                 style={linkStyle}
               >
                 Customer Receipts
               </NavLink>
+
+              <NavLink
+                  to="/customer-receipts/rejected"
+                  className={({ isActive }) => linkClassName(isActive)}
+                  style={linkStyle}
+                >
+                  Rejected Customer Receipts
+                </NavLink>
             </div>
 
             <div className="sidebar-section" style={sectionStyle}>
@@ -162,6 +178,14 @@ export function Sidebar() {
               </NavLink>
 
               <NavLink
+                  to="/purchase-invoices/rejected"
+                  className={({ isActive }) => linkClassName(isActive)}
+                  style={linkStyle}
+                >
+                  Rejected Purchase Invoices
+              </NavLink>
+
+              <NavLink
                 to="/vendor-payments"
                 className={({ isActive }) => linkClassName(isActive)}
                 style={linkStyle}
@@ -169,6 +193,13 @@ export function Sidebar() {
                 Vendor Payments
               </NavLink>
             </div>
+            <NavLink
+                to="/vendor-payments/rejected"
+                className={({ isActive }) => linkClassName(isActive)}
+                style={linkStyle}
+              >
+                Rejected Vendor Payments
+              </NavLink>
 
             <div className="sidebar-section" style={sectionStyle}>
               <div className="muted" style={sectionTitleStyle}>

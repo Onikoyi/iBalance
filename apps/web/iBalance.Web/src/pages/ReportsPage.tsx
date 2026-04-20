@@ -143,10 +143,13 @@ function splitCsvLine(line: string) {
 function invoiceStatusLabel(value: number) {
   switch (value) {
     case 1: return 'Draft';
-    case 2: return 'Posted';
-    case 3: return 'Part Paid';
-    case 4: return 'Paid';
-    case 5: return 'Cancelled';
+    case 2: return 'Submitted for Approval';
+    case 3: return 'Approved';
+    case 4: return 'Posted';
+    case 5: return 'Part Paid';
+    case 6: return 'Paid';
+    case 7: return 'Rejected';
+    case 8: return 'Cancelled';
     default: return 'Unknown';
   }
 }
@@ -154,8 +157,11 @@ function invoiceStatusLabel(value: number) {
 function receiptStatusLabel(value: number) {
   switch (value) {
     case 1: return 'Draft';
-    case 2: return 'Posted';
-    case 3: return 'Cancelled';
+    case 2: return 'Submitted for Approval';
+    case 3: return 'Approved';
+    case 4: return 'Rejected';
+    case 5: return 'Posted';
+    case 6: return 'Cancelled';
     default: return 'Unknown';
   }
 }
@@ -163,10 +169,13 @@ function receiptStatusLabel(value: number) {
 function purchaseInvoiceStatusLabel(value: number) {
   switch (value) {
     case 1: return 'Draft';
-    case 2: return 'Posted';
-    case 3: return 'Part Paid';
-    case 4: return 'Paid';
-    case 5: return 'Cancelled';
+    case 2: return 'Submitted for Approval';
+    case 3: return 'Approved';
+    case 4: return 'Posted';
+    case 5: return 'Part Paid';
+    case 6: return 'Paid';
+    case 7: return 'Rejected';
+    case 8: return 'Cancelled';
     default: return 'Unknown';
   }
 }
@@ -182,6 +191,7 @@ function vendorPaymentStatusLabel(value: number) {
     default: return 'Unknown';
   }
 }
+
 
 function reconciliationStatusLabel(value: number) {
   switch (value) {
@@ -267,6 +277,26 @@ function ReportPrintHeader({ title, subtitle }: ReportHeaderProps) {
         <div className="muted">{subtitle}</div>
       </div>
     </div>
+  );
+}
+
+
+function ReportSectionDivider({
+  title,
+  subtitle,
+}: {
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <section className="panel no-print" style={{ borderLeft: '4px solid rgba(75, 29, 115, 0.35)' }}>
+      <div className="section-heading">
+        <div>
+          <h2>{title}</h2>
+          <div className="muted">{subtitle}</div>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -1058,15 +1088,21 @@ export function ReportsPage() {
       totalCollected: invoices.reduce((sum, item) => sum + Number(item.amountPaid || 0), 0),
       totalOutstanding: invoices.reduce((sum, item) => sum + Number(item.balanceAmount || 0), 0),
       draftInvoiceCount: invoices.filter((item) => item.status === 1).length,
-      postedInvoiceCount: invoices.filter((item) => item.status === 2).length,
-      partPaidInvoiceCount: invoices.filter((item) => item.status === 3).length,
-      paidInvoiceCount: invoices.filter((item) => item.status === 4).length,
-      cancelledInvoiceCount: invoices.filter((item) => item.status === 5).length,
+      submittedInvoiceCount: invoices.filter((item) => item.status === 2).length,
+      approvedInvoiceCount: invoices.filter((item) => item.status === 3).length,
+      postedInvoiceCount: invoices.filter((item) => item.status === 4).length,
+      partPaidInvoiceCount: invoices.filter((item) => item.status === 5).length,
+      paidInvoiceCount: invoices.filter((item) => item.status === 6).length,
+      rejectedInvoiceCount: invoices.filter((item) => item.status === 7).length,
+      cancelledInvoiceCount: invoices.filter((item) => item.status === 8).length,
       totalReceipts: receipts.length,
       totalReceiptAmount: receipts.reduce((sum, item) => sum + Number(item.amount || 0), 0),
       draftReceiptCount: receipts.filter((item) => item.status === 1).length,
-      postedReceiptCount: receipts.filter((item) => item.status === 2).length,
-      cancelledReceiptCount: receipts.filter((item) => item.status === 3).length,
+      submittedReceiptCount: receipts.filter((item) => item.status === 2).length,
+      approvedReceiptCount: receipts.filter((item) => item.status === 3).length,
+      rejectedReceiptCount: receipts.filter((item) => item.status === 4).length,
+      postedReceiptCount: receipts.filter((item) => item.status === 5).length,
+      cancelledReceiptCount: receipts.filter((item) => item.status === 6).length,
     };
   }, [filteredSalesInvoices, filteredCustomerReceipts]);
 
@@ -1080,10 +1116,13 @@ export function ReportsPage() {
       totalPaid: invoices.reduce((sum, item) => sum + Number(item.amountPaid || 0), 0),
       totalOutstanding: invoices.reduce((sum, item) => sum + Number(item.balanceAmount || 0), 0),
       draftInvoiceCount: invoices.filter((item) => item.status === 1).length,
-      postedInvoiceCount: invoices.filter((item) => item.status === 2).length,
-      partPaidInvoiceCount: invoices.filter((item) => item.status === 3).length,
-      paidInvoiceCount: invoices.filter((item) => item.status === 4).length,
-      cancelledInvoiceCount: invoices.filter((item) => item.status === 5).length,
+      submittedInvoiceCount: invoices.filter((item) => item.status === 2).length,
+      approvedInvoiceCount: invoices.filter((item) => item.status === 3).length,
+      postedInvoiceCount: invoices.filter((item) => item.status === 4).length,
+      partPaidInvoiceCount: invoices.filter((item) => item.status === 5).length,
+      paidInvoiceCount: invoices.filter((item) => item.status === 6).length,
+      rejectedInvoiceCount: invoices.filter((item) => item.status === 7).length,
+      cancelledInvoiceCount: invoices.filter((item) => item.status === 8).length,
       totalPayments: payments.length,
       totalPaymentAmount: payments.reduce((sum, item) => sum + Number(item.amount || 0), 0),
       draftPaymentCount: payments.filter((item) => item.status === 1).length,
@@ -2273,7 +2312,7 @@ export function ReportsPage() {
 
   return (
     <div className="reports-grid">
-      <section className="panel no-print">
+<section className="panel no-print">
         <div className="section-heading">
           <div>
             <h2>Report filters</h2>
@@ -2340,197 +2379,111 @@ export function ReportsPage() {
         </div>
       </section>
 
-      <section id="print-trial-balance" className="panel printable-report">
-        <div className="section-heading no-print">
-          <div>
-            <h2>Trial Balance</h2>
-            <span className="muted">{periodText}</span>
-          </div>
-          <button className="button" onClick={printTrialBalanceStandalone}>
-            Print Trial Balance
-          </button>
+      <ReportSectionDivider
+        title="Treasury, Cashbook & Bank Reconciliation"
+        subtitle="Start here for cash/bank positions, detailed cashbook movements, bank reconciliation, statement import, and call-over matching."
+      />
+
+<section id="print-cashbook-summary" className="panel printable-report">
+      <div className="section-heading no-print">
+        <div>
+          <h2>Treasury / Cashbook Summary</h2>
+          <span className="muted">{periodText}</span>
         </div>
+        <button className="button" onClick={printCashbookSummaryStandalone}>
+          Print Treasury Summary
+        </button>
+      </div>
 
-        <ReportPrintHeader title="Trial Balance" subtitle={periodText} />
+      <ReportPrintHeader title="Treasury / Cashbook Summary" subtitle={periodText} />
 
-        <div className="kv" style={{ marginBottom: 16 }}>
-          <div className="kv-row">
-            <span>Reporting Period</span>
-            <span>{periodText.replace('Reporting Period: ', '')}</span>
-          </div>
-          <div className="kv-row">
-            <span>Accounts Included</span>
-            <span>{trialBalance.data.count}</span>
-          </div>
-          <div className="kv-row">
-            <span>Total Debit</span>
-            <span>{formatAmount(trialBalance.data.totalDebit)}</span>
-          </div>
-          <div className="kv-row">
-            <span>Total Credit</span>
-            <span>{formatAmount(trialBalance.data.totalCredit)}</span>
-          </div>
+      <div className="kv" style={{ marginBottom: 16 }}>
+        <div className="kv-row">
+          <span>Reporting Period</span>
+          <span>{periodText.replace('Reporting Period: ', '')}</span>
         </div>
+        <div className="kv-row">
+          <span>Treasury Accounts</span>
+          <span>{cashbookSummary.data.count}</span>
+        </div>
+        <div className="kv-row">
+          <span>Total Opening Balance (Debit)</span>
+          <span>{formatAmount(cashbookSummary.data.totalOpeningBalanceDebit)}</span>
+        </div>
+        <div className="kv-row">
+          <span>Total Opening Balance (Credit)</span>
+          <span>{formatAmount(cashbookSummary.data.totalOpeningBalanceCredit)}</span>
+        </div>
+        <div className="kv-row">
+          <span>Total Period Debit</span>
+          <span>{formatAmount(cashbookSummary.data.totalPeriodDebit)}</span>
+        </div>
+        <div className="kv-row">
+          <span>Total Period Credit</span>
+          <span>{formatAmount(cashbookSummary.data.totalPeriodCredit)}</span>
+        </div>
+        <div className="kv-row">
+          <span>Total Closing Balance (Debit)</span>
+          <span>{formatAmount(cashbookSummary.data.totalClosingBalanceDebit)}</span>
+        </div>
+        <div className="kv-row">
+          <span>Total Closing Balance (Credit)</span>
+          <span>{formatAmount(cashbookSummary.data.totalClosingBalanceCredit)}</span>
+        </div>
+      </div>
 
-        <div className="table-wrap">
-          <table className="data-table report-print-table">
-            <thead>
+      <div className="table-wrap">
+        <table className="data-table report-print-table">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Account Name</th>
+              <th style={{ textAlign: 'right' }}>Opening Debit</th>
+              <th style={{ textAlign: 'right' }}>Opening Credit</th>
+              <th style={{ textAlign: 'right' }}>Period Debit</th>
+              <th style={{ textAlign: 'right' }}>Period Credit</th>
+              <th style={{ textAlign: 'right' }}>Closing Debit</th>
+              <th style={{ textAlign: 'right' }}>Closing Credit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {cashbookSummary.data.items.length === 0 ? (
               <tr>
-                <th>Code</th>
-                <th>Account Name</th>
-                <th style={{ textAlign: 'right' }}>Total Debit</th>
-                <th style={{ textAlign: 'right' }}>Total Credit</th>
-                <th style={{ textAlign: 'right' }}>Balance Debit</th>
-                <th style={{ textAlign: 'right' }}>Balance Credit</th>
+                <td colSpan={8} className="muted">
+                  No treasury accounts were found for the selected reporting period.
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {trialBalance.data.items.map((item) => (
+            ) : (
+              cashbookSummary.data.items.map((item) => (
                 <tr key={item.ledgerAccountId}>
                   <td>{item.code}</td>
                   <td>{item.name}</td>
-                  <td style={{ textAlign: 'right' }}>{formatAmount(item.totalDebit)}</td>
-                  <td style={{ textAlign: 'right' }}>{formatAmount(item.totalCredit)}</td>
-                  <td style={{ textAlign: 'right' }}>{formatAmount(item.balanceDebit)}</td>
-                  <td style={{ textAlign: 'right' }}>{formatAmount(item.balanceCredit)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatAmount(item.openingBalanceDebit)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatAmount(item.openingBalanceCredit)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatAmount(item.periodDebit)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatAmount(item.periodCredit)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatAmount(item.closingBalanceDebit)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatAmount(item.closingBalanceCredit)}</td>
                 </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr>
-                <th colSpan={2}>Total</th>
-                <th style={{ textAlign: 'right' }}>{formatAmount(trialBalance.data.totalDebit)}</th>
-                <th style={{ textAlign: 'right' }}>{formatAmount(trialBalance.data.totalCredit)}</th>
-                <th />
-                <th />
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </section>
+              ))
+            )}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th colSpan={2}>Totals</th>
+              <th style={{ textAlign: 'right' }}>{formatAmount(cashbookSummary.data.totalOpeningBalanceDebit)}</th>
+              <th style={{ textAlign: 'right' }}>{formatAmount(cashbookSummary.data.totalOpeningBalanceCredit)}</th>
+              <th style={{ textAlign: 'right' }}>{formatAmount(cashbookSummary.data.totalPeriodDebit)}</th>
+              <th style={{ textAlign: 'right' }}>{formatAmount(cashbookSummary.data.totalPeriodCredit)}</th>
+              <th style={{ textAlign: 'right' }}>{formatAmount(cashbookSummary.data.totalClosingBalanceDebit)}</th>
+              <th style={{ textAlign: 'right' }}>{formatAmount(cashbookSummary.data.totalClosingBalanceCredit)}</th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
 
-      <section id="print-balance-sheet" className="panel printable-report">
-        <div className="section-heading no-print">
-          <div>
-            <h2>Balance Sheet</h2>
-            <span className="muted">{asAtText}</span>
-          </div>
-          <button className="button" onClick={printBalanceSheetStandalone}>
-            Print Balance Sheet
-          </button>
-        </div>
-
-        <ReportPrintHeader title="Balance Sheet" subtitle={asAtText} />
-
-        <div className="panel no-print" style={{ marginBottom: 16 }}>
-          <div className="muted">{asAtText}</div>
-        </div>
-
-        <div className="report-block">
-          <h3>Assets</h3>
-          {balanceSheet.data.assets.length === 0 ? (
-            <div className="muted">No asset balances available.</div>
-          ) : (
-            balanceSheet.data.assets.map((item) => (
-              <div key={item.ledgerAccountId} className="report-line">
-                <span>{item.code} - {item.name}</span>
-                <strong>{formatAmount(item.balance ?? 0)}</strong>
-              </div>
-            ))
-          )}
-        </div>
-
-        <div className="report-block">
-          <h3>Liabilities</h3>
-          {balanceSheet.data.liabilities.length === 0 ? (
-            <div className="muted">No liability balances available.</div>
-          ) : (
-            balanceSheet.data.liabilities.map((item) => (
-              <div key={item.ledgerAccountId} className="report-line">
-                <span>{item.code} - {item.name}</span>
-                <strong>{formatAmount(item.balance ?? 0)}</strong>
-              </div>
-            ))
-          )}
-        </div>
-
-        <div className="report-block">
-          <h3>Equity</h3>
-          {balanceSheet.data.equity.length === 0 ? (
-            <div className="muted">No equity balances available.</div>
-          ) : (
-            balanceSheet.data.equity.map((item) => (
-              <div key={item.ledgerAccountId} className="report-line">
-                <span>{item.code} - {item.name}</span>
-                <strong>{formatAmount(item.balance ?? 0)}</strong>
-              </div>
-            ))
-          )}
-        </div>
-
-        <div className="report-totals">
-          <div>{asAtText}</div>
-          <div>Total Assets: {formatAmount(balanceSheet.data.totalAssets)}</div>
-          <div>Total Liabilities: {formatAmount(balanceSheet.data.totalLiabilities)}</div>
-          <div>Total Equity: {formatAmount(balanceSheet.data.totalEquity)}</div>
-          <div>Total Liabilities and Equity: {formatAmount(balanceSheet.data.totalLiabilitiesAndEquity)}</div>
-        </div>
-      </section>
-
-      <section id="print-income-statement" className="panel printable-report">
-        <div className="section-heading no-print">
-          <div>
-            <h2>Income Statement</h2>
-            <span className="muted">{periodText}</span>
-          </div>
-          <button className="button" onClick={printIncomeStatementStandalone}>
-            Print Income Statement
-          </button>
-        </div>
-
-        <ReportPrintHeader title="Income Statement" subtitle={periodText} />
-
-        <div className="panel no-print" style={{ marginBottom: 16 }}>
-          <div className="muted">{periodText}</div>
-        </div>
-
-        <div className="report-block">
-          <h3>Income</h3>
-          {incomeStatement.data.income.length === 0 ? (
-            <div className="muted">No income balances available.</div>
-          ) : (
-            incomeStatement.data.income.map((item) => (
-              <div key={item.ledgerAccountId} className="report-line">
-                <span>{item.code} - {item.name}</span>
-                <strong>{formatAmount(item.amount ?? 0)}</strong>
-              </div>
-            ))
-          )}
-        </div>
-
-        <div className="report-block">
-          <h3>Expenses</h3>
-          {incomeStatement.data.expenses.length === 0 ? (
-            <div className="muted">No expense balances available.</div>
-          ) : (
-            incomeStatement.data.expenses.map((item) => (
-              <div key={item.ledgerAccountId} className="report-line">
-                <span>{item.code} - {item.name}</span>
-                <strong>{formatAmount(item.amount ?? 0)}</strong>
-              </div>
-            ))
-          )}
-        </div>
-
-        <div className="report-totals">
-          <div>{periodText}</div>
-          <div>Total Income: {formatAmount(incomeStatement.data.totalIncome)}</div>
-          <div>Total Expenses: {formatAmount(incomeStatement.data.totalExpenses)}</div>
-          <div>Net Income: {formatAmount(incomeStatement.data.netIncome)}</div>
-        </div>
-      </section>
-
-      <section id="print-cashbook" className="panel printable-report">
+<section id="print-cashbook" className="panel printable-report">
         <div className="section-heading no-print">
           <div>
             <h2>Cashbook</h2>
@@ -2644,342 +2597,7 @@ export function ReportsPage() {
         )}
       </section>
 
-
-      <section id="print-cashbook-summary" className="panel printable-report">
-      <div className="section-heading no-print">
-        <div>
-          <h2>Treasury / Cashbook Summary</h2>
-          <span className="muted">{periodText}</span>
-        </div>
-        <button className="button" onClick={printCashbookSummaryStandalone}>
-          Print Treasury Summary
-        </button>
-      </div>
-
-      <ReportPrintHeader title="Treasury / Cashbook Summary" subtitle={periodText} />
-
-      <div className="kv" style={{ marginBottom: 16 }}>
-        <div className="kv-row">
-          <span>Reporting Period</span>
-          <span>{periodText.replace('Reporting Period: ', '')}</span>
-        </div>
-        <div className="kv-row">
-          <span>Treasury Accounts</span>
-          <span>{cashbookSummary.data.count}</span>
-        </div>
-        <div className="kv-row">
-          <span>Total Opening Balance (Debit)</span>
-          <span>{formatAmount(cashbookSummary.data.totalOpeningBalanceDebit)}</span>
-        </div>
-        <div className="kv-row">
-          <span>Total Opening Balance (Credit)</span>
-          <span>{formatAmount(cashbookSummary.data.totalOpeningBalanceCredit)}</span>
-        </div>
-        <div className="kv-row">
-          <span>Total Period Debit</span>
-          <span>{formatAmount(cashbookSummary.data.totalPeriodDebit)}</span>
-        </div>
-        <div className="kv-row">
-          <span>Total Period Credit</span>
-          <span>{formatAmount(cashbookSummary.data.totalPeriodCredit)}</span>
-        </div>
-        <div className="kv-row">
-          <span>Total Closing Balance (Debit)</span>
-          <span>{formatAmount(cashbookSummary.data.totalClosingBalanceDebit)}</span>
-        </div>
-        <div className="kv-row">
-          <span>Total Closing Balance (Credit)</span>
-          <span>{formatAmount(cashbookSummary.data.totalClosingBalanceCredit)}</span>
-        </div>
-      </div>
-
-      <div className="table-wrap">
-        <table className="data-table report-print-table">
-          <thead>
-            <tr>
-              <th>Code</th>
-              <th>Account Name</th>
-              <th style={{ textAlign: 'right' }}>Opening Debit</th>
-              <th style={{ textAlign: 'right' }}>Opening Credit</th>
-              <th style={{ textAlign: 'right' }}>Period Debit</th>
-              <th style={{ textAlign: 'right' }}>Period Credit</th>
-              <th style={{ textAlign: 'right' }}>Closing Debit</th>
-              <th style={{ textAlign: 'right' }}>Closing Credit</th>
-            </tr>
-          </thead>
-          <tbody>
-            {cashbookSummary.data.items.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="muted">
-                  No treasury accounts were found for the selected reporting period.
-                </td>
-              </tr>
-            ) : (
-              cashbookSummary.data.items.map((item) => (
-                <tr key={item.ledgerAccountId}>
-                  <td>{item.code}</td>
-                  <td>{item.name}</td>
-                  <td style={{ textAlign: 'right' }}>{formatAmount(item.openingBalanceDebit)}</td>
-                  <td style={{ textAlign: 'right' }}>{formatAmount(item.openingBalanceCredit)}</td>
-                  <td style={{ textAlign: 'right' }}>{formatAmount(item.periodDebit)}</td>
-                  <td style={{ textAlign: 'right' }}>{formatAmount(item.periodCredit)}</td>
-                  <td style={{ textAlign: 'right' }}>{formatAmount(item.closingBalanceDebit)}</td>
-                  <td style={{ textAlign: 'right' }}>{formatAmount(item.closingBalanceCredit)}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-          <tfoot>
-            <tr>
-              <th colSpan={2}>Totals</th>
-              <th style={{ textAlign: 'right' }}>{formatAmount(cashbookSummary.data.totalOpeningBalanceDebit)}</th>
-              <th style={{ textAlign: 'right' }}>{formatAmount(cashbookSummary.data.totalOpeningBalanceCredit)}</th>
-              <th style={{ textAlign: 'right' }}>{formatAmount(cashbookSummary.data.totalPeriodDebit)}</th>
-              <th style={{ textAlign: 'right' }}>{formatAmount(cashbookSummary.data.totalPeriodCredit)}</th>
-              <th style={{ textAlign: 'right' }}>{formatAmount(cashbookSummary.data.totalClosingBalanceDebit)}</th>
-              <th style={{ textAlign: 'right' }}>{formatAmount(cashbookSummary.data.totalClosingBalanceCredit)}</th>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    </section>
-
-
-    <section id="print-tax-report" className="panel printable-report">
-    <div className="section-heading no-print">
-    <div>
-      <h2>VAT / WHT / Other Tax Report</h2>
-      <span className="muted">
-        Date-range tax report for setup-driven VAT, withholding tax, and other levies.
-      </span>
-    </div>
-
-    <button className="button" onClick={printTaxReportStandalone}>
-      Print Tax Report
-    </button>
-  </div>
-
-    <ReportPrintHeader title="VAT / WHT / Other Tax Report" subtitle={periodText} />
-
-    <div className="form-grid two no-print" style={{ marginBottom: 16 }}>
-      <div className="form-row">
-        <label>Tax Type</label>
-        <select
-          className="select"
-          value={taxReportComponentKind}
-          onChange={(e) => setTaxReportComponentKind(e.target.value)}
-        >
-          <option value="all">All Tax Types</option>
-          <option value="1">VAT</option>
-          <option value="2">WHT</option>
-          <option value="3">Other</option>
-        </select>
-      </div>
-
-      <div className="form-row">
-        <label>Transaction Scope</label>
-        <select
-          className="select"
-          value={taxReportTransactionScope}
-          onChange={(e) => setTaxReportTransactionScope(e.target.value)}
-        >
-          <option value="all">All Scopes</option>
-          <option value="1">Sales</option>
-          <option value="2">Purchases</option>
-          <option value="3">Both</option>
-        </select>
-      </div>
-    </div>
-
-    <div className="kv" style={{ marginBottom: 16 }}>
-      <div className="kv-row">
-        <span>Reporting Period</span>
-        <span>{periodText.replace('Reporting Period: ', '')}</span>
-      </div>
-      <div className="kv-row">
-        <span>Tax Type Filter</span>
-        <span>
-          {taxReportComponentKind === 'all'
-            ? 'All Tax Types'
-            : taxComponentKindLabel(Number(taxReportComponentKind))}
-        </span>
-      </div>
-      <div className="kv-row">
-        <span>Transaction Scope Filter</span>
-        <span>
-          {taxReportTransactionScope === 'all'
-            ? 'All Scopes'
-            : taxTransactionScopeLabel(Number(taxReportTransactionScope))}
-        </span>
-      </div>
-      <div className="kv-row">
-        <span>Tax Line Count</span>
-        <span>{taxReportQ.data.count}</span>
-      </div>
-      <div className="kv-row">
-        <span>Total Taxable Amount</span>
-        <span>{formatAmount(taxReportQ.data.totalTaxableAmount)}</span>
-      </div>
-      <div className="kv-row">
-        <span>Total Tax Amount</span>
-        <span>{formatAmount(taxReportQ.data.totalTaxAmount)}</span>
-      </div>
-      <div className="kv-row">
-        <span>Total Additions</span>
-        <span>{formatAmount(taxReportQ.data.totalAdditions)}</span>
-      </div>
-      <div className="kv-row">
-        <span>Total Deductions</span>
-        <span>{formatAmount(taxReportQ.data.totalDeductions)}</span>
-      </div>
-    </div>
-
-    <div className="section-heading">
-      <div>
-        <h2>Tax Summary by Type</h2>
-        <span className="muted">Grouped VAT/WHT/Other tax totals</span>
-      </div>
-    </div>
-
-    <div className="table-wrap" style={{ marginBottom: 16 }}>
-      <table className="data-table report-print-table">
-        <thead>
-          <tr>
-            <th>Tax Type</th>
-            <th style={{ textAlign: 'right' }}>Count</th>
-            <th style={{ textAlign: 'right' }}>Taxable Amount</th>
-            <th style={{ textAlign: 'right' }}>Tax Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {taxReportQ.data.byComponentKind.length === 0 ? (
-            <tr>
-              <td colSpan={4} className="muted">
-                No tax activity was found for the selected filters.
-              </td>
-            </tr>
-          ) : (
-            taxReportQ.data.byComponentKind.map((item) => (
-              <tr key={item.componentKind}>
-                <td>{taxComponentKindLabel(item.componentKind)}</td>
-                <td style={{ textAlign: 'right' }}>{item.count}</td>
-                <td style={{ textAlign: 'right' }}>{formatAmount(item.totalTaxableAmount)}</td>
-                <td style={{ textAlign: 'right' }}>{formatAmount(item.totalTaxAmount)}</td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
-
-    <div className="section-heading">
-      <div>
-        <h2>Tax Summary by Tax Code</h2>
-        <span className="muted">Grouped totals by configured tax code</span>
-      </div>
-    </div>
-
-    <div className="table-wrap" style={{ marginBottom: 16 }}>
-      <table className="data-table report-print-table">
-        <thead>
-          <tr>
-            <th>Tax Code</th>
-            <th>Tax Name</th>
-            <th>Kind</th>
-            <th>Mode</th>
-            <th>Scope</th>
-            <th style={{ textAlign: 'right' }}>Rate %</th>
-            <th style={{ textAlign: 'right' }}>Count</th>
-            <th style={{ textAlign: 'right' }}>Taxable Amount</th>
-            <th style={{ textAlign: 'right' }}>Tax Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {taxReportQ.data.byTaxCode.length === 0 ? (
-            <tr>
-              <td colSpan={9} className="muted">
-                No tax-code activity was found for the selected filters.
-              </td>
-            </tr>
-          ) : (
-            taxReportQ.data.byTaxCode.map((item) => (
-              <tr key={item.taxCodeId}>
-                <td>{item.taxCode || '—'}</td>
-                <td>{item.taxCodeName || '—'}</td>
-                <td>{taxComponentKindLabel(item.componentKind)}</td>
-                <td>{taxApplicationModeLabel(item.applicationMode)}</td>
-                <td>{taxTransactionScopeLabel(item.transactionScope)}</td>
-                <td style={{ textAlign: 'right' }}>{formatAmount(item.ratePercent)}</td>
-                <td style={{ textAlign: 'right' }}>{item.count}</td>
-                <td style={{ textAlign: 'right' }}>{formatAmount(item.totalTaxableAmount)}</td>
-                <td style={{ textAlign: 'right' }}>{formatAmount(item.totalTaxAmount)}</td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
-
-    <div className="section-heading">
-      <div>
-        <h2>Tax Movement Details</h2>
-        <span className="muted">Line-level VAT/WHT/Other tax activity</span>
-      </div>
-    </div>
-
-    <div className="table-wrap">
-      <table className="data-table report-print-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Document</th>
-            <th>Counterparty</th>
-            <th>Tax Code</th>
-            <th>Kind</th>
-            <th>Mode</th>
-            <th>Scope</th>
-            <th style={{ textAlign: 'right' }}>Rate %</th>
-            <th style={{ textAlign: 'right' }}>Taxable Amount</th>
-            <th style={{ textAlign: 'right' }}>Tax Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {taxReportQ.data.items.length === 0 ? (
-            <tr>
-              <td colSpan={10} className="muted">
-                No tax movement lines were found for the selected filters.
-              </td>
-            </tr>
-          ) : (
-            taxReportQ.data.items.map((item) => (
-              <tr key={item.id}>
-                <td>{formatDateTime(item.transactionDateUtc)}</td>
-                <td>
-                  <div>{item.sourceDocumentNumber}</div>
-                  <div className="muted">{item.sourceModule} / {item.sourceDocumentType}</div>
-                </td>
-                <td>
-                  {item.counterpartyName || item.counterpartyCode
-                    ? `${item.counterpartyCode || ''} ${item.counterpartyName || ''}`.trim()
-                    : '—'}
-                </td>
-                <td>{item.taxCode || '—'}</td>
-                <td>{taxComponentKindLabel(item.componentKind)}</td>
-                <td>{taxApplicationModeLabel(item.applicationMode)}</td>
-                <td>{taxTransactionScopeLabel(item.transactionScope)}</td>
-                <td style={{ textAlign: 'right' }}>{formatAmount(item.ratePercent)}</td>
-                <td style={{ textAlign: 'right' }}>{formatAmount(item.taxableAmount)}</td>
-                <td style={{ textAlign: 'right' }}>{formatAmount(item.taxAmount)}</td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-
-    <section className="panel no-print">
+<section className="panel no-print">
     <div className="section-heading">
       <div>
         <h2>Bank Reconciliation</h2>
@@ -3363,8 +2981,7 @@ export function ReportsPage() {
     )}
   </section>
 
-
-  <section className="panel no-print">
+<section className="panel no-print">
   <div className="section-heading">
     <div>
       <h2>Call-over Workspace</h2>
@@ -3958,9 +3575,445 @@ export function ReportsPage() {
   </div>
 </section>
 
+      <ReportSectionDivider
+        title="Core Financial Statements"
+        subtitle="Use these statutory management reports for control totals and management review."
+      />
 
+<section id="print-trial-balance" className="panel printable-report">
+        <div className="section-heading no-print">
+          <div>
+            <h2>Trial Balance</h2>
+            <span className="muted">{periodText}</span>
+          </div>
+          <button className="button" onClick={printTrialBalanceStandalone}>
+            Print Trial Balance
+          </button>
+        </div>
 
-      <section id="print-accounts-receivable-summary" className="panel printable-report">
+        <ReportPrintHeader title="Trial Balance" subtitle={periodText} />
+
+        <div className="kv" style={{ marginBottom: 16 }}>
+          <div className="kv-row">
+            <span>Reporting Period</span>
+            <span>{periodText.replace('Reporting Period: ', '')}</span>
+          </div>
+          <div className="kv-row">
+            <span>Accounts Included</span>
+            <span>{trialBalance.data.count}</span>
+          </div>
+          <div className="kv-row">
+            <span>Total Debit</span>
+            <span>{formatAmount(trialBalance.data.totalDebit)}</span>
+          </div>
+          <div className="kv-row">
+            <span>Total Credit</span>
+            <span>{formatAmount(trialBalance.data.totalCredit)}</span>
+          </div>
+        </div>
+
+        <div className="table-wrap">
+          <table className="data-table report-print-table">
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Account Name</th>
+                <th style={{ textAlign: 'right' }}>Total Debit</th>
+                <th style={{ textAlign: 'right' }}>Total Credit</th>
+                <th style={{ textAlign: 'right' }}>Balance Debit</th>
+                <th style={{ textAlign: 'right' }}>Balance Credit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {trialBalance.data.items.map((item) => (
+                <tr key={item.ledgerAccountId}>
+                  <td>{item.code}</td>
+                  <td>{item.name}</td>
+                  <td style={{ textAlign: 'right' }}>{formatAmount(item.totalDebit)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatAmount(item.totalCredit)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatAmount(item.balanceDebit)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatAmount(item.balanceCredit)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <th colSpan={2}>Total</th>
+                <th style={{ textAlign: 'right' }}>{formatAmount(trialBalance.data.totalDebit)}</th>
+                <th style={{ textAlign: 'right' }}>{formatAmount(trialBalance.data.totalCredit)}</th>
+                <th />
+                <th />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </section>
+
+<section id="print-income-statement" className="panel printable-report">
+        <div className="section-heading no-print">
+          <div>
+            <h2>Income Statement</h2>
+            <span className="muted">{periodText}</span>
+          </div>
+          <button className="button" onClick={printIncomeStatementStandalone}>
+            Print Income Statement
+          </button>
+        </div>
+
+        <ReportPrintHeader title="Income Statement" subtitle={periodText} />
+
+        <div className="panel no-print" style={{ marginBottom: 16 }}>
+          <div className="muted">{periodText}</div>
+        </div>
+
+        <div className="report-block">
+          <h3>Income</h3>
+          {incomeStatement.data.income.length === 0 ? (
+            <div className="muted">No income balances available.</div>
+          ) : (
+            incomeStatement.data.income.map((item) => (
+              <div key={item.ledgerAccountId} className="report-line">
+                <span>{item.code} - {item.name}</span>
+                <strong>{formatAmount(item.amount ?? 0)}</strong>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="report-block">
+          <h3>Expenses</h3>
+          {incomeStatement.data.expenses.length === 0 ? (
+            <div className="muted">No expense balances available.</div>
+          ) : (
+            incomeStatement.data.expenses.map((item) => (
+              <div key={item.ledgerAccountId} className="report-line">
+                <span>{item.code} - {item.name}</span>
+                <strong>{formatAmount(item.amount ?? 0)}</strong>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="report-totals">
+          <div>{periodText}</div>
+          <div>Total Income: {formatAmount(incomeStatement.data.totalIncome)}</div>
+          <div>Total Expenses: {formatAmount(incomeStatement.data.totalExpenses)}</div>
+          <div>Net Income: {formatAmount(incomeStatement.data.netIncome)}</div>
+        </div>
+      </section>
+
+<section id="print-balance-sheet" className="panel printable-report">
+        <div className="section-heading no-print">
+          <div>
+            <h2>Balance Sheet</h2>
+            <span className="muted">{asAtText}</span>
+          </div>
+          <button className="button" onClick={printBalanceSheetStandalone}>
+            Print Balance Sheet
+          </button>
+        </div>
+
+        <ReportPrintHeader title="Balance Sheet" subtitle={asAtText} />
+
+        <div className="panel no-print" style={{ marginBottom: 16 }}>
+          <div className="muted">{asAtText}</div>
+        </div>
+
+        <div className="report-block">
+          <h3>Assets</h3>
+          {balanceSheet.data.assets.length === 0 ? (
+            <div className="muted">No asset balances available.</div>
+          ) : (
+            balanceSheet.data.assets.map((item) => (
+              <div key={item.ledgerAccountId} className="report-line">
+                <span>{item.code} - {item.name}</span>
+                <strong>{formatAmount(item.balance ?? 0)}</strong>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="report-block">
+          <h3>Liabilities</h3>
+          {balanceSheet.data.liabilities.length === 0 ? (
+            <div className="muted">No liability balances available.</div>
+          ) : (
+            balanceSheet.data.liabilities.map((item) => (
+              <div key={item.ledgerAccountId} className="report-line">
+                <span>{item.code} - {item.name}</span>
+                <strong>{formatAmount(item.balance ?? 0)}</strong>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="report-block">
+          <h3>Equity</h3>
+          {balanceSheet.data.equity.length === 0 ? (
+            <div className="muted">No equity balances available.</div>
+          ) : (
+            balanceSheet.data.equity.map((item) => (
+              <div key={item.ledgerAccountId} className="report-line">
+                <span>{item.code} - {item.name}</span>
+                <strong>{formatAmount(item.balance ?? 0)}</strong>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="report-totals">
+          <div>{asAtText}</div>
+          <div>Total Assets: {formatAmount(balanceSheet.data.totalAssets)}</div>
+          <div>Total Liabilities: {formatAmount(balanceSheet.data.totalLiabilities)}</div>
+          <div>Total Equity: {formatAmount(balanceSheet.data.totalEquity)}</div>
+          <div>Total Liabilities and Equity: {formatAmount(balanceSheet.data.totalLiabilitiesAndEquity)}</div>
+        </div>
+      </section>
+
+      <ReportSectionDivider
+        title="Tax Reports"
+        subtitle="Review VAT, WHT, and other tax movements generated from sales and purchase invoices."
+      />
+
+<section id="print-tax-report" className="panel printable-report">
+    <div className="section-heading no-print">
+    <div>
+      <h2>VAT / WHT / Other Tax Report</h2>
+      <span className="muted">
+        Date-range tax report for setup-driven VAT, withholding tax, and other levies.
+      </span>
+    </div>
+
+    <button className="button" onClick={printTaxReportStandalone}>
+      Print Tax Report
+    </button>
+  </div>
+
+    <ReportPrintHeader title="VAT / WHT / Other Tax Report" subtitle={periodText} />
+
+    <div className="form-grid two no-print" style={{ marginBottom: 16 }}>
+      <div className="form-row">
+        <label>Tax Type</label>
+        <select
+          className="select"
+          value={taxReportComponentKind}
+          onChange={(e) => setTaxReportComponentKind(e.target.value)}
+        >
+          <option value="all">All Tax Types</option>
+          <option value="1">VAT</option>
+          <option value="2">WHT</option>
+          <option value="3">Other</option>
+        </select>
+      </div>
+
+      <div className="form-row">
+        <label>Transaction Scope</label>
+        <select
+          className="select"
+          value={taxReportTransactionScope}
+          onChange={(e) => setTaxReportTransactionScope(e.target.value)}
+        >
+          <option value="all">All Scopes</option>
+          <option value="1">Sales</option>
+          <option value="2">Purchases</option>
+          <option value="3">Both</option>
+        </select>
+      </div>
+    </div>
+
+    <div className="kv" style={{ marginBottom: 16 }}>
+      <div className="kv-row">
+        <span>Reporting Period</span>
+        <span>{periodText.replace('Reporting Period: ', '')}</span>
+      </div>
+      <div className="kv-row">
+        <span>Tax Type Filter</span>
+        <span>
+          {taxReportComponentKind === 'all'
+            ? 'All Tax Types'
+            : taxComponentKindLabel(Number(taxReportComponentKind))}
+        </span>
+      </div>
+      <div className="kv-row">
+        <span>Transaction Scope Filter</span>
+        <span>
+          {taxReportTransactionScope === 'all'
+            ? 'All Scopes'
+            : taxTransactionScopeLabel(Number(taxReportTransactionScope))}
+        </span>
+      </div>
+      <div className="kv-row">
+        <span>Tax Line Count</span>
+        <span>{taxReportQ.data.count}</span>
+      </div>
+      <div className="kv-row">
+        <span>Total Taxable Amount</span>
+        <span>{formatAmount(taxReportQ.data.totalTaxableAmount)}</span>
+      </div>
+      <div className="kv-row">
+        <span>Total Tax Amount</span>
+        <span>{formatAmount(taxReportQ.data.totalTaxAmount)}</span>
+      </div>
+      <div className="kv-row">
+        <span>Total Additions</span>
+        <span>{formatAmount(taxReportQ.data.totalAdditions)}</span>
+      </div>
+      <div className="kv-row">
+        <span>Total Deductions</span>
+        <span>{formatAmount(taxReportQ.data.totalDeductions)}</span>
+      </div>
+    </div>
+
+    <div className="section-heading">
+      <div>
+        <h2>Tax Summary by Type</h2>
+        <span className="muted">Grouped VAT/WHT/Other tax totals</span>
+      </div>
+    </div>
+
+    <div className="table-wrap" style={{ marginBottom: 16 }}>
+      <table className="data-table report-print-table">
+        <thead>
+          <tr>
+            <th>Tax Type</th>
+            <th style={{ textAlign: 'right' }}>Count</th>
+            <th style={{ textAlign: 'right' }}>Taxable Amount</th>
+            <th style={{ textAlign: 'right' }}>Tax Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {taxReportQ.data.byComponentKind.length === 0 ? (
+            <tr>
+              <td colSpan={4} className="muted">
+                No tax activity was found for the selected filters.
+              </td>
+            </tr>
+          ) : (
+            taxReportQ.data.byComponentKind.map((item) => (
+              <tr key={item.componentKind}>
+                <td>{taxComponentKindLabel(item.componentKind)}</td>
+                <td style={{ textAlign: 'right' }}>{item.count}</td>
+                <td style={{ textAlign: 'right' }}>{formatAmount(item.totalTaxableAmount)}</td>
+                <td style={{ textAlign: 'right' }}>{formatAmount(item.totalTaxAmount)}</td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+
+    <div className="section-heading">
+      <div>
+        <h2>Tax Summary by Tax Code</h2>
+        <span className="muted">Grouped totals by configured tax code</span>
+      </div>
+    </div>
+
+    <div className="table-wrap" style={{ marginBottom: 16 }}>
+      <table className="data-table report-print-table">
+        <thead>
+          <tr>
+            <th>Tax Code</th>
+            <th>Tax Name</th>
+            <th>Kind</th>
+            <th>Mode</th>
+            <th>Scope</th>
+            <th style={{ textAlign: 'right' }}>Rate %</th>
+            <th style={{ textAlign: 'right' }}>Count</th>
+            <th style={{ textAlign: 'right' }}>Taxable Amount</th>
+            <th style={{ textAlign: 'right' }}>Tax Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {taxReportQ.data.byTaxCode.length === 0 ? (
+            <tr>
+              <td colSpan={9} className="muted">
+                No tax-code activity was found for the selected filters.
+              </td>
+            </tr>
+          ) : (
+            taxReportQ.data.byTaxCode.map((item) => (
+              <tr key={item.taxCodeId}>
+                <td>{item.taxCode || '—'}</td>
+                <td>{item.taxCodeName || '—'}</td>
+                <td>{taxComponentKindLabel(item.componentKind)}</td>
+                <td>{taxApplicationModeLabel(item.applicationMode)}</td>
+                <td>{taxTransactionScopeLabel(item.transactionScope)}</td>
+                <td style={{ textAlign: 'right' }}>{formatAmount(item.ratePercent)}</td>
+                <td style={{ textAlign: 'right' }}>{item.count}</td>
+                <td style={{ textAlign: 'right' }}>{formatAmount(item.totalTaxableAmount)}</td>
+                <td style={{ textAlign: 'right' }}>{formatAmount(item.totalTaxAmount)}</td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+
+    <div className="section-heading">
+      <div>
+        <h2>Tax Movement Details</h2>
+        <span className="muted">Line-level VAT/WHT/Other tax activity</span>
+      </div>
+    </div>
+
+    <div className="table-wrap">
+      <table className="data-table report-print-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Document</th>
+            <th>Counterparty</th>
+            <th>Tax Code</th>
+            <th>Kind</th>
+            <th>Mode</th>
+            <th>Scope</th>
+            <th style={{ textAlign: 'right' }}>Rate %</th>
+            <th style={{ textAlign: 'right' }}>Taxable Amount</th>
+            <th style={{ textAlign: 'right' }}>Tax Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {taxReportQ.data.items.length === 0 ? (
+            <tr>
+              <td colSpan={10} className="muted">
+                No tax movement lines were found for the selected filters.
+              </td>
+            </tr>
+          ) : (
+            taxReportQ.data.items.map((item) => (
+              <tr key={item.id}>
+                <td>{formatDateTime(item.transactionDateUtc)}</td>
+                <td>
+                  <div>{item.sourceDocumentNumber}</div>
+                  <div className="muted">{item.sourceModule} / {item.sourceDocumentType}</div>
+                </td>
+                <td>
+                  {item.counterpartyName || item.counterpartyCode
+                    ? `${item.counterpartyCode || ''} ${item.counterpartyName || ''}`.trim()
+                    : '—'}
+                </td>
+                <td>{item.taxCode || '—'}</td>
+                <td>{taxComponentKindLabel(item.componentKind)}</td>
+                <td>{taxApplicationModeLabel(item.applicationMode)}</td>
+                <td>{taxTransactionScopeLabel(item.transactionScope)}</td>
+                <td style={{ textAlign: 'right' }}>{formatAmount(item.ratePercent)}</td>
+                <td style={{ textAlign: 'right' }}>{formatAmount(item.taxableAmount)}</td>
+                <td style={{ textAlign: 'right' }}>{formatAmount(item.taxAmount)}</td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+      <ReportSectionDivider
+        title="Subledger Operational Reports"
+        subtitle="Review Accounts Receivable and Accounts Payable transaction summaries after workflow processing."
+      />
+
+<section id="print-accounts-receivable-summary" className="panel printable-report">
         <div className="section-heading no-print">
           <div>
             <h2>Accounts Receivable Summary</h2>
@@ -3999,6 +4052,14 @@ export function ReportsPage() {
             <span>{arSummary.draftInvoiceCount}</span>
           </div>
           <div className="kv-row">
+            <span>Submitted Invoices</span>
+            <span>{arSummary.submittedInvoiceCount}</span>
+          </div>
+          <div className="kv-row">
+            <span>Approved Invoices</span>
+            <span>{arSummary.approvedInvoiceCount}</span>
+          </div>
+          <div className="kv-row">
             <span>Posted Invoices</span>
             <span>{arSummary.postedInvoiceCount}</span>
           </div>
@@ -4009,6 +4070,10 @@ export function ReportsPage() {
           <div className="kv-row">
             <span>Paid Invoices</span>
             <span>{arSummary.paidInvoiceCount}</span>
+          </div>
+          <div className="kv-row">
+            <span>Rejected Invoices</span>
+            <span>{arSummary.rejectedInvoiceCount}</span>
           </div>
           <div className="kv-row">
             <span>Cancelled Invoices</span>
@@ -4054,7 +4119,7 @@ export function ReportsPage() {
         </div>
       </section>
 
-      <section id="print-customer-receipts-summary" className="panel printable-report">
+<section id="print-customer-receipts-summary" className="panel printable-report">
         <div className="section-heading no-print">
           <div>
             <h2>Customer Receipts Summary</h2>
@@ -4083,6 +4148,18 @@ export function ReportsPage() {
           <div className="kv-row">
             <span>Draft Receipts</span>
             <span>{arSummary.draftReceiptCount}</span>
+          </div>
+          <div className="kv-row">
+            <span>Submitted Receipts</span>
+            <span>{arSummary.submittedReceiptCount}</span>
+          </div>
+          <div className="kv-row">
+            <span>Approved Receipts</span>
+            <span>{arSummary.approvedReceiptCount}</span>
+          </div>
+          <div className="kv-row">
+            <span>Rejected Receipts</span>
+            <span>{arSummary.rejectedReceiptCount}</span>
           </div>
           <div className="kv-row">
             <span>Posted Receipts</span>
@@ -4131,7 +4208,7 @@ export function ReportsPage() {
         </div>
       </section>
 
-      <section id="print-accounts-payable-summary" className="panel printable-report">
+<section id="print-accounts-payable-summary" className="panel printable-report">
         <div className="section-heading no-print">
           <div>
             <h2>Accounts Payable Summary</h2>
@@ -4170,6 +4247,14 @@ export function ReportsPage() {
             <span>{apSummary.draftInvoiceCount}</span>
           </div>
           <div className="kv-row">
+            <span>Submitted Invoices</span>
+            <span>{apSummary.submittedInvoiceCount}</span>
+          </div>
+          <div className="kv-row">
+            <span>Approved Invoices</span>
+            <span>{apSummary.approvedInvoiceCount}</span>
+          </div>
+          <div className="kv-row">
             <span>Posted Invoices</span>
             <span>{apSummary.postedInvoiceCount}</span>
           </div>
@@ -4180,6 +4265,10 @@ export function ReportsPage() {
           <div className="kv-row">
             <span>Paid Invoices</span>
             <span>{apSummary.paidInvoiceCount}</span>
+          </div>
+          <div className="kv-row">
+            <span>Rejected Invoices</span>
+            <span>{apSummary.rejectedInvoiceCount}</span>
           </div>
           <div className="kv-row">
             <span>Cancelled Invoices</span>
@@ -4225,7 +4314,7 @@ export function ReportsPage() {
         </div>
       </section>
 
-      <section id="print-vendor-payments-summary" className="panel printable-report">
+<section id="print-vendor-payments-summary" className="panel printable-report">
         <div className="section-heading no-print">
           <div>
             <h2>Vendor Payments Summary</h2>

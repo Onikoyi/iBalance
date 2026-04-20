@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  approvePurchaseInvoice,
   createPurchaseInvoice,
   getAccounts,
   getPurchaseInvoices,
@@ -9,11 +10,13 @@ import {
   getVendors,
   postPurchaseInvoice,
   previewTaxCalculation,
+  rejectPurchaseInvoice,
+  submitPurchaseInvoiceForApproval,
   type CreatePurchaseInvoiceRequest,
   type PurchaseInvoiceLineDto,
   type TaxCodeDto,
 } from '../lib/api';
-import { canManageFinanceSetup, canViewFinance } from '../lib/auth';
+import { canApproveWorkflows, canManageFinanceSetup, canViewFinance } from '../lib/auth';
 
 const emptyLine: PurchaseInvoiceLineDto = {
   description: '',
@@ -46,29 +49,48 @@ function formatAmount(value: number) {
 
 function purchaseInvoiceStatusLabel(value: number) {
   switch (value) {
-    case 1: return 'Draft';
-    case 2: return 'Posted';
-    case 3: return 'Part Paid';
-    case 4: return 'Paid';
-    case 5: return 'Cancelled';
-    default: return 'Unknown';
+    case 1:
+      return 'Draft';
+    case 2:
+      return 'Submitted for Approval';
+    case 3:
+      return 'Approved';
+    case 4:
+      return 'Posted';
+    case 5:
+      return 'Part Paid';
+    case 6:
+      return 'Paid';
+    case 7:
+      return 'Rejected';
+    case 8:
+      return 'Cancelled';
+    default:
+      return 'Unknown';
   }
 }
 
 function taxComponentKindLabel(value: number) {
   switch (value) {
-    case 1: return 'VAT';
-    case 2: return 'WHT';
-    case 3: return 'Other';
-    default: return 'Unknown';
+    case 1:
+      return 'VAT';
+    case 2:
+      return 'WHT';
+    case 3:
+      return 'Other';
+    default:
+      return 'Unknown';
   }
 }
 
 function taxApplicationModeLabel(value: number) {
   switch (value) {
-    case 1: return 'Add to Amount';
-    case 2: return 'Deduct from Amount';
-    default: return 'Unknown';
+    case 1:
+      return 'Add to Amount';
+    case 2:
+      return 'Deduct from Amount';
+    default:
+      return 'Unknown';
   }
 }
 
@@ -76,6 +98,7 @@ export function PurchaseInvoicesPage() {
   const qc = useQueryClient();
   const canView = canViewFinance();
   const canManage = canManageFinanceSetup();
+  const canApprove = canApproveWorkflows();
 
   const [showCreate, setShowCreate] = useState(false);
   const [showPost, setShowPost] = useState(false);
@@ -90,6 +113,7 @@ export function PurchaseInvoicesPage() {
   });
   const [errorText, setErrorText] = useState('');
   const [infoText, setInfoText] = useState('');
+  const [rejectReason, setRejectReason] = useState('');
 
   const invoicesQ = useQuery({
     queryKey: ['ap-purchase-invoices'],
@@ -108,7 +132,6 @@ export function PurchaseInvoicesPage() {
     queryFn: getAccounts,
     enabled: canView,
   });
-
 
   const taxCodesQ = useQuery({
     queryKey: ['tax-codes', 'purchases', 'active'],
@@ -134,12 +157,57 @@ export function PurchaseInvoicesPage() {
     },
   });
 
+  const submitApprovalMut = useMutation({
+    mutationFn: (purchaseInvoiceId: string) => submitPurchaseInvoiceForApproval(purchaseInvoiceId),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['ap-purchase-invoices'] });
+      setErrorText('');
+      setInfoText('Purchase invoice submitted for approval successfully.');
+    },
+    onError: (error) => {
+      setErrorText(getTenantReadableError(error, 'Unable to submit purchase invoice for approval.'));
+      setInfoText('');
+    },
+  });
+
+  const approveMut = useMutation({
+    mutationFn: (purchaseInvoiceId: string) => approvePurchaseInvoice(purchaseInvoiceId),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['ap-purchase-invoices'] });
+      setErrorText('');
+      setInfoText('Purchase invoice approved successfully.');
+    },
+    onError: (error) => {
+      setErrorText(getTenantReadableError(error, 'Unable to approve purchase invoice.'));
+      setInfoText('');
+    },
+  });
+
+  const rejectMut = useMutation({
+    mutationFn: (purchaseInvoiceId: string) =>
+      rejectPurchaseInvoice(purchaseInvoiceId, { reason: rejectReason.trim() }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['ap-purchase-invoices'] });
+      setRejectReason('');
+      setErrorText('');
+      setInfoText('Purchase invoice rejected successfully.');
+    },
+    onError: (error) => {
+      setErrorText(getTenantReadableError(error, 'Unable to reject purchase invoice.'));
+      setInfoText('');
+    },
+  });
+
   const postMut = useMutation({
     mutationFn: () => postPurchaseInvoice(selectedInvoiceId, postForm),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['ap-purchase-invoices'] });
+      await qc.invalidateQueries({ queryKey: ['ap-vendor-payments'] });
       await qc.invalidateQueries({ queryKey: ['accounts'] });
       await qc.invalidateQueries({ queryKey: ['journal-entries'] });
+      await qc.invalidateQueries({ queryKey: ['trial-balance'] });
+      await qc.invalidateQueries({ queryKey: ['balance-sheet'] });
+      await qc.invalidateQueries({ queryKey: ['income-statement'] });
       setShowPost(false);
       setSelectedInvoiceId('');
       setPostForm({
@@ -155,8 +223,13 @@ export function PurchaseInvoicesPage() {
     },
   });
 
+  const visibleInvoices = useMemo(() => {
+    return (invoicesQ.data?.items ?? []).filter((item) => item.status !== 7);
+  }, [invoicesQ.data?.items]);
+
   const summary = useMemo(() => {
-    const items = invoicesQ.data?.items ?? [];
+    const items = visibleInvoices;
+
     return {
       total: items.length,
       totalBaseAmount: items.reduce((sum, x) => sum + x.totalAmount, 0),
@@ -166,11 +239,15 @@ export function PurchaseInvoicesPage() {
       totalPaid: items.reduce((sum, x) => sum + x.amountPaid, 0),
       totalOutstanding: items.reduce((sum, x) => sum + x.balanceAmount, 0),
       drafts: items.filter((x) => x.status === 1).length,
-      posted: items.filter((x) => x.status === 2).length,
-      partPaid: items.filter((x) => x.status === 3).length,
-      paid: items.filter((x) => x.status === 4).length,
+      submitted: items.filter((x) => x.status === 2).length,
+      approved: items.filter((x) => x.status === 3).length,
+      posted: items.filter((x) => x.status === 4).length,
+      partPaid: items.filter((x) => x.status === 5).length,
+      paid: items.filter((x) => x.status === 6).length,
+      rejected: items.filter((x) => x.status === 7).length,
+      cancelled: items.filter((x) => x.status === 8).length,
     };
-  }, [invoicesQ.data?.items]);
+  }, [visibleInvoices]);
 
   const postingAccounts = useMemo(() => {
     return (accountsQ.data?.items ?? []).filter((x) => x.isActive && !x.isHeader && x.isPostingAllowed);
@@ -271,8 +348,8 @@ export function PurchaseInvoicesPage() {
   }
 
   function openPostModal(invoiceId: string) {
-    if (!canManage) {
-      setErrorText('You currently have read-only access on this page.');
+    if (!canApprove) {
+      setErrorText('You do not have permission to post approved purchase invoices.');
       setInfoText('');
       return;
     }
@@ -360,9 +437,55 @@ export function PurchaseInvoicesPage() {
     });
   }
 
+  function submitForApproval(purchaseInvoiceId: string) {
+    setErrorText('');
+    setInfoText('');
+
+    if (!canManage) {
+      setErrorText('You do not have permission to submit purchase invoices for approval.');
+      return;
+    }
+
+    submitApprovalMut.mutate(purchaseInvoiceId);
+  }
+
+  function approveInvoice(purchaseInvoiceId: string) {
+    setErrorText('');
+    setInfoText('');
+
+    if (!canApprove) {
+      setErrorText('You do not have permission to approve purchase invoices.');
+      return;
+    }
+
+    approveMut.mutate(purchaseInvoiceId);
+  }
+
+  function rejectInvoice(purchaseInvoiceId: string) {
+    setErrorText('');
+    setInfoText('');
+
+    if (!canApprove) {
+      setErrorText('You do not have permission to reject purchase invoices.');
+      return;
+    }
+
+    if (!rejectReason.trim()) {
+      setErrorText('Please enter a rejection reason before rejecting the purchase invoice.');
+      return;
+    }
+
+    rejectMut.mutate(purchaseInvoiceId);
+  }
+
   async function submitPost() {
     setErrorText('');
     setInfoText('');
+
+    if (!canApprove) {
+      setErrorText('You do not have permission to post approved purchase invoices.');
+      return;
+    }
 
     if (!postForm.payableLedgerAccountId) {
       setErrorText('Payable ledger account is required.');
@@ -404,12 +527,13 @@ export function PurchaseInvoicesPage() {
         <div className="section-heading">
           <div>
             <h2>Purchase Invoices</h2>
-            <div className="muted">Capture and post supplier invoices for Accounts Payable.</div>
+            <div className="muted">Capture, approve, and post supplier invoices for Accounts Payable.</div>
           </div>
 
           {canManage ? (
             <div className="inline-actions">
               <button className="button primary" onClick={openCreateModal}>New Purchase Invoice</button>
+              <a className="button" href="/purchase-invoices/rejected">Rejected Purchase Invoices</a>
             </div>
           ) : null}
         </div>
@@ -423,9 +547,13 @@ export function PurchaseInvoicesPage() {
           <div className="kv-row"><span>Total Paid</span><span>{formatAmount(summary.totalPaid)}</span></div>
           <div className="kv-row"><span>Total Outstanding</span><span>{formatAmount(summary.totalOutstanding)}</span></div>
           <div className="kv-row"><span>Draft</span><span>{summary.drafts}</span></div>
+          <div className="kv-row"><span>Submitted for Approval</span><span>{summary.submitted}</span></div>
+          <div className="kv-row"><span>Approved</span><span>{summary.approved}</span></div>
           <div className="kv-row"><span>Posted</span><span>{summary.posted}</span></div>
           <div className="kv-row"><span>Part Paid</span><span>{summary.partPaid}</span></div>
           <div className="kv-row"><span>Paid</span><span>{summary.paid}</span></div>
+          <div className="kv-row"><span>Rejected</span><span>{summary.rejected}</span></div>
+          <div className="kv-row"><span>Cancelled</span><span>{summary.cancelled}</span></div>
         </div>
 
         {infoText ? (
@@ -444,7 +572,17 @@ export function PurchaseInvoicesPage() {
       <section className="panel">
         <div className="section-heading">
           <h2>Purchase Invoice Listing</h2>
-          <span className="muted">{invoicesQ.data.count} invoice(s)</span>
+          <span className="muted">{visibleInvoices.length} active invoice(s)</span>
+        </div>
+
+        <div className="form-row" style={{ marginBottom: 16 }}>
+          <label>Rejection Reason</label>
+          <input
+            className="input"
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            placeholder="Required only when rejecting a submitted purchase invoice"
+          />
         </div>
 
         <div className="table-wrap">
@@ -463,22 +601,29 @@ export function PurchaseInvoicesPage() {
                 <th style={{ textAlign: 'right' }}>Paid</th>
                 <th style={{ textAlign: 'right' }}>Balance</th>
                 <th>Posted On</th>
-                <th style={{ width: 120 }}>Action</th>
+                <th style={{ width: 260 }}>Action</th>
               </tr>
             </thead>
             <tbody>
-              {invoicesQ.data.items.length === 0 ? (
+            {visibleInvoices.length === 0 ? (
                 <tr>
                   <td colSpan={13} className="muted">
                     No purchase invoices have been created yet.
                   </td>
                 </tr>
               ) : (
-                invoicesQ.data.items.map((item) => (
+                visibleInvoices.map((item) => (
                   <tr key={item.id}>
                     <td>{item.invoiceNumber}</td>
                     <td>{item.vendorCode} - {item.vendorName}</td>
-                    <td>{item.description}</td>
+                    <td>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <span>{item.description}</span>
+                        {item.status === 7 && item.rejectionReason ? (
+                          <span className="muted">Rejected: {item.rejectionReason}</span>
+                        ) : null}
+                      </div>
+                    </td>
                     <td>{formatDateTime(item.invoiceDateUtc)}</td>
                     <td>{purchaseInvoiceStatusLabel(item.status)}</td>
                     <td style={{ textAlign: 'right' }}>{formatAmount(item.totalAmount)}</td>
@@ -489,12 +634,50 @@ export function PurchaseInvoicesPage() {
                     <td style={{ textAlign: 'right' }}>{formatAmount(item.balanceAmount)}</td>
                     <td>{formatDateTime(item.postedOnUtc)}</td>
                     <td>
-                      {item.status === 1 && canManage ? (
-                        <button className="button" onClick={() => openPostModal(item.id)}>
-                          Post
-                        </button>
+                    {[1, 2, 3].includes(item.status) ? (
+                        <div className="inline-actions">
+                          {item.status === 1 && canManage ? (
+                            <button
+                              className="button"
+                              onClick={() => submitForApproval(item.id)}
+                              disabled={submitApprovalMut.isPending}
+                            >
+                              {submitApprovalMut.isPending ? 'Submitting…' : 'Submit'}
+                            </button>
+                          ) : null}
+
+                          {item.status === 2 && canApprove ? (
+                            <>
+                              <button
+                                className="button"
+                                onClick={() => approveInvoice(item.id)}
+                                disabled={approveMut.isPending}
+                              >
+                                {approveMut.isPending ? 'Approving…' : 'Approve'}
+                              </button>
+
+                              <button
+                                className="button danger"
+                                onClick={() => rejectInvoice(item.id)}
+                                disabled={rejectMut.isPending}
+                              >
+                                {rejectMut.isPending ? 'Rejecting…' : 'Reject'}
+                              </button>
+                            </>
+                          ) : null}
+
+                          {item.status === 3 && canApprove ? (
+                            <button
+                              className="button primary"
+                              onClick={() => openPostModal(item.id)}
+                              disabled={postMut.isPending}
+                            >
+                              Post Invoice
+                            </button>
+                          ) : null}
+                        </div>
                       ) : (
-                        '—'
+                        <span className="muted">No action required</span>
                       )}
                     </td>
                   </tr>
@@ -713,9 +896,6 @@ export function PurchaseInvoicesPage() {
                 </table>
               </div>
             ) : null}
-
-
-
 
             <div className="modal-footer">
               <button className="button" onClick={closeCreateModal} disabled={createMut.isPending}>Cancel</button>

@@ -113,6 +113,61 @@ public sealed class VendorPayment : TenantOwnedEntity
         SetModified(lastModifiedBy);
     }
 
+    public void CorrectRejectedPayment(
+    Guid vendorId,
+    Guid purchaseInvoiceId,
+    DateTime paymentDateUtc,
+    string paymentNumber,
+    string description,
+    decimal amount,
+    string? modifiedBy)
+{
+    if (Status != VendorPaymentStatus.Rejected)
+    {
+        throw new InvalidOperationException("Only rejected vendor payments can be corrected.");
+    }
+
+    if (JournalEntryId.HasValue || PostedOnUtc.HasValue)
+    {
+        throw new InvalidOperationException("Posted vendor payments cannot be corrected.");
+    }
+
+    if (vendorId == Guid.Empty)
+    {
+        throw new ArgumentException("Vendor is required.", nameof(vendorId));
+    }
+
+    if (purchaseInvoiceId == Guid.Empty)
+    {
+        throw new ArgumentException("Purchase invoice is required.", nameof(purchaseInvoiceId));
+    }
+
+    if (string.IsNullOrWhiteSpace(paymentNumber))
+    {
+        throw new ArgumentException("Payment number is required.", nameof(paymentNumber));
+    }
+
+    if (string.IsNullOrWhiteSpace(description))
+    {
+        throw new ArgumentException("Payment description is required.", nameof(description));
+    }
+
+    if (amount <= 0m)
+    {
+        throw new ArgumentException("Payment amount must be greater than zero.", nameof(amount));
+    }
+
+    VendorId = vendorId;
+    PurchaseInvoiceId = purchaseInvoiceId;
+    PaymentDateUtc = paymentDateUtc;
+    PaymentNumber = paymentNumber.Trim().ToUpperInvariant();
+    Description = description.Trim();
+    Amount = amount;
+
+    SetModified(modifiedBy);
+}
+
+
     public void SubmitForApproval(string? submittedBy)
     {
         EnsureActiveForWorkflow();

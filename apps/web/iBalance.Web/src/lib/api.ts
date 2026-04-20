@@ -820,7 +820,14 @@ export type SalesInvoiceDto = {
   journalEntryId?: string | null;
   postedOnUtc?: string | null;
   lineCount: number;
-};
+  submittedBy?: string | null;
+  submittedOnUtc?: string | null;
+  approvedBy?: string | null;
+  approvedOnUtc?: string | null;
+  rejectedBy?: string | null;
+  rejectedOnUtc?: string | null;
+  rejectionReason?: string | null;
+  };
 
 export type SalesInvoicesResponse = {
   tenantContextAvailable: boolean;
@@ -842,6 +849,75 @@ export type CreateSalesInvoiceRequest = {
 export type PostSalesInvoiceRequest = {
   receivableLedgerAccountId: string;
   revenueLedgerAccountId: string;
+};
+
+export type RejectedSalesInvoiceLineDto = {
+  id: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+};
+
+export type RejectedSalesInvoiceTaxLineDto = {
+  id: string;
+  taxCodeId: string;
+  componentKind: number;
+  applicationMode: number;
+  transactionScope: number;
+  ratePercent: number;
+  taxableAmount: number;
+  taxAmount: number;
+  taxLedgerAccountId: string;
+  description: string;
+};
+
+export type RejectedSalesInvoiceDto = {
+  id: string;
+  customerId: string;
+  customerCode: string;
+  customerName: string;
+  invoiceDateUtc: string;
+  invoiceNumber: string;
+  description: string;
+  status: number;
+  totalAmount: number;
+  taxAdditionAmount: number;
+  taxDeductionAmount: number;
+  grossAmount: number;
+  netReceivableAmount: number;
+  amountPaid: number;
+  balanceAmount: number;
+  journalEntryId?: string | null;
+  postedOnUtc?: string | null;
+  submittedBy?: string | null;
+  submittedByDisplayName?: string | null;
+  submittedOnUtc?: string | null;
+  approvedBy?: string | null;
+  approvedByDisplayName?: string | null;
+  approvedOnUtc?: string | null;
+  rejectedBy?: string | null;
+  rejectedByDisplayName?: string | null;
+  rejectedOnUtc?: string | null;
+  rejectionReason?: string | null;
+  createdOnUtc?: string | null;
+  createdBy?: string | null;
+  createdByDisplayName?: string | null;
+  preparedByDisplayName?: string | null;
+  lastModifiedOnUtc?: string | null;
+  lastModifiedBy?: string | null;
+  lastModifiedByDisplayName?: string | null;
+  lines: RejectedSalesInvoiceLineDto[];
+  taxLines: RejectedSalesInvoiceTaxLineDto[];
+};
+
+export type UpdateSalesInvoiceRequest = {
+  customerId: string;
+  invoiceDateUtc: string;
+  invoiceNumber: string;
+  description: string;
+  lines: SalesInvoiceLineDto[];
+  taxCodeIds?: string[];
 };
 
 export type CustomerReceiptDto = {
@@ -1006,6 +1082,60 @@ export type RejectCustomerReceiptRequest = {
   reason: string;
 };
 
+
+export type RejectedCustomerReceiptDto = {
+  id: string;
+  customerId: string;
+  customerCode: string;
+  customerName: string;
+  salesInvoiceId: string;
+  invoiceNumber: string;
+  invoiceDescription: string;
+  invoiceDateUtc?: string | null;
+  invoiceTotalAmount: number;
+  invoiceTaxAdditionAmount: number;
+  invoiceTaxDeductionAmount: number;
+  invoiceGrossAmount: number;
+  invoiceNetReceivableAmount: number;
+  invoiceAmountPaid: number;
+  invoiceBalanceAmount: number;
+  receiptDateUtc: string;
+  receiptNumber: string;
+  description: string;
+  amount: number;
+  status: number;
+  postingRequiresApproval: boolean;
+  submittedBy?: string | null;
+  submittedByDisplayName?: string | null;
+  submittedOnUtc?: string | null;
+  approvedBy?: string | null;
+  approvedByDisplayName?: string | null;
+  approvedOnUtc?: string | null;
+  rejectedBy?: string | null;
+  rejectedByDisplayName?: string | null;
+  rejectedOnUtc?: string | null;
+  rejectionReason?: string | null;
+  createdOnUtc?: string | null;
+  createdBy?: string | null;
+  createdByDisplayName?: string | null;
+  preparedByDisplayName?: string | null;
+  lastModifiedOnUtc?: string | null;
+  lastModifiedBy?: string | null;
+  lastModifiedByDisplayName?: string | null;
+  journalEntryId?: string | null;
+  postedOnUtc?: string | null;
+};
+
+export type UpdateCustomerReceiptRequest = {
+  customerId: string;
+  salesInvoiceId: string;
+  receiptDateUtc: string;
+  receiptNumber: string;
+  description: string;
+  amount: number;
+};
+
+
 export type VendorDto = {
   id: string;
   vendorCode: string;
@@ -1059,7 +1189,14 @@ export type PurchaseInvoiceDto = {
   journalEntryId?: string | null;
   postedOnUtc?: string | null;
   lineCount: number;
-};
+  submittedBy?: string | null;
+  submittedOnUtc?: string | null;
+  approvedBy?: string | null;
+  approvedOnUtc?: string | null;
+  rejectedBy?: string | null;
+  rejectedOnUtc?: string | null;
+  rejectionReason?: string | null;
+  };
 
 export type PurchaseInvoicesResponse = {
   tenantContextAvailable: boolean;
@@ -1082,6 +1219,78 @@ export type PostPurchaseInvoiceRequest = {
   payableLedgerAccountId: string;
   expenseLedgerAccountId: string;
 };
+
+
+export type RejectedPurchaseInvoiceLineDto = {
+  id: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+};
+
+export type RejectedPurchaseInvoiceTaxLineDto = {
+  id: string;
+  taxCodeId: string;
+  componentKind: number;
+  applicationMode: number;
+  transactionScope: number;
+  ratePercent: number;
+  taxableAmount: number;
+  taxAmount: number;
+  taxLedgerAccountId: string;
+  description: string;
+};
+
+export type RejectedPurchaseInvoiceDto = {
+  id: string;
+  vendorId: string;
+  vendorCode: string;
+  vendorName: string;
+  invoiceDateUtc: string;
+  invoiceNumber: string;
+  description: string;
+  status: number;
+  totalAmount: number;
+  taxAdditionAmount: number;
+  taxDeductionAmount: number;
+  grossAmount: number;
+  netPayableAmount: number;
+  amountPaid: number;
+  balanceAmount: number;
+  journalEntryId?: string | null;
+  postedOnUtc?: string | null;
+  submittedBy?: string | null;
+  submittedByDisplayName?: string | null;
+  submittedOnUtc?: string | null;
+  approvedBy?: string | null;
+  approvedByDisplayName?: string | null;
+  approvedOnUtc?: string | null;
+  rejectedBy?: string | null;
+  rejectedByDisplayName?: string | null;
+  rejectedOnUtc?: string | null;
+  rejectionReason?: string | null;
+  createdOnUtc?: string | null;
+  createdBy?: string | null;
+  createdByDisplayName?: string | null;
+  preparedByDisplayName?: string | null;
+  lastModifiedOnUtc?: string | null;
+  lastModifiedBy?: string | null;
+  lastModifiedByDisplayName?: string | null;
+  lines: RejectedPurchaseInvoiceLineDto[];
+  taxLines: RejectedPurchaseInvoiceTaxLineDto[];
+};
+
+export type UpdatePurchaseInvoiceRequest = {
+  vendorId: string;
+  invoiceDateUtc: string;
+  invoiceNumber: string;
+  description: string;
+  lines: PurchaseInvoiceLineDto[];
+  taxCodeIds?: string[];
+};
+
+
 
 export type VendorPaymentDto = {
   id: string;
@@ -1165,6 +1374,11 @@ export type VendorPaymentDetailResponse = {
     rejectedOnUtc?: string | null;
     rejectionReason?: string | null;
     journalEntryId?: string | null;
+    journalEntryReference?: string | null;
+    journalEntryDescription?: string | null;
+    journalEntryDateUtc?: string | null;
+    journalEntryStatus?: number | null;
+    journalEntryPostedAtUtc?: string | null;
     postedOnUtc?: string | null;
     createdOnUtc: string;
     createdBy?: string | null;
@@ -1201,6 +1415,58 @@ export type RejectVendorPaymentRequest = {
   reason: string;
 };
 
+export type RejectedVendorPaymentDto = {
+  id: string;
+  vendorId: string;
+  vendorCode: string;
+  vendorName: string;
+  purchaseInvoiceId: string;
+  invoiceNumber: string;
+  invoiceDescription: string;
+  invoiceDateUtc?: string | null;
+  invoiceTotalAmount: number;
+  invoiceTaxAdditionAmount: number;
+  invoiceTaxDeductionAmount: number;
+  invoiceGrossAmount: number;
+  invoiceNetPayableAmount: number;
+  invoiceAmountPaid: number;
+  invoiceBalanceAmount: number;
+  paymentDateUtc: string;
+  paymentNumber: string;
+  description: string;
+  amount: number;
+  status: number;
+  postingRequiresApproval: boolean;
+  submittedBy?: string | null;
+  submittedByDisplayName?: string | null;
+  submittedOnUtc?: string | null;
+  approvedBy?: string | null;
+  approvedByDisplayName?: string | null;
+  approvedOnUtc?: string | null;
+  rejectedBy?: string | null;
+  rejectedByDisplayName?: string | null;
+  rejectedOnUtc?: string | null;
+  rejectionReason?: string | null;
+  createdOnUtc?: string | null;
+  createdBy?: string | null;
+  createdByDisplayName?: string | null;
+  preparedByDisplayName?: string | null;
+  lastModifiedOnUtc?: string | null;
+  lastModifiedBy?: string | null;
+  lastModifiedByDisplayName?: string | null;
+  journalEntryId?: string | null;
+  postedOnUtc?: string | null;
+};
+
+export type UpdateVendorPaymentRequest = {
+  vendorId: string;
+  purchaseInvoiceId: string;
+  paymentDateUtc: string;
+  paymentNumber: string;
+  description: string;
+  amount: number;
+};
+
 export type RejectJournalEntryRequest = {
   reason: string;
 };
@@ -1225,11 +1491,53 @@ export async function createPurchaseInvoice(payload: CreatePurchaseInvoiceReques
   return response.data;
 }
 
+
+export async function submitPurchaseInvoiceForApproval(purchaseInvoiceId: string) {
+  const response = await api.post(`/api/finance/ap/purchase-invoices/${purchaseInvoiceId}/submit`);
+  return response.data;
+}
+
+export async function approvePurchaseInvoice(purchaseInvoiceId: string) {
+  const response = await api.post(`/api/finance/ap/purchase-invoices/${purchaseInvoiceId}/approve`);
+  return response.data;
+}
+
+export async function rejectPurchaseInvoice(purchaseInvoiceId: string, payload: { reason: string }) {
+  const response = await api.post(`/api/finance/ap/purchase-invoices/${purchaseInvoiceId}/reject`, payload);
+  return response.data;
+}
+
+
 export async function postPurchaseInvoice(purchaseInvoiceId: string, payload: PostPurchaseInvoiceRequest) {
   const response = await api.post(
     `/api/finance/ap/purchase-invoices/${encodeURIComponent(purchaseInvoiceId)}/post`,
     payload
   );
+  return response.data;
+}
+
+
+export async function getRejectedPurchaseInvoices(): Promise<{
+  tenantContextAvailable: boolean;
+  tenantId: string;
+  tenantKey: string;
+  count: number;
+  items: RejectedPurchaseInvoiceDto[];
+}> {
+  const response = await api.get('/api/finance/ap/purchase-invoices/rejected');
+  return response.data;
+}
+
+export async function updateRejectedPurchaseInvoice(
+  purchaseInvoiceId: string,
+  payload: UpdatePurchaseInvoiceRequest
+) {
+  const response = await api.put(`/api/finance/ap/purchase-invoices/${purchaseInvoiceId}`, payload);
+  return response.data;
+}
+
+export async function deleteRejectedPurchaseInvoice(purchaseInvoiceId: string) {
+  const response = await api.delete(`/api/finance/ap/purchase-invoices/${purchaseInvoiceId}`);
   return response.data;
 }
 
@@ -1289,6 +1597,31 @@ export async function rejectVendorPayment(vendorPaymentId: string, payload: Reje
     `/api/finance/ap/vendor-payments/${encodeURIComponent(vendorPaymentId)}/reject`,
     payload
   );
+  return response.data;
+}
+
+
+export async function getRejectedVendorPayments(): Promise<{
+  tenantContextAvailable: boolean;
+  tenantId: string;
+  tenantKey: string;
+  count: number;
+  items: RejectedVendorPaymentDto[];
+}> {
+  const response = await api.get('/api/finance/ap/vendor-payments/rejected');
+  return response.data;
+}
+
+export async function updateRejectedVendorPayment(
+  vendorPaymentId: string,
+  payload: UpdateVendorPaymentRequest
+) {
+  const response = await api.put(`/api/finance/ap/vendor-payments/${vendorPaymentId}`, payload);
+  return response.data;
+}
+
+export async function deleteRejectedVendorPayment(vendorPaymentId: string) {
+  const response = await api.delete(`/api/finance/ap/vendor-payments/${vendorPaymentId}`);
   return response.data;
 }
 
@@ -1522,6 +1855,69 @@ export async function postSalesInvoice(salesInvoiceId: string, payload: PostSale
     `/api/finance/ar/sales-invoices/${encodeURIComponent(salesInvoiceId)}/post`,
     payload
   );
+  return response.data;
+}
+
+export async function submitSalesInvoiceForApproval(salesInvoiceId: string) {
+  const response = await api.post(`/api/finance/ar/sales-invoices/${salesInvoiceId}/submit`);
+  return response.data;
+}
+
+export async function approveSalesInvoice(salesInvoiceId: string) {
+  const response = await api.post(`/api/finance/ar/sales-invoices/${salesInvoiceId}/approve`);
+  return response.data;
+}
+
+export async function rejectSalesInvoice(salesInvoiceId: string, payload: { reason: string }) {
+  const response = await api.post(`/api/finance/ar/sales-invoices/${salesInvoiceId}/reject`, payload);
+  return response.data;
+}
+
+export async function getRejectedSalesInvoices(): Promise<{
+  tenantContextAvailable: boolean;
+  tenantId: string;
+  tenantKey: string;
+  count: number;
+  items: RejectedSalesInvoiceDto[];
+}> {
+  const response = await api.get('/api/finance/ar/sales-invoices/rejected');
+  return response.data;
+}
+
+export async function updateRejectedSalesInvoice(
+  salesInvoiceId: string,
+  payload: UpdateSalesInvoiceRequest
+) {
+  const response = await api.put(`/api/finance/ar/sales-invoices/${salesInvoiceId}`, payload);
+  return response.data;
+}
+
+export async function deleteRejectedSalesInvoice(salesInvoiceId: string) {
+  const response = await api.delete(`/api/finance/ar/sales-invoices/${salesInvoiceId}`);
+  return response.data;
+}
+
+export async function getRejectedCustomerReceipts(): Promise<{
+  tenantContextAvailable: boolean;
+  tenantId: string;
+  tenantKey: string;
+  count: number;
+  items: RejectedCustomerReceiptDto[];
+}> {
+  const response = await api.get('/api/finance/ar/customer-receipts/rejected');
+  return response.data;
+}
+
+export async function updateRejectedCustomerReceipt(
+  customerReceiptId: string,
+  payload: UpdateCustomerReceiptRequest
+) {
+  const response = await api.put(`/api/finance/ar/customer-receipts/${customerReceiptId}`, payload);
+  return response.data;
+}
+
+export async function deleteRejectedCustomerReceipt(customerReceiptId: string) {
+  const response = await api.delete(`/api/finance/ar/customer-receipts/${customerReceiptId}`);
   return response.data;
 }
 

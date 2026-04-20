@@ -93,6 +93,20 @@ public sealed class SalesInvoice
 
     public DateTime? PostedOnUtc { get; private set; }
 
+    public string? SubmittedBy { get; private set; }
+
+    public DateTime? SubmittedOnUtc { get; private set; }
+
+    public string? ApprovedBy { get; private set; }
+
+    public DateTime? ApprovedOnUtc { get; private set; }
+
+    public string? RejectedBy { get; private set; }
+
+    public DateTime? RejectedOnUtc { get; private set; }
+
+    public string? RejectionReason { get; private set; }
+
     public DateTime? CancelledOnUtc { get; private set; }
 
     public DateTime CreatedOnUtc { get; private set; }
@@ -131,6 +145,46 @@ public sealed class SalesInvoice
         Touch();
     }
 
+    public void CorrectRejectedInvoice(
+    Guid customerId,
+    DateTime invoiceDateUtc,
+    string invoiceNumber,
+    string description,
+    string? modifiedBy)
+{
+    if (Status != SalesInvoiceStatus.Rejected)
+    {
+        throw new InvalidOperationException("Only rejected sales invoices can be corrected.");
+    }
+
+    if (JournalEntryId.HasValue || PostedOnUtc.HasValue)
+    {
+        throw new InvalidOperationException("Posted sales invoices cannot be corrected.");
+    }
+
+    if (customerId == Guid.Empty)
+    {
+        throw new ArgumentException("Customer is required.", nameof(customerId));
+    }
+
+    if (string.IsNullOrWhiteSpace(invoiceNumber))
+    {
+        throw new ArgumentException("Invoice number is required.", nameof(invoiceNumber));
+    }
+
+    if (string.IsNullOrWhiteSpace(description))
+    {
+        throw new ArgumentException("Invoice description is required.", nameof(description));
+    }
+
+    CustomerId = customerId;
+    InvoiceDateUtc = invoiceDateUtc;
+    InvoiceNumber = invoiceNumber.Trim().ToUpperInvariant();
+    Description = description.Trim();
+
+    SetAudit(CreatedBy, modifiedBy);
+}
+
     public void RecalculateTotals()
     {
         RecalculateTotals(TaxAdditionAmount, TaxDeductionAmount);
@@ -168,9 +222,84 @@ public sealed class SalesInvoice
         Touch();
     }
 
+    public void SubmitForApproval(string submittedBy)
+{
+    if (string.IsNullOrWhiteSpace(submittedBy))
+    {
+        throw new ArgumentException("Submitted by user is required.", nameof(submittedBy));
+    }
+
+    if (Status != SalesInvoiceStatus.Draft && Status != SalesInvoiceStatus.Rejected)
+    {
+        throw new InvalidOperationException("Only draft or rejected sales invoices can be submitted for approval.");
+    }
+
+    if (NetReceivableAmount <= 0m)
+    {
+        throw new InvalidOperationException("Only invoices with a positive net receivable amount can be submitted for approval.");
+    }
+
+    Status = SalesInvoiceStatus.SubmittedForApproval;
+    SubmittedBy = submittedBy.Trim();
+    SubmittedOnUtc = DateTime.UtcNow;
+
+    RejectedBy = null;
+    RejectedOnUtc = null;
+    RejectionReason = null;
+
+    Touch();
+}
+
+public void Approve(string approvedBy)
+{
+    if (string.IsNullOrWhiteSpace(approvedBy))
+    {
+        throw new ArgumentException("Approved by user is required.", nameof(approvedBy));
+    }
+
+    if (Status != SalesInvoiceStatus.SubmittedForApproval)
+    {
+        throw new InvalidOperationException("Only submitted sales invoices can be approved.");
+    }
+
+    Status = SalesInvoiceStatus.Approved;
+    ApprovedBy = approvedBy.Trim();
+    ApprovedOnUtc = DateTime.UtcNow;
+
+    Touch();
+}
+
+public void Reject(string rejectedBy, string reason)
+{
+    if (string.IsNullOrWhiteSpace(rejectedBy))
+    {
+        throw new ArgumentException("Rejected by user is required.", nameof(rejectedBy));
+    }
+
+    if (string.IsNullOrWhiteSpace(reason))
+    {
+        throw new ArgumentException("Rejection reason is required.", nameof(reason));
+    }
+
+    if (Status != SalesInvoiceStatus.SubmittedForApproval)
+    {
+        throw new InvalidOperationException("Only submitted sales invoices can be rejected.");
+    }
+
+    Status = SalesInvoiceStatus.Rejected;
+    RejectedBy = rejectedBy.Trim();
+    RejectedOnUtc = DateTime.UtcNow;
+    RejectionReason = reason.Trim();
+
+    Touch();
+}
+
     public void MarkPosted(Guid journalEntryId)
     {
-        EnsureDraft();
+        if (Status != SalesInvoiceStatus.Approved)
+        {
+            throw new InvalidOperationException("Only approved sales invoices can be posted.");
+        }
 
         if (journalEntryId == Guid.Empty)
         {

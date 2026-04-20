@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using iBalance.BuildingBlocks.Infrastructure.Persistence;
 namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260419221402_AddSalesInvoiceApprovalWorkflow")]
+    partial class AddSalesInvoiceApprovalWorkflow
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -765,12 +768,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
-                    b.Property<string>("ApprovedBy")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("ApprovedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<decimal>("BalanceAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
@@ -812,23 +809,8 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("PostedOnUtc")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("RejectedBy")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("RejectedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("RejectionReason")
-                        .HasColumnType("text");
-
                     b.Property<int>("Status")
                         .HasColumnType("integer");
-
-                    b.Property<string>("SubmittedBy")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("SubmittedOnUtc")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal>("TaxAdditionAmount")
                         .HasColumnType("numeric");

@@ -32,11 +32,22 @@ function formatDateTime(value?: string | null) {
   return parsed.toLocaleString();
 }
 
+function formatDateInput(value?: string | null) {
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toISOString().slice(0, 16);
+}
+
+function toUtcIsoFromInput(value: string) {
+  return value ? new Date(value).toISOString() : '';
+}
+
 function formatAmount(value: number) {
   return new Intl.NumberFormat('en-NG', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(value);
+  }).format(value || 0);
 }
 
 function vendorPaymentStatusLabel(value: number) {
@@ -54,10 +65,13 @@ function vendorPaymentStatusLabel(value: number) {
 function purchaseInvoiceStatusLabel(value: number) {
   switch (value) {
     case 1: return 'Draft';
-    case 2: return 'Posted';
-    case 3: return 'Part Paid';
-    case 4: return 'Paid';
-    case 5: return 'Cancelled';
+    case 2: return 'Submitted for Approval';
+    case 3: return 'Approved';
+    case 4: return 'Posted';
+    case 5: return 'Part Paid';
+    case 6: return 'Paid';
+    case 7: return 'Rejected';
+    case 8: return 'Cancelled';
     default: return 'Unknown';
   }
 }
@@ -110,10 +124,14 @@ export function VendorPaymentsPage() {
 
   async function refreshAfterWorkflow() {
     await qc.invalidateQueries({ queryKey: ['ap-vendor-payments'] });
+    await qc.invalidateQueries({ queryKey: ['ap-rejected-vendor-payments'] });
     await qc.invalidateQueries({ queryKey: ['ap-purchase-invoices'] });
     await qc.invalidateQueries({ queryKey: ['accounts'] });
     await qc.invalidateQueries({ queryKey: ['journal-entries'] });
     await qc.invalidateQueries({ queryKey: ['ap-vendor-payment-detail'] });
+    await qc.invalidateQueries({ queryKey: ['trial-balance'] });
+    await qc.invalidateQueries({ queryKey: ['balance-sheet'] });
+    await qc.invalidateQueries({ queryKey: ['income-statement'] });
   }
 
   const createMut = useMutation({
@@ -163,7 +181,8 @@ export function VendorPaymentsPage() {
   });
 
   const rejectMut = useMutation({
-    mutationFn: () => rejectVendorPayment(selectedPaymentId, { reason: rejectReason.trim() }),
+    mutationFn: (vendorPaymentId: string) =>
+      rejectVendorPayment(vendorPaymentId, { reason: rejectReason.trim() }),
     onSuccess: async () => {
       await refreshAfterWorkflow();
       setShowReject(false);
@@ -197,8 +216,12 @@ export function VendorPaymentsPage() {
     },
   });
 
+  const visiblePayments = useMemo(() => {
+    return (paymentsQ.data?.items ?? []).filter((item) => item.status !== 4);
+  }, [paymentsQ.data?.items]);
+  
   const summary = useMemo(() => {
-    const items = paymentsQ.data?.items ?? [];
+    const items = visiblePayments;
     return {
       total: items.length,
       totalAmount: items.reduce((sum, x) => sum + x.amount, 0),
@@ -209,7 +232,7 @@ export function VendorPaymentsPage() {
       posted: items.filter((x) => x.status === 5).length,
       cancelled: items.filter((x) => x.status === 6).length,
     };
-  }, [paymentsQ.data?.items]);
+  }, [visiblePayments]);
 
   const postingAccounts = useMemo(() => {
     return (accountsQ.data?.items ?? []).filter((x) => x.isActive && !x.isHeader && x.isPostingAllowed);
@@ -217,7 +240,7 @@ export function VendorPaymentsPage() {
 
   const eligibleInvoices = useMemo(() => {
     return (purchaseInvoicesQ.data?.items ?? []).filter(
-      (x) => (x.status === 2 || x.status === 3) && Number(x.balanceAmount || 0) > 0
+      (x) => (x.status === 4 || x.status === 5) && Number(x.balanceAmount || 0) > 0
     );
   }, [purchaseInvoicesQ.data?.items]);
 
@@ -225,7 +248,6 @@ export function VendorPaymentsPage() {
     if (!form.vendorId) return eligibleInvoices;
     return eligibleInvoices.filter((x) => x.vendorId === form.vendorId);
   }, [eligibleInvoices, form.vendorId]);
-
 
   const selectedInvoice = useMemo(() => {
     return (purchaseInvoicesQ.data?.items ?? []).find((x) => x.id === form.purchaseInvoiceId) ?? null;
@@ -395,12 +417,17 @@ export function VendorPaymentsPage() {
       return;
     }
 
+    if (!selectedPaymentId) {
+      setErrorText('Please select a vendor payment to reject.');
+      return;
+    }
+
     if (!rejectReason.trim()) {
       setErrorText('Rejection reason is required.');
       return;
     }
 
-    await rejectMut.mutateAsync();
+    await rejectMut.mutateAsync(selectedPaymentId);
   }
 
   async function submitPost() {
@@ -409,6 +436,11 @@ export function VendorPaymentsPage() {
 
     if (!canApprove) {
       setErrorText('You do not have permission to post approved vendor payments.');
+      return;
+    }
+
+    if (!selectedPaymentId) {
+      setErrorText('Please select a vendor payment to post.');
       return;
     }
 
@@ -458,6 +490,9 @@ export function VendorPaymentsPage() {
           {canManage ? (
             <div className="inline-actions">
               <button className="button primary" onClick={openCreateModal}>New Vendor Payment</button>
+              <Link to="/vendor-payments/rejected" className="button">
+                Rejected Vendor Payments
+              </Link>
             </div>
           ) : null}
         </div>
@@ -489,7 +524,7 @@ export function VendorPaymentsPage() {
       <section className="panel">
         <div className="section-heading">
           <h2>Vendor Payment Listing</h2>
-          <span className="muted">{paymentsQ.data.count} payment(s)</span>
+          <span className="muted">{visiblePayments.length} active payment(s)</span>
         </div>
 
         <div className="table-wrap">
@@ -507,18 +542,18 @@ export function VendorPaymentsPage() {
                 <th>Approved On</th>
                 <th>Posted On</th>
                 <th style={{ textAlign: 'right' }}>Amount</th>
-                <th style={{ width: 320 }}>Action</th>
+                <th style={{ width: 340 }}>Action</th>
               </tr>
             </thead>
             <tbody>
-              {paymentsQ.data.items.length === 0 ? (
+            {visiblePayments.length === 0 ? (
                 <tr>
                   <td colSpan={12} className="muted">
                     No vendor payments have been created yet.
                   </td>
                 </tr>
               ) : (
-                paymentsQ.data.items.map((item) => (
+                visiblePayments.map((item) => (
                   <tr key={item.id}>
                     <td>{item.paymentNumber}</td>
                     <td>{item.vendorCode} - {item.vendorName}</td>
@@ -540,7 +575,7 @@ export function VendorPaymentsPage() {
                     <td style={{ textAlign: 'right' }}>{formatAmount(item.amount)}</td>
                     <td>
                       <div className="inline-actions">
-                        {(item.status === 1 || item.status === 4) && canManage ? (
+                      {item.status === 1 && canManage ? (
                           <button
                             className="button"
                             onClick={() => handleSubmitForApproval(item.id)}
@@ -559,8 +594,9 @@ export function VendorPaymentsPage() {
                             >
                               {approveMut.isPending && selectedPaymentId === item.id ? 'Approving…' : 'Approve'}
                             </button>
+
                             <button
-                              className="button"
+                              className="button danger"
                               onClick={() => openRejectModal(item.id)}
                               disabled={rejectMut.isPending}
                             >
@@ -570,7 +606,7 @@ export function VendorPaymentsPage() {
                         ) : null}
 
                         {item.status === 3 && canApprove ? (
-                          <button className="button" onClick={() => openPostModal(item.id)}>
+                          <button className="button" onClick={() => openPostModal(item.id)} disabled={postMut.isPending}>
                             Post
                           </button>
                         ) : null}
@@ -656,8 +692,8 @@ export function VendorPaymentsPage() {
                 <input
                   className="input"
                   type="datetime-local"
-                  value={form.paymentDateUtc ? new Date(form.paymentDateUtc).toISOString().slice(0, 16) : ''}
-                  onChange={(e) => update('paymentDateUtc', new Date(e.target.value).toISOString())}
+                  value={formatDateInput(form.paymentDateUtc)}
+                  onChange={(e) => update('paymentDateUtc', toUtcIsoFromInput(e.target.value))}
                 />
               </div>
 
@@ -683,54 +719,51 @@ export function VendorPaymentsPage() {
               </div>
             </div>
 
-
-
             {selectedInvoice ? (
-          <div className="kv" style={{ marginTop: 16, marginBottom: 16 }}>
-            <div className="kv-row">
-              <span>Selected Invoice</span>
-              <span>{selectedInvoice.invoiceNumber}</span>
-            </div>
-            <div className="kv-row">
-              <span>Invoice Status</span>
-              <span>{purchaseInvoiceStatusLabel(selectedInvoice.status)}</span>
-            </div>
-            <div className="kv-row">
-              <span>Base Amount</span>
-              <span>{formatAmount(selectedInvoice.totalAmount)}</span>
-            </div>
-            <div className="kv-row">
-              <span>Tax Additions</span>
-              <span>{formatAmount(selectedInvoice.taxAdditionAmount || 0)}</span>
-            </div>
-            <div className="kv-row">
-              <span>Tax Deductions</span>
-              <span>{formatAmount(selectedInvoice.taxDeductionAmount || 0)}</span>
-            </div>
-            <div className="kv-row">
-              <span>Gross Amount</span>
-              <span>{formatAmount(selectedInvoice.grossAmount || selectedInvoice.totalAmount)}</span>
-            </div>
-            <div className="kv-row">
-              <span>Net Payable Amount</span>
-              <span>{formatAmount(selectedInvoice.netPayableAmount || selectedInvoice.totalAmount)}</span>
-            </div>
-            <div className="kv-row">
-              <span>Amount Paid</span>
-              <span>{formatAmount(selectedInvoice.amountPaid)}</span>
-            </div>
-            <div className="kv-row">
-              <span>Outstanding Balance</span>
-              <span>{formatAmount(selectedInvoice.balanceAmount)}</span>
-            </div>
-          </div>
-        ) : null}
-
-
-
+              <div className="kv" style={{ marginTop: 16, marginBottom: 16 }}>
+                <div className="kv-row">
+                  <span>Selected Invoice</span>
+                  <span>{selectedInvoice.invoiceNumber}</span>
+                </div>
+                <div className="kv-row">
+                  <span>Invoice Status</span>
+                  <span>{purchaseInvoiceStatusLabel(selectedInvoice.status)}</span>
+                </div>
+                <div className="kv-row">
+                  <span>Base Amount</span>
+                  <span>{formatAmount(selectedInvoice.totalAmount)}</span>
+                </div>
+                <div className="kv-row">
+                  <span>Tax Additions</span>
+                  <span>{formatAmount(selectedInvoice.taxAdditionAmount || 0)}</span>
+                </div>
+                <div className="kv-row">
+                  <span>Tax Deductions</span>
+                  <span>{formatAmount(selectedInvoice.taxDeductionAmount || 0)}</span>
+                </div>
+                <div className="kv-row">
+                  <span>Gross Amount</span>
+                  <span>{formatAmount(selectedInvoice.grossAmount || selectedInvoice.totalAmount)}</span>
+                </div>
+                <div className="kv-row">
+                  <span>Net Payable Amount</span>
+                  <span>{formatAmount(selectedInvoice.netPayableAmount || selectedInvoice.totalAmount)}</span>
+                </div>
+                <div className="kv-row">
+                  <span>Amount Paid</span>
+                  <span>{formatAmount(selectedInvoice.amountPaid)}</span>
+                </div>
+                <div className="kv-row">
+                  <span>Outstanding Balance</span>
+                  <span>{formatAmount(selectedInvoice.balanceAmount)}</span>
+                </div>
+              </div>
+            ) : null}
 
             <div className="modal-footer">
-              <button className="button" onClick={closeCreateModal} disabled={createMut.isPending}>Cancel</button>
+              <button className="button" onClick={closeCreateModal} disabled={createMut.isPending}>
+                Cancel
+              </button>
               <button className="button primary" onClick={submitCreate} disabled={createMut.isPending}>
                 {createMut.isPending ? 'Creating…' : 'Create Vendor Payment'}
               </button>
@@ -761,8 +794,10 @@ export function VendorPaymentsPage() {
             </div>
 
             <div className="modal-footer">
-              <button className="button" onClick={closeRejectModal} disabled={rejectMut.isPending}>Cancel</button>
-              <button className="button primary" onClick={submitReject} disabled={rejectMut.isPending}>
+              <button className="button" onClick={closeRejectModal} disabled={rejectMut.isPending}>
+                Cancel
+              </button>
+              <button className="button danger" onClick={submitReject} disabled={rejectMut.isPending}>
                 {rejectMut.isPending ? 'Rejecting…' : 'Reject Vendor Payment'}
               </button>
             </div>
@@ -819,7 +854,9 @@ export function VendorPaymentsPage() {
             </div>
 
             <div className="modal-footer">
-              <button className="button" onClick={closePostModal} disabled={postMut.isPending}>Cancel</button>
+              <button className="button" onClick={closePostModal} disabled={postMut.isPending}>
+                Cancel
+              </button>
               <button className="button primary" onClick={submitPost} disabled={postMut.isPending}>
                 {postMut.isPending ? 'Posting…' : 'Post Vendor Payment'}
               </button>

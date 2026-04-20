@@ -22,11 +22,24 @@ function formatDateTime(value?: string | null) {
   return parsed.toLocaleString();
 }
 
+function formatJournalEntry(payment: VoucherData['payment']) {
+  if (payment.journalEntryReference) {
+    return payment.journalEntryDescription
+      ? `${payment.journalEntryReference} - ${payment.journalEntryDescription}`
+      : payment.journalEntryReference;
+  }
+
+  return payment.journalEntryId ? 'Posted journal entry available' : '—';
+}
+
 function vendorPaymentStatusLabel(value: number) {
   switch (value) {
     case 1: return 'Draft';
-    case 2: return 'Posted';
-    case 3: return 'Cancelled';
+    case 2: return 'Submitted for Approval';
+    case 3: return 'Approved';
+    case 4: return 'Rejected';
+    case 5: return 'Posted';
+    case 6: return 'Cancelled';
     default: return 'Unknown';
   }
 }
@@ -57,6 +70,11 @@ type VoucherData = {
     amount: number;
     status: number;
     journalEntryId?: string | null;
+    journalEntryReference?: string | null;
+    journalEntryDescription?: string | null;
+    journalEntryDateUtc?: string | null;
+    journalEntryStatus?: number | null;
+    journalEntryPostedAtUtc?: string | null;
     postedOnUtc?: string | null;
     createdOnUtc: string;
     createdBy?: string | null;
@@ -245,7 +263,7 @@ function buildVoucherPrintHtml(args: {
       <div class="kv-row"><span>Status</span><span>${vendorPaymentStatusLabel(payment.status)}</span></div>
       <div class="kv-row"><span>Payment Amount</span><span>${formatAmount(payment.amount)}</span></div>
       <div class="kv-row"><span>Posted On</span><span>${formatDateTime(payment.postedOnUtc)}</span></div>
-      <div class="kv-row"><span>Journal Entry</span><span>${payment.journalEntryId || 'Not posted'}</span></div>
+      // <div class="kv-row"><span>Journal Entry</span><span>${formatJournalEntry(payment)}</span></div>
     </div>
 
     <div class="grid-two">
@@ -468,7 +486,7 @@ export function VendorPaymentVoucherPrintPage() {
           <div className="kv-row"><span>Status</span><span>{vendorPaymentStatusLabel(payment.status)}</span></div>
           <div className="kv-row"><span>Payment Amount</span><span>{formatAmount(payment.amount)}</span></div>
           <div className="kv-row"><span>Posted On</span><span>{formatDateTime(payment.postedOnUtc)}</span></div>
-          <div className="kv-row"><span>Journal Entry</span><span>{payment.journalEntryId || 'Not posted'}</span></div>
+          <div className="kv-row"><span>Journal Entry</span><span>{formatJournalEntry(payment)}</span></div>
         </div>
 
         <div className="form-grid two" style={{ marginBottom: 16 }}>

@@ -133,6 +133,61 @@ public sealed class CustomerReceipt
         Touch();
     }
 
+
+    public void CorrectRejectedReceipt(
+    Guid customerId,
+    Guid salesInvoiceId,
+    DateTime receiptDateUtc,
+    string receiptNumber,
+    string description,
+    decimal amount,
+    string? modifiedBy)
+{
+    if (Status != CustomerReceiptStatus.Rejected)
+    {
+        throw new InvalidOperationException("Only rejected customer receipts can be corrected.");
+    }
+
+    if (JournalEntryId.HasValue || PostedOnUtc.HasValue)
+    {
+        throw new InvalidOperationException("Posted customer receipts cannot be corrected.");
+    }
+
+    if (customerId == Guid.Empty)
+    {
+        throw new ArgumentException("Customer is required.", nameof(customerId));
+    }
+
+    if (salesInvoiceId == Guid.Empty)
+    {
+        throw new ArgumentException("Sales invoice is required.", nameof(salesInvoiceId));
+    }
+
+    if (string.IsNullOrWhiteSpace(receiptNumber))
+    {
+        throw new ArgumentException("Receipt number is required.", nameof(receiptNumber));
+    }
+
+    if (string.IsNullOrWhiteSpace(description))
+    {
+        throw new ArgumentException("Receipt description is required.", nameof(description));
+    }
+
+    if (amount <= 0m)
+    {
+        throw new ArgumentException("Receipt amount must be greater than zero.", nameof(amount));
+    }
+
+    CustomerId = customerId;
+    SalesInvoiceId = salesInvoiceId;
+    ReceiptDateUtc = receiptDateUtc;
+    ReceiptNumber = receiptNumber.Trim().ToUpperInvariant();
+    Description = description.Trim();
+    Amount = amount;
+
+    SetAudit(CreatedBy, modifiedBy);
+}
+
     public void SubmitForApproval(string? submittedBy)
     {
         EnsureActiveForWorkflow();
