@@ -18,7 +18,10 @@ import { VendorPaymentsPage } from './pages/VendorPaymentsPage';
 import { RejectedVendorPaymentsPage } from './pages/RejectedVendorPaymentsPage';
 import { VendorPaymentVoucherPrintPage } from './pages/VendorPaymentVoucherPrintPage';
 import { VendorStatementPage } from './pages/VendorStatementPage';
-
+import { BudgetsPage } from './pages/BudgetsPage';
+import { RejectedBudgetsPage } from './pages/RejectedBudgetsPage';
+import { BudgetVsActualPage } from './pages/BudgetVsActualPage';
+import { BudgetVsActualPrintPage } from './pages/BudgetVsActualPrintPage';
 import { LandingPage } from './pages/LandingPage';
 import { PricingPublicPage } from './pages/PricingPublicPage';
 import { TenantOnboardingPage } from './pages/TenantOnboardingPage';
@@ -260,6 +263,49 @@ export default function App() {
           </RequireAuth>
         }
       />
+
+        <Route
+  path="/budgets"
+  element={
+    <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+      <AppShell>
+        <BudgetsPage />
+      </AppShell>
+    </RequireAuth>
+  }
+/>
+
+<Route
+  path="/budgets/rejected"
+  element={
+    <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+      <AppShell>
+        <RejectedBudgetsPage />
+      </AppShell>
+    </RequireAuth>
+  }
+/>
+
+<Route
+  path="/budget-vs-actual"
+  element={
+    <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+      <AppShell>
+        <BudgetVsActualPage />
+      </AppShell>
+    </RequireAuth>
+  }
+/>
+
+      <Route
+          path="/budget-vs-actual/print"
+          element={
+            <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+              <BudgetVsActualPrintPage />
+            </RequireAuth>
+          }
+        />
+
       <Route
         path="/reports"
         element={

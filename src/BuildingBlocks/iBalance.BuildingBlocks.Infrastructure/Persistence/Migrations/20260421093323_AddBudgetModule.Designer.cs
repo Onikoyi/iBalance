@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using iBalance.BuildingBlocks.Infrastructure.Persistence;
 namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260421093323_AddBudgetModule")]
+    partial class AddBudgetModule
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -248,9 +251,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<bool>("AllowOverrun")
-                        .HasColumnType("boolean");
-
                     b.Property<string>("ApprovedBy")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
@@ -265,17 +265,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTime?>("CancelledOnUtc")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ClosedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime?>("ClosedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ClosureReason")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
 
                     b.Property<string>("CreatedBy")
                         .HasColumnType("text");
@@ -309,9 +298,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.Property<string>("Notes")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
-
-                    b.Property<int>("OverrunPolicy")
-                        .HasColumnType("integer");
 
                     b.Property<DateTime>("PeriodEndUtc")
                         .HasColumnType("timestamp with time zone");
@@ -402,59 +388,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.HasIndex("LedgerAccountId");
 
                     b.ToTable("BudgetLines", "finance");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.BudgetTransfer", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Amount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<Guid>("BudgetId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CreatedBy")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("FromBudgetLineId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("LastModifiedBy")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("LastModifiedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Reason")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ToBudgetLineId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("TransferredBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime>("TransferredOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BudgetId");
-
-                    b.ToTable("BudgetTransfers", "finance");
                 });
 
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.Customer", b =>

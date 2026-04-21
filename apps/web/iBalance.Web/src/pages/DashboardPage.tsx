@@ -5,6 +5,8 @@ import {
   getCustomerReceipts,
   getDashboardSummary,
   getSalesInvoices,
+  getTaxReport,
+  getBudgets,
 } from '../lib/api';
 import { StatCard } from '../components/common/StatCard';
 
@@ -29,16 +31,19 @@ function formatAmount(value: number) {
   return new Intl.NumberFormat('en-NG', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(value);
+  }).format(value || 0);
 }
 
-function invoiceStatusLabel(value?: number) {
+function salesInvoiceStatusLabel(value?: number) {
   switch (value) {
     case 1: return 'Draft';
-    case 2: return 'Posted';
-    case 3: return 'Part Paid';
-    case 4: return 'Paid';
-    case 5: return 'Cancelled';
+    case 2: return 'Submitted for Approval';
+    case 3: return 'Approved';
+    case 4: return 'Posted';
+    case 5: return 'Part Paid';
+    case 6: return 'Paid';
+    case 7: return 'Rejected';
+    case 8: return 'Cancelled';
     default: return 'Unknown';
   }
 }
@@ -67,6 +72,18 @@ export function DashboardPage() {
     staleTime: 60_000,
   });
 
+  const taxReportQ = useQuery({
+    queryKey: ['dashboard-tax-report'],
+    queryFn: () => getTaxReport(undefined, undefined, null, null),
+    staleTime: 60_000,
+  });
+
+  const budgetsQ = useQuery({
+    queryKey: ['dashboard-budgets'],
+    queryFn: getBudgets,
+    staleTime: 60_000,
+  });
+
   if (isLoading) {
     return <div className="panel">Loading dashboard...</div>;
   }
@@ -77,20 +94,62 @@ export function DashboardPage() {
 
   const invoices = invoicesQ.data?.items || [];
   const receipts = receiptsQ.data?.items || [];
+  const taxReport = taxReportQ.data;
+
+  const activeInvoices = invoices.filter((x) => x.status !== 7 && x.status !== 8);
+  const activeReceipts = receipts.filter((x) => x.status !== 4 && x.status !== 6);
 
   const arSummary = {
-    totalInvoices: invoices.length,
-    draftInvoices: invoices.filter((x) => x.status === 1).length,
-    postedInvoices: invoices.filter((x) => x.status === 2).length,
-    partPaidInvoices: invoices.filter((x) => x.status === 3).length,
-    paidInvoices: invoices.filter((x) => x.status === 4).length,
-    receivableBalance: invoices.reduce((sum, x) => sum + Number(x.balanceAmount || 0), 0),
-    invoicedAmount: invoices.reduce((sum, x) => sum + Number(x.totalAmount || 0), 0),
-    cashCollected: invoices.reduce((sum, x) => sum + Number(x.amountPaid || 0), 0),
-    totalReceipts: receipts.length,
-    draftReceipts: receipts.filter((x) => x.status === 1).length,
-    postedReceipts: receipts.filter((x) => x.status === 2).length,
+    totalInvoices: activeInvoices.length,
+    draftInvoices: activeInvoices.filter((x) => x.status === 1).length,
+    submittedInvoices: activeInvoices.filter((x) => x.status === 2).length,
+    approvedInvoices: activeInvoices.filter((x) => x.status === 3).length,
+    postedInvoices: activeInvoices.filter((x) => x.status === 4).length,
+    partPaidInvoices: activeInvoices.filter((x) => x.status === 5).length,
+    paidInvoices: activeInvoices.filter((x) => x.status === 6).length,
+    receivableBalance: activeInvoices.reduce((sum, x) => sum + Number(x.balanceAmount || 0), 0),
+    invoicedAmount: activeInvoices.reduce((sum, x) => sum + Number(x.netReceivableAmount || x.totalAmount || 0), 0),
+    cashCollected: activeInvoices.reduce((sum, x) => sum + Number(x.amountPaid || 0), 0),
+    totalReceipts: activeReceipts.length,
+    draftReceipts: activeReceipts.filter((x) => x.status === 1).length,
+    submittedReceipts: activeReceipts.filter((x) => x.status === 2).length,
+    approvedReceipts: activeReceipts.filter((x) => x.status === 3).length,
+    postedReceipts: activeReceipts.filter((x) => x.status === 5).length,
   };
+
+  const taxSummary = {
+    totalTaxLines: taxReport?.count ?? 0,
+    totalTaxableAmount: taxReport?.totalTaxableAmount ?? 0,
+    totalTaxAmount: taxReport?.totalTaxAmount ?? 0,
+    totalTaxAdditions: taxReport?.totalAdditions ?? 0,
+    totalTaxDeductions: taxReport?.totalDeductions ?? 0,
+    vatAmount:
+      taxReport?.byComponentKind?.find((x) => x.componentKind === 1)?.totalTaxAmount ?? 0,
+    whtAmount:
+      taxReport?.byComponentKind?.find((x) => x.componentKind === 2)?.totalTaxAmount ?? 0,
+    otherTaxAmount:
+      taxReport?.byComponentKind?.find((x) => x.componentKind === 3)?.totalTaxAmount ?? 0,
+  };
+
+  const budgets = budgetsQ.data?.items || [];
+
+const activeBudgets = budgets.filter((x) => x.status !== 4 && x.status !== 6);
+
+const budgetSummary = {
+  totalBudgets: activeBudgets.length,
+  draftBudgets: activeBudgets.filter((x) => x.status === 1).length,
+  submittedBudgets: activeBudgets.filter((x) => x.status === 2).length,
+  approvedBudgets: activeBudgets.filter((x) => x.status === 3).length,
+  lockedBudgets: activeBudgets.filter((x) => x.status === 5).length,
+  closedBudgets: activeBudgets.filter((x) => x.status === 7).length,
+  approvedBudgetAmount: activeBudgets
+    .filter((x) => x.status === 3)
+    .reduce((sum, x) => sum + Number(x.totalAmount || 0), 0),
+  lockedBudgetAmount: activeBudgets
+    .filter((x) => x.status === 5)
+    .reduce((sum, x) => sum + Number(x.totalAmount || 0), 0),
+  controlledBudgets: activeBudgets.filter((x) => x.overrunPolicy === 1 || x.overrunPolicy === 4).length,
+};
 
   return (
     <div className="page-grid">
@@ -108,10 +167,73 @@ export function DashboardPage() {
           <StatCard label="Draft Journals" value={data.totalDraftJournals} />
           <StatCard label="Opening Journals" value={data.totalOpeningBalanceJournals} />
           <StatCard label="Ledger Movements" value={data.totalLedgerMovements} />
-          <StatCard label="Total Debit" value={data.totalDebit.toFixed(2)} />
-          <StatCard label="Total Credit" value={data.totalCredit.toFixed(2)} />
+          <StatCard label="Total Debit" value={formatAmount(data.totalDebit)} />
+          <StatCard label="Total Credit" value={formatAmount(data.totalCredit)} />
         </div>
       </section>
+
+      <section className="panel">
+        <div className="section-heading">
+          <h2>Tax overview</h2>
+          <span className="muted">VAT, WHT, and other tax activity</span>
+        </div>
+
+        {taxReportQ.isLoading ? (
+          <div className="muted">Loading tax metrics...</div>
+        ) : taxReportQ.isError ? (
+          <div className="muted">Tax metrics are not available right now.</div>
+        ) : (
+          <>
+            <div className="stats-grid">
+              <StatCard label="Tax Lines" value={taxSummary.totalTaxLines} />
+              <StatCard label="Taxable Amount" value={formatAmount(taxSummary.totalTaxableAmount)} />
+              <StatCard label="Total Tax Amount" value={formatAmount(taxSummary.totalTaxAmount)} />
+              <StatCard label="Tax Additions" value={formatAmount(taxSummary.totalTaxAdditions)} />
+              <StatCard label="Tax Deductions" value={formatAmount(taxSummary.totalTaxDeductions)} />
+              <StatCard label="VAT" value={formatAmount(taxSummary.vatAmount)} />
+              <StatCard label="WHT" value={formatAmount(taxSummary.whtAmount)} />
+              <StatCard label="Other Taxes" value={formatAmount(taxSummary.otherTaxAmount)} />
+            </div>
+
+            <div className="hero-actions" style={{ marginTop: 16 }}>
+              <Link to="/reports" className="button primary">Open Tax Reports</Link>
+            </div>
+          </>
+        )}
+      </section>
+
+      <section className="panel">
+  <div className="section-heading">
+    <h2>Budget overview</h2>
+    <span className="muted">Budget control, approval, and utilization readiness</span>
+  </div>
+
+  {budgetsQ.isLoading ? (
+    <div className="muted">Loading budget metrics...</div>
+  ) : budgetsQ.isError ? (
+    <div className="muted">Budget metrics are not available right now.</div>
+  ) : (
+    <>
+      <div className="stats-grid">
+        <StatCard label="Budgets" value={budgetSummary.totalBudgets} />
+        <StatCard label="Draft Budgets" value={budgetSummary.draftBudgets} />
+        <StatCard label="Submitted Budgets" value={budgetSummary.submittedBudgets} />
+        <StatCard label="Approved Budgets" value={budgetSummary.approvedBudgets} />
+        <StatCard label="Locked Budgets" value={budgetSummary.lockedBudgets} />
+        <StatCard label="Closed Budgets" value={budgetSummary.closedBudgets} />
+        <StatCard label="Approved Budget Amount" value={formatAmount(budgetSummary.approvedBudgetAmount)} />
+        <StatCard label="Locked Budget Amount" value={formatAmount(budgetSummary.lockedBudgetAmount)} />
+        <StatCard label="Strict Control Budgets" value={budgetSummary.controlledBudgets} />
+      </div>
+
+      <div className="hero-actions" style={{ marginTop: 16 }}>
+        <Link to="/budgets" className="button primary">Open Budgets</Link>
+        <Link to="/budget-vs-actual" className="button">Budget vs Actual</Link>
+        <Link to="/budgets/rejected" className="button">Rejected Budgets</Link>
+      </div>
+    </>
+  )}
+</section>
 
       <section className="panel">
         <div className="section-heading">
@@ -122,10 +244,14 @@ export function DashboardPage() {
         <div className="stats-grid">
           <StatCard label="Invoices" value={arSummary.totalInvoices} />
           <StatCard label="Draft Invoices" value={arSummary.draftInvoices} />
+          <StatCard label="Submitted Invoices" value={arSummary.submittedInvoices} />
+          <StatCard label="Approved Invoices" value={arSummary.approvedInvoices} />
           <StatCard label="Posted Invoices" value={arSummary.postedInvoices} />
           <StatCard label="Part Paid" value={arSummary.partPaidInvoices} />
           <StatCard label="Paid Invoices" value={arSummary.paidInvoices} />
           <StatCard label="Receipts" value={arSummary.totalReceipts} />
+          <StatCard label="Submitted Receipts" value={arSummary.submittedReceipts} />
+          <StatCard label="Approved Receipts" value={arSummary.approvedReceipts} />
           <StatCard label="Posted Receipts" value={arSummary.postedReceipts} />
           <StatCard label="Invoiced Amount" value={formatAmount(arSummary.invoicedAmount)} />
           <StatCard label="Cash Collected" value={formatAmount(arSummary.cashCollected)} />
@@ -211,16 +337,16 @@ export function DashboardPage() {
       <section className="panel">
         <div className="section-heading">
           <h2>Recent invoice activity</h2>
-          <span className="muted">Latest sales invoice records</span>
+          <span className="muted">Latest active sales invoice records</span>
         </div>
 
         {invoicesQ.isLoading ? (
           <div className="muted">Loading invoice activity...</div>
-        ) : invoices.length === 0 ? (
-          <div className="muted">No invoice activity is available yet.</div>
+        ) : activeInvoices.length === 0 ? (
+          <div className="muted">No active invoice activity is available yet.</div>
         ) : (
           <div className="detail-stack">
-            {invoices.slice(0, 5).map((invoice) => (
+            {activeInvoices.slice(0, 5).map((invoice) => (
               <div key={invoice.id} className="kv" style={{ marginBottom: 12 }}>
                 <div className="kv-row">
                   <span>Invoice</span>
@@ -232,11 +358,11 @@ export function DashboardPage() {
                 </div>
                 <div className="kv-row">
                   <span>Status</span>
-                  <span>{invoiceStatusLabel(invoice.status)}</span>
+                  <span>{salesInvoiceStatusLabel(invoice.status)}</span>
                 </div>
                 <div className="kv-row">
-                  <span>Total</span>
-                  <span>{formatAmount(invoice.totalAmount)}</span>
+                  <span>Net Receivable</span>
+                  <span>{formatAmount(invoice.netReceivableAmount || invoice.totalAmount)}</span>
                 </div>
                 <div className="kv-row">
                   <span>Balance</span>

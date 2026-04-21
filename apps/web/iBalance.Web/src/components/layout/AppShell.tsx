@@ -31,11 +31,21 @@ function pageTitleForPath(pathname: string) {
   if (pathname.startsWith('/accounts')) return 'Chart of Accounts';
   if (pathname.startsWith('/journals')) return 'Journal Management';
   if (pathname.startsWith('/customers')) return 'Customer Management';
+  if (pathname.startsWith('/sales-invoices/rejected')) return 'Rejected Sales Invoices';
   if (pathname.startsWith('/sales-invoices')) return 'Sales Invoice Management';
+  if (pathname.startsWith('/customer-receipts/rejected')) return 'Rejected Customer Receipts';
   if (pathname.startsWith('/customer-receipts')) return 'Customer Receipt Management';
+  if (pathname.startsWith('/vendors')) return 'Vendor Management';
+  if (pathname.startsWith('/purchase-invoices/rejected')) return 'Rejected Purchase Invoices';
+  if (pathname.startsWith('/purchase-invoices')) return 'Purchase Invoice Management';
+  if (pathname.startsWith('/vendor-payments/rejected')) return 'Rejected Vendor Payments';
+  if (pathname.startsWith('/vendor-payments')) return 'Vendor Payment Management';
   if (pathname.startsWith('/fiscal-periods')) return 'Fiscal Period Management';
   if (pathname.startsWith('/reports')) return 'Financial Reports';
   if (pathname.startsWith('/admin')) return 'Administration';
+  if (pathname.startsWith('/budgets/rejected')) return 'Rejected Budgets';
+  if (pathname.startsWith('/budget-vs-actual')) return 'Budget vs Actual';
+  if (pathname.startsWith('/budgets')) return 'Budget Management';
   return 'Finance Dashboard';
 }
 
@@ -43,11 +53,21 @@ function pageSubtitleForPath(pathname: string) {
   if (pathname.startsWith('/accounts')) return 'Manage ledger structure and posting accounts.';
   if (pathname.startsWith('/journals')) return 'Manage journals, posting workflow, and reversals.';
   if (pathname.startsWith('/customers')) return 'Register and maintain accounts receivable customers.';
+  if (pathname.startsWith('/sales-invoices/rejected')) return 'Correct, resubmit, or delete rejected sales invoices.';
   if (pathname.startsWith('/sales-invoices')) return 'Raise and review sales invoices for receivables operations.';
+  if (pathname.startsWith('/customer-receipts/rejected')) return 'Correct, resubmit, or delete rejected customer receipts.';
   if (pathname.startsWith('/customer-receipts')) return 'Capture customer collections and apply receipts against receivables.';
+  if (pathname.startsWith('/vendors')) return 'Register and maintain accounts payable vendors.';
+  if (pathname.startsWith('/purchase-invoices/rejected')) return 'Correct, resubmit, or delete rejected purchase invoices.';
+  if (pathname.startsWith('/purchase-invoices')) return 'Capture and manage supplier invoices for payables operations.';
+  if (pathname.startsWith('/vendor-payments/rejected')) return 'Correct, resubmit, or delete rejected vendor payments.';
+  if (pathname.startsWith('/vendor-payments')) return 'Capture supplier payments and route them through approval.';
   if (pathname.startsWith('/fiscal-periods')) return 'Manage accounting periods and open or close operations.';
   if (pathname.startsWith('/reports')) return 'Review financial performance and print-ready reports.';
   if (pathname.startsWith('/admin')) return 'Manage tenant operations, users, subscriptions, and recovery.';
+  if (pathname.startsWith('/budgets/rejected')) return 'Correct, resubmit, or delete rejected budgets.';
+  if (pathname.startsWith('/budget-vs-actual')) return 'Compare approved budgets against posted accounting actuals.';
+  if (pathname.startsWith('/budgets')) return 'Create, approve, lock, close, upload, and control budgets.';
   return 'Review operational activity across your accounting workspace.';
 }
 
@@ -69,17 +89,7 @@ function LogoSlot({
   }
 
   return (
-    <div
-      style={{
-        minWidth: 36,
-        height: 36,
-        borderRadius: 10,
-        display: 'grid',
-        placeItems: 'center',
-        background: 'rgba(75, 29, 115, 0.12)',
-        fontWeight: 700,
-      }}
-    >
+    <div className="logo-fallback">
       {fallbackText.slice(0, 1).toUpperCase()}
     </div>
   );
@@ -149,17 +159,18 @@ export function AppShell({ children }: PropsWithChildren) {
 
       <div className="app-main">
         <header className="topbar">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="topbar-title-block">
+            <div className="topbar-brand-row">
               <LogoSlot src={companyLogo} fallbackText="iBalance" />
+
               <div>
                 <div className="eyebrow">Nikosoft Technologies</div>
-                <h1 style={{ margin: 0 }}>{title}</h1>
-                <div className="muted" style={{ marginTop: 4 }}>{subtitle}</div>
+                <h1>{title}</h1>
+                <div className="muted topbar-subtitle">{subtitle}</div>
               </div>
             </div>
 
-            <div className="muted" style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
+            <div className="topbar-session-row">
               <span>
                 Signed in as <strong>{session?.userEmail || 'Not available'}</strong>
               </span>
@@ -172,27 +183,18 @@ export function AppShell({ children }: PropsWithChildren) {
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 340 }}>
-            <div
-              className="panel"
-              style={{
-                margin: 0,
-                padding: 12,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-              }}
-            >
+          <div className="topbar-actions-block">
+            <div className="tenant-card">
               <LogoSlot src={tenantLogo} fallbackText={getTenantKey() || 'Tenant'} />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600 }}>{getTenantKey() || 'Organization'}</div>
-                <div className="muted" style={{ fontSize: 12 }}>
+              <div className="tenant-card-meta">
+                <div className="tenant-card-title">{getTenantKey() || 'Organization'}</div>
+                <div className="muted tenant-card-detail">
                   {licenseSummary.detail}
                 </div>
               </div>
             </div>
 
-            <div className="inline-actions" style={{ justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+            <div className="inline-actions topbar-links">
               <Link to="/customers" className="button">Customers</Link>
               <Link to="/sales-invoices" className="button">Sales Invoices</Link>
               <Link to="/customer-receipts" className="button">Customer Receipts</Link>
@@ -203,10 +205,10 @@ export function AppShell({ children }: PropsWithChildren) {
           </div>
         </header>
 
-        <section className="panel" style={{ marginBottom: 16 }}>
+        <section className="panel tenant-context-panel">
           <div className="section-heading">
             <div>
-              <h2 style={{ margin: 0, fontSize: 18 }}>Tenant workspace</h2>
+              <h2>Tenant workspace</h2>
               <div className="muted">Switch tenant context carefully when working across organizations.</div>
             </div>
           </div>

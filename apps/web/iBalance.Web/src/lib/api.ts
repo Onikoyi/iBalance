@@ -1471,6 +1471,354 @@ export type RejectJournalEntryRequest = {
   reason: string;
 };
 
+// -----------------------------
+// Budgets
+// -----------------------------
+
+export type BudgetStatus = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+export type BudgetType = 1 | 2 | 3 | 4;
+
+export type BudgetOverrunPolicy = 1 | 2 | 3 | 4;
+
+export type BudgetLineDto = {
+  id: string;
+  ledgerAccountId: string;
+  ledgerAccountCode: string;
+  ledgerAccountName: string;
+  category: number;
+  normalBalance: number;
+  periodStartUtc: string;
+  periodEndUtc: string;
+  budgetAmount: number;
+  notes?: string | null;
+};
+
+export type BudgetDto = {
+  id: string;
+  budgetNumber: string;
+  name: string;
+  description: string;
+  type: BudgetType;
+  periodStartUtc: string;
+  periodEndUtc: string;
+  status: BudgetStatus;
+  overrunPolicy: BudgetOverrunPolicy;
+  allowOverrun: boolean;
+  notes?: string | null;
+  submittedBy?: string | null;
+  submittedOnUtc?: string | null;
+  approvedBy?: string | null;
+  approvedOnUtc?: string | null;
+  submittedByDisplayName?: string | null;
+  approvedByDisplayName?: string | null;
+  rejectedByDisplayName?: string | null;
+  lockedByDisplayName?: string | null;
+  closedByDisplayName?: string | null;
+  rejectedBy?: string | null;
+  rejectedOnUtc?: string | null;
+  rejectionReason?: string | null;
+  lockedBy?: string | null;
+  lockedOnUtc?: string | null;
+  closedBy?: string | null;
+  closedOnUtc?: string | null;
+  closureReason?: string | null;
+  cancelledOnUtc?: string | null;
+  lineCount: number;
+  totalAmount: number;
+};
+
+export type BudgetDetailDto = BudgetDto & {
+  lines: BudgetLineDto[];
+};
+
+export type BudgetTransferDto = {
+  id: string;
+  budgetId: string;
+  fromBudgetLineId: string;
+  toBudgetLineId: string;
+  amount: number;
+  reason: string;
+  transferredBy?: string | null;
+  transferredByDisplayName?: string | null;
+  transferredOnUtc: string;
+};
+
+export type BudgetLineRequest = {
+  id?: string | null;
+  ledgerAccountId: string;
+  periodStartUtc: string;
+  periodEndUtc: string;
+  budgetAmount: number;
+  notes?: string | null;
+};
+
+export type CreateBudgetRequest = {
+  budgetNumber: string;
+  name: string;
+  description: string;
+  type: BudgetType;
+  periodStartUtc: string;
+  periodEndUtc: string;
+  notes?: string | null;
+  overrunPolicy?: BudgetOverrunPolicy | null;
+  lines: BudgetLineRequest[];
+};
+
+export type RejectBudgetRequest = {
+  reason: string;
+};
+
+export type CloseBudgetRequest = {
+  reason: string;
+};
+
+export type SetBudgetOverrunPolicyRequest = {
+  overrunPolicy: BudgetOverrunPolicy;
+};
+
+export type TransferBudgetRequest = {
+  fromBudgetLineId: string;
+  toBudgetLineId: string;
+  amount: number;
+  reason: string;
+};
+
+export type UploadBudgetRowRequest = {
+  budgetNumber: string;
+  budgetName: string;
+  description: string;
+  budgetType: string;
+  periodStart: string;
+  periodEnd: string;
+  overrunPolicy: string;
+  ledgerAccountCode: string;
+  linePeriodStart: string;
+  linePeriodEnd: string;
+  budgetAmount: number;
+  notes?: string | null;
+};
+
+export type UploadBudgetRequest = {
+  notes?: string | null;
+  rows: UploadBudgetRowRequest[];
+};
+
+export type BudgetVsActualItemDto = {
+  budgetLineId: string;
+  ledgerAccountId: string;
+  ledgerAccountCode: string;
+  ledgerAccountName: string;
+  category: number;
+  normalBalance: number;
+  periodStartUtc: string;
+  periodEndUtc: string;
+  budgetAmount: number;
+  actualAmount: number;
+  varianceAmount: number;
+  utilizationPercent: number;
+  isOverBudget: boolean;
+  budgetOverrunPolicy: BudgetOverrunPolicy;
+  overrunStatus: string;
+  notes?: string | null;
+};
+
+export type BudgetVsActualResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string;
+  tenantKey: string;
+  budget: BudgetDto;
+  totalBudgetAmount: number;
+  totalActualAmount: number;
+  totalVarianceAmount: number;
+  overBudgetLineCount: number;
+  count: number;
+  items: BudgetVsActualItemDto[];
+};
+
+export type ConsolidatedBudgetVsActualBudgetDto = {
+  id: string;
+  budgetNumber: string;
+  name: string;
+  description: string;
+  type: BudgetType;
+  budgetTypeName: string;
+  periodStartUtc: string;
+  periodEndUtc: string;
+  status: BudgetStatus;
+  overrunPolicy: BudgetOverrunPolicy;
+  allowOverrun: boolean;
+  notes?: string | null;
+  lineCount: number;
+  totalBudgetAmount: number;
+  totalActualAmount: number;
+  totalVarianceAmount: number;
+  overBudgetLineCount: number;
+  items: BudgetVsActualItemDto[];
+};
+
+export type ConsolidatedBudgetVsActualSectionDto = {
+  budgetType: BudgetType;
+  budgetTypeName: string;
+  budgetCount: number;
+  totalBudgetAmount: number;
+  totalActualAmount: number;
+  totalVarianceAmount: number;
+  overBudgetLineCount: number;
+  budgets: ConsolidatedBudgetVsActualBudgetDto[];
+};
+
+export type ConsolidatedBudgetVsActualResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string;
+  tenantKey: string;
+  periodStartUtc: string;
+  periodEndUtc: string;
+  sectionCount: number;
+  budgetCount: number;
+  totalBudgetAmount: number;
+  totalActualAmount: number;
+  totalVarianceAmount: number;
+  overBudgetLineCount: number;
+  sections: ConsolidatedBudgetVsActualSectionDto[];
+};
+
+
+export async function getConsolidatedBudgetVsActual(
+  periodStartUtc: string,
+  periodEndUtc: string,
+  budgetType?: BudgetType | null
+): Promise<ConsolidatedBudgetVsActualResponse> {
+  const response = await api.get('/api/finance/budgets/reports/budget-vs-actual-consolidated', {
+    params: {
+      periodStartUtc,
+      periodEndUtc,
+      budgetType: budgetType ?? undefined,
+    },
+  });
+
+  return response.data;
+}
+
+export async function getBudgets(): Promise<{
+  tenantContextAvailable: boolean;
+  tenantId: string;
+  tenantKey: string;
+  count: number;
+  items: BudgetDto[];
+}> {
+  const response = await api.get('/api/finance/budgets');
+  return response.data;
+}
+
+export async function getRejectedBudgets(): Promise<{
+  tenantContextAvailable: boolean;
+  tenantId: string;
+  tenantKey: string;
+  count: number;
+  items: BudgetDetailDto[];
+}> {
+  const response = await api.get('/api/finance/budgets/rejected');
+  return response.data;
+}
+
+export async function getBudgetDetail(budgetId: string): Promise<{
+  tenantContextAvailable: boolean;
+  tenantId: string;
+  tenantKey: string;
+  budget: BudgetDetailDto;
+  transfers: BudgetTransferDto[];
+}> {
+  const response = await api.get(`/api/finance/budgets/${budgetId}`);
+  return response.data;
+}
+
+export async function createBudget(payload: CreateBudgetRequest) {
+  const response = await api.post('/api/finance/budgets', payload);
+  return response.data;
+}
+
+export async function updateBudget(budgetId: string, payload: CreateBudgetRequest) {
+  const response = await api.put(`/api/finance/budgets/${budgetId}`, payload);
+  return response.data;
+}
+
+export async function deleteBudget(budgetId: string) {
+  const response = await api.delete(`/api/finance/budgets/${budgetId}`);
+  return response.data;
+}
+
+export async function submitBudgetForApproval(budgetId: string) {
+  const response = await api.post(`/api/finance/budgets/${budgetId}/submit`);
+  return response.data;
+}
+
+export async function approveBudget(budgetId: string) {
+  const response = await api.post(`/api/finance/budgets/${budgetId}/approve`);
+  return response.data;
+}
+
+export async function rejectBudget(budgetId: string, payload: RejectBudgetRequest) {
+  const response = await api.post(`/api/finance/budgets/${budgetId}/reject`, payload);
+  return response.data;
+}
+
+export async function lockBudget(budgetId: string) {
+  const response = await api.post(`/api/finance/budgets/${budgetId}/lock`);
+  return response.data;
+}
+
+export async function closeBudget(budgetId: string, payload: CloseBudgetRequest) {
+  const response = await api.post(`/api/finance/budgets/${budgetId}/close`, payload);
+  return response.data;
+}
+
+export async function setBudgetOverrunPolicy(
+  budgetId: string,
+  payload: SetBudgetOverrunPolicyRequest
+) {
+  const response = await api.post(`/api/finance/budgets/${budgetId}/overrun-policy`, payload);
+  return response.data;
+}
+
+export async function transferBudgetAmount(
+  budgetId: string,
+  payload: TransferBudgetRequest
+) {
+  const response = await api.post(`/api/finance/budgets/${budgetId}/transfers`, payload);
+  return response.data;
+}
+
+export async function uploadBudget(payload: UploadBudgetRequest) {
+  const response = await api.post('/api/finance/budgets/upload', payload);
+  return response.data;
+}
+
+export async function getBudgetVsActual(budgetId: string): Promise<BudgetVsActualResponse> {
+  const response = await api.get('/api/finance/budgets/reports/budget-vs-actual', {
+    params: { budgetId },
+  });
+  return response.data;
+}
+
+export async function downloadBudgetUploadTemplate() {
+  const response = await api.get('/api/finance/budgets/upload-template', {
+    responseType: 'blob',
+  });
+
+  const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+
+  link.href = url;
+  link.setAttribute('download', 'ibalance-budget-upload-template.csv');
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  window.URL.revokeObjectURL(url);
+}
+
 export async function getVendors() {
   const response = await api.get<VendorsResponse>('/api/finance/ap/vendors');
   return response.data;

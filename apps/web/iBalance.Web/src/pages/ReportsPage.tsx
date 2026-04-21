@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   cancelBankReconciliation,
@@ -3770,24 +3771,67 @@ export function ReportsPage() {
         </div>
       </section>
 
-      <ReportSectionDivider
-        title="Tax Reports"
-        subtitle="Review VAT, WHT, and other tax movements generated from sales and purchase invoices."
-      />
+     
 
-<section id="print-tax-report" className="panel printable-report">
-    <div className="section-heading no-print">
+
+  <section className="panel no-print">
+  <div className="section-heading">
     <div>
-      <h2>VAT / WHT / Other Tax Report</h2>
-      <span className="muted">
-        Date-range tax report for setup-driven VAT, withholding tax, and other levies.
-      </span>
+      <h2>Budget Reports</h2>
+      <div className="muted">
+        Review budget register, rejected budgets, budget utilization, and Budget vs Actual performance.
+      </div>
+    </div>
+  </div>
+
+  <div className="stats-grid">
+    <div className="stat-card">
+      <div className="muted">Budget Register</div>
+      <div style={{ marginTop: 12 }}>
+        <Link to="/budgets" className="button primary">
+          Open Budgets
+        </Link>
+      </div>
     </div>
 
-    <button className="button" onClick={printTaxReportStandalone}>
-      Print Tax Report
-    </button>
+    <div className="stat-card">
+      <div className="muted">Rejected Budgets</div>
+      <div style={{ marginTop: 12 }}>
+        <Link to="/budgets/rejected" className="button">
+          Open Rejected Budgets
+        </Link>
+      </div>
+    </div>
+
+    <div className="stat-card">
+      <div className="muted">Budget vs Actual</div>
+      <div style={{ marginTop: 12 }}>
+        <Link to="/budget-vs-actual" className="button">
+          Open Budget vs Actual
+        </Link>
+      </div>
+    </div>
   </div>
+</section>
+
+<ReportSectionDivider
+title="Tax Reports"
+subtitle="Review VAT, WHT, and other tax movements generated from sales and purchase invoices."
+/>
+
+<section id="print-tax-report" className="panel printable-report">
+<div className="section-heading no-print">
+<div>
+<h2>VAT / WHT / Other Tax Report</h2>
+<span className="muted">
+Date-range tax report for setup-driven VAT, withholding tax, and other levies.
+</span>
+</div>
+
+<button className="button" onClick={printTaxReportStandalone}>
+Print Tax Report
+</button>
+</div>
 
     <ReportPrintHeader title="VAT / WHT / Other Tax Report" subtitle={periodText} />
 

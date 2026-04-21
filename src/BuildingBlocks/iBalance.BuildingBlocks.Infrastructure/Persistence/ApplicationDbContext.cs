@@ -58,6 +58,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<PurchaseInvoice> PurchaseInvoices => Set<PurchaseInvoice>();
     public DbSet<PurchaseInvoiceLine> PurchaseInvoiceLines => Set<PurchaseInvoiceLine>();
     public DbSet<VendorPayment> VendorPayments => Set<VendorPayment>();
+    public DbSet<Budget> Budgets => Set<Budget>();
+    public DbSet<BudgetLine> BudgetLines => Set<BudgetLine>();
+    public DbSet<BudgetTransfer> BudgetTransfers => Set<BudgetTransfer>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -414,6 +417,106 @@ public class ApplicationDbContext : DbContext
             entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
         });
 
+        modelBuilder.Entity<Budget>(entity =>
+{
+    entity.ToTable("Budgets", "finance");
+
+    entity.HasKey(x => x.Id);
+
+    entity.Property(x => x.BudgetNumber)
+        .HasMaxLength(50)
+        .IsRequired();
+
+    entity.Property(x => x.Name)
+        .HasMaxLength(200)
+        .IsRequired();
+
+    entity.Property(x => x.Description)
+        .HasMaxLength(1000)
+        .IsRequired();
+
+    entity.Property(x => x.Notes)
+        .HasMaxLength(2000);
+
+    entity.Property(x => x.SubmittedBy)
+        .HasMaxLength(100);
+
+    entity.Property(x => x.ApprovedBy)
+        .HasMaxLength(100);
+
+    entity.Property(x => x.RejectedBy)
+        .HasMaxLength(100);
+
+    entity.Property(x => x.RejectionReason)
+        .HasMaxLength(1000);
+
+    entity.Property(x => x.LockedBy)
+        .HasMaxLength(100);
+
+    entity.HasIndex(x => new { x.TenantId, x.BudgetNumber })
+        .IsUnique();
+
+    entity.HasMany(x => x.Lines)
+        .WithOne(x => x.Budget)
+        .HasForeignKey(x => x.BudgetId)
+        .OnDelete(DeleteBehavior.Cascade);
+
+    entity.Property(x => x.ClosedBy)
+    .HasMaxLength(100);
+
+    entity.Property(x => x.ClosureReason)
+    .HasMaxLength(1000);
+
+    entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
+});
+
+modelBuilder.Entity<BudgetLine>(entity =>
+{
+    entity.ToTable("BudgetLines", "finance");
+
+    entity.HasKey(x => x.Id);
+
+    entity.Property(x => x.BudgetAmount)
+        .HasPrecision(18, 2);
+
+    entity.Property(x => x.Notes)
+        .HasMaxLength(1000);
+
+    entity.HasOne(x => x.Budget)
+        .WithMany(x => x.Lines)
+        .HasForeignKey(x => x.BudgetId)
+        .OnDelete(DeleteBehavior.Cascade);
+
+    entity.HasOne(x => x.LedgerAccount)
+        .WithMany()
+        .HasForeignKey(x => x.LedgerAccountId)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
+});
+
+
+modelBuilder.Entity<BudgetTransfer>(entity =>
+{
+    entity.ToTable("BudgetTransfers", "finance");
+
+    entity.HasKey(x => x.Id);
+
+    entity.Property(x => x.Amount)
+        .HasPrecision(18, 2);
+
+    entity.Property(x => x.Reason)
+        .HasMaxLength(1000)
+        .IsRequired();
+
+    entity.Property(x => x.TransferredBy)
+        .HasMaxLength(100);
+
+    entity.HasIndex(x => x.BudgetId);
+
+    entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+});
+
         modelBuilder.Entity<JournalEntry>(entity =>
         {
             entity.ToTable("JournalEntries", "finance");
@@ -507,6 +610,15 @@ public class ApplicationDbContext : DbContext
             .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
 
         modelBuilder.Entity<VendorPayment>()
+            .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+
+        modelBuilder.Entity<Budget>()
+            .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+
+        modelBuilder.Entity<BudgetLine>()
+            .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+
+        modelBuilder.Entity<BudgetTransfer>()
             .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
     }
 

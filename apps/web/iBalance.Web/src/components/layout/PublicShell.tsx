@@ -84,7 +84,7 @@ export function PublicShell({ children }: PropsWithChildren) {
         <div>
           <strong>© Nikosoft Technologies</strong> — iBalance Accounting Cloud
         </div>
-        <div className="muted">Tenant-ready • Deep Purple Finance Suite • Audit-first</div>
+        <div className="muted">Tenant-ready •  Finance Suite • Audit-first</div>
       </footer>
     </div>
   );
