@@ -28,6 +28,7 @@ import { TenantOnboardingPage } from './pages/TenantOnboardingPage';
 import { SubscriptionRequestPage } from './pages/SubscriptionRequestPage';
 import { LicenseStatusPage } from './pages/LicenseStatusPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { RejectedJournalEntriesPage } from './pages/RejectedJournalEntriesPage';
 
 import { LoginPage } from './pages/auth/LoginPage';
 import { SignUpPage } from './pages/auth/SignUpPage';
@@ -116,6 +117,17 @@ export default function App() {
           </RequireAuth>
         }
       />
+
+      <Route
+          path="/journals/rejected"
+          element={
+            <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+              <AppShell>
+                <RejectedJournalEntriesPage />
+              </AppShell>
+            </RequireAuth>
+          }
+        />
       <Route
         path="/customers"
         element={

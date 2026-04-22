@@ -30,6 +30,7 @@ function licenseLabel(value?: number) {
 function pageTitleForPath(pathname: string) {
   if (pathname.startsWith('/accounts')) return 'Chart of Accounts';
   if (pathname.startsWith('/journals')) return 'Journal Management';
+  if (pathname.startsWith('/journals/rejected')) return 'Rejected Journals';
   if (pathname.startsWith('/customers')) return 'Customer Management';
   if (pathname.startsWith('/sales-invoices/rejected')) return 'Rejected Sales Invoices';
   if (pathname.startsWith('/sales-invoices')) return 'Sales Invoice Management';
@@ -52,6 +53,7 @@ function pageTitleForPath(pathname: string) {
 function pageSubtitleForPath(pathname: string) {
   if (pathname.startsWith('/accounts')) return 'Manage ledger structure and posting accounts.';
   if (pathname.startsWith('/journals')) return 'Manage journals, posting workflow, and reversals.';
+  if (pathname.startsWith('/journals/rejected')) return 'Correct, resubmit, or void rejected journal entries.';
   if (pathname.startsWith('/customers')) return 'Register and maintain accounts receivable customers.';
   if (pathname.startsWith('/sales-invoices/rejected')) return 'Correct, resubmit, or delete rejected sales invoices.';
   if (pathname.startsWith('/sales-invoices')) return 'Raise and review sales invoices for receivables operations.';

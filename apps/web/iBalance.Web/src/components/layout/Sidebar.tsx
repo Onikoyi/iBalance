@@ -57,10 +57,15 @@ export function Sidebar() {
                 Journals
               </NavLink>
 
+              <NavLink to="/journals/rejected" className={({ isActive }) => linkClassName(isActive)}>
+                Rejected Journals
+              </NavLink>
+
               {canManageSetup ? (
                 <NavLink to="/fiscal-periods" className={({ isActive }) => linkClassName(isActive)}>
                   Fiscal Periods
                 </NavLink>
+                
               ) : null}
             </div>
 

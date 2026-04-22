@@ -466,6 +466,9 @@ export type JournalEntryDto = {
   status: number;
   type: number;
   postingRequiresApproval?: boolean;
+  submittedByDisplayName?: string | null;
+  approvedByDisplayName?: string | null;
+  rejectedByDisplayName?: string | null;
   submittedBy?: string | null;
   submittedOnUtc?: string | null;
   approvedBy?: string | null;
@@ -1683,6 +1686,31 @@ export type ConsolidatedBudgetVsActualResponse = {
   sections: ConsolidatedBudgetVsActualSectionDto[];
 };
 
+export type UpdateJournalEntryRequest = CreateJournalEntryRequest;
+
+export async function updateJournalEntry(
+  journalEntryId: string,
+  payload: UpdateJournalEntryRequest
+) {
+  const response = await api.put(
+    `/api/finance/journal-entries/${encodeURIComponent(journalEntryId)}`,
+    payload
+  );
+
+  return response.data;
+}
+
+export async function getRejectedJournalEntries() {
+  const response = await api.get<ListEnvelope<JournalEntryDto>>('/api/finance/journal-entries');
+
+  const items = response.data.items.filter((item) => item.status === 4);
+
+  return {
+    ...response.data,
+    count: items.length,
+    items,
+  };
+}
 
 export async function getConsolidatedBudgetVsActual(
   periodStartUtc: string,

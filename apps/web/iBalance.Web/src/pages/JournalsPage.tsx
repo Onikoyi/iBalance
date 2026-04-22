@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   approveJournalEntry,
@@ -59,6 +60,10 @@ function formatAmount(value: number) {
   }).format(value);
 }
 
+function actorName(value?: string | null, displayName?: string | null) {
+  return displayName || value || '—';
+}
+
 type LineForm = {
   ledgerAccountId: string;
   description: string;
@@ -115,6 +120,7 @@ export function JournalsPage() {
   const [reverseForm, setReverseForm] = useState<ReverseForm>(emptyReverseForm);
   const [reverseTargetId, setReverseTargetId] = useState('');
   const [selectedJournalId, setSelectedJournalId] = useState('');
+  const [detailJournal, setDetailJournal] = useState<JournalEntryDto | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
   const canView = canViewFinance();
@@ -144,6 +150,10 @@ export function JournalsPage() {
     return items
       .filter((x: LedgerAccountDto) => x.isActive && !x.isHeader && x.isPostingAllowed)
       .sort((a: LedgerAccountDto, b: LedgerAccountDto) => a.code.localeCompare(b.code));
+  }, [accountsQ.data?.items]);
+
+  const accountMap = useMemo(() => {
+    return new Map((accountsQ.data?.items || []).map((account: LedgerAccountDto) => [account.id, account]));
   }, [accountsQ.data?.items]);
 
   const journalSummary = useMemo(() => {
@@ -293,6 +303,10 @@ export function JournalsPage() {
   });
 
   const journals = journalsQ.data?.items ?? [];
+
+const activeRegisterJournals = useMemo(() => {
+  return journals.filter((journal: JournalEntryDto) => journal.status !== 4);
+}, [journals]);
 
   const totals = useMemo(() => {
     const debit = journalForm.lines.reduce((s, l) => s + parseMoney(l.debitAmount), 0);
@@ -616,6 +630,10 @@ export function JournalsPage() {
               <button className="button" onClick={() => openCreate('opening')}>Opening Balance</button>
             </>
           ) : null}
+
+          <Link to="/journals/rejected" className="button">
+            Rejected Journals
+          </Link>
         </div>
 
         {!canCreate && !canPostReverse ? (
@@ -658,7 +676,7 @@ export function JournalsPage() {
       <section className="panel">
         <div className="section-heading">
           <h2>Journal register</h2>
-          <span className="muted">{journalsQ.data.count} journal(s)</span>
+          <span className="muted">{activeRegisterJournals.length} active journal(s)</span>
         </div>
 
         <div className="table-wrap">
@@ -676,94 +694,186 @@ export function JournalsPage() {
               </tr>
             </thead>
             <tbody>
-              {journals.map((item: JournalEntryDto) => (
-                <tr key={item.id}>
-                  <td>{formatDateTime(item.entryDateUtc)}</td>
-                  <td>{item.reference}</td>
-                  <td>
-                    <div>{item.description}</div>
-                    <div className="muted" style={{ marginTop: 4 }}>
-                      {item.submittedOnUtc ? `Submitted: ${formatDateTime(item.submittedOnUtc)}` : ''}
-                      {item.approvedOnUtc ? ` • Approved: ${formatDateTime(item.approvedOnUtc)}` : ''}
-                      {item.postedAtUtc ? ` • Posted: ${formatDateTime(item.postedAtUtc)}` : ''}
-                    </div>
-                    {item.rejectionReason ? (
-                      <div className="muted" style={{ marginTop: 4 }}>
-                        Rejection Reason: {item.rejectionReason}
-                      </div>
-                    ) : null}
-                  </td>
-                  <td>{typeLabel(item.type)}</td>
-                  <td>{statusLabel(item.status)}</td>
-                  <td style={{ textAlign: 'right' }}>{formatAmount(Number(item.totalDebit))}</td>
-                  <td style={{ textAlign: 'right' }}>{formatAmount(Number(item.totalCredit))}</td>
-                  <td>
-                    <div className="inline-actions" style={{ flexWrap: 'wrap' }}>
-                      {(item.status === 1 || item.status === 4) && item.type !== 3 && canCreate ? (
-                        <button
-                          className="button"
-                          onClick={() => submitForApproval(item.id)}
-                          disabled={submitMut.isPending}
-                        >
-                          {submitMut.isPending && selectedJournalId === item.id ? 'Submitting…' : 'Submit'}
-                        </button>
-                      ) : null}
-
-                      {item.status === 2 && canPostReverse ? (
-                        <>
-                          <button
-                            className="button"
-                            onClick={() => approve(item.id)}
-                            disabled={approveMut.isPending}
-                          >
-                            {approveMut.isPending && selectedJournalId === item.id ? 'Approving…' : 'Approve'}
-                          </button>
-
-                          <button
-                            className="button danger"
-                            onClick={() => reject(item.id)}
-                            disabled={rejectMut.isPending}
-                          >
-                            {rejectMut.isPending && selectedJournalId === item.id ? 'Rejecting…' : 'Reject'}
-                          </button>
-                        </>
-                      ) : null}
-
-                      {item.status === 3 && canPostReverse ? (
-                        <button
-                          className="button primary"
-                          onClick={() => post(item.id)}
-                          disabled={postMut.isPending}
-                        >
-                          {postMut.isPending && selectedJournalId === item.id ? 'Posting…' : 'Post'}
-                        </button>
-                      ) : null}
-
-                      {(item.status === 1 || item.status === 4) && canCreate ? (
-                        <button
-                          className="button danger"
-                          onClick={() => voidEntry(item.id)}
-                          disabled={voidMut.isPending}
-                        >
-                          {voidMut.isPending && selectedJournalId === item.id ? 'Voiding…' : 'Void'}
-                        </button>
-                      ) : null}
-
-                      {item.status === 5 && canPostReverse ? (
-                        <button className="button" onClick={() => openReverse(item.id)}>
-                          Reverse
-                        </button>
-                      ) : null}
-
-                      <span className="muted">Lines: {item.lineCount}</span>
-                    </div>
+              {activeRegisterJournals.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="muted">
+                    No active journals found. Rejected journals are managed from the Rejected Journals page.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                activeRegisterJournals.map((item: JournalEntryDto) => (
+                  <tr key={item.id}>
+                    <td>{formatDateTime(item.entryDateUtc)}</td>
+
+                    <td>{item.reference}</td>
+
+                    <td>
+                      <div>{item.description}</div>
+
+                      <div className="muted" style={{ marginTop: 4 }}>
+                        {item.submittedOnUtc ? `Submitted: ${formatDateTime(item.submittedOnUtc)}` : ''}
+                        {item.approvedOnUtc ? ` • Approved: ${formatDateTime(item.approvedOnUtc)}` : ''}
+                        {item.postedAtUtc ? ` • Posted: ${formatDateTime(item.postedAtUtc)}` : ''}
+                      </div>
+                    </td>
+
+                    <td>{typeLabel(item.type)}</td>
+
+                    <td>{statusLabel(item.status)}</td>
+
+                    <td style={{ textAlign: 'right' }}>
+                      {formatAmount(Number(item.totalDebit))}
+                    </td>
+
+                    <td style={{ textAlign: 'right' }}>
+                      {formatAmount(Number(item.totalCredit))}
+                    </td>
+
+                    <td>
+                      <div className="inline-actions" style={{ flexWrap: 'wrap' }}>
+                        <button className="button" onClick={() => setDetailJournal(item)}>
+                          View
+                        </button>
+
+                        {item.status === 1 && item.type !== 3 && canCreate ? (
+                          <button
+                            className="button"
+                            onClick={() => submitForApproval(item.id)}
+                            disabled={submitMut.isPending}
+                          >
+                            {submitMut.isPending && selectedJournalId === item.id ? 'Submitting…' : 'Submit'}
+                          </button>
+                        ) : null}
+
+                        {item.status === 2 && canPostReverse ? (
+                          <>
+                            <button
+                              className="button"
+                              onClick={() => approve(item.id)}
+                              disabled={approveMut.isPending}
+                            >
+                              {approveMut.isPending && selectedJournalId === item.id ? 'Approving…' : 'Approve'}
+                            </button>
+
+                            <button
+                              className="button danger"
+                              onClick={() => reject(item.id)}
+                              disabled={rejectMut.isPending}
+                            >
+                              {rejectMut.isPending && selectedJournalId === item.id ? 'Rejecting…' : 'Reject'}
+                            </button>
+                          </>
+                        ) : null}
+
+                        {item.status === 3 && canPostReverse ? (
+                          <button
+                            className="button primary"
+                            onClick={() => post(item.id)}
+                            disabled={postMut.isPending}
+                          >
+                            {postMut.isPending && selectedJournalId === item.id ? 'Posting…' : 'Post'}
+                          </button>
+                        ) : null}
+
+                        {item.status === 1 && item.type !== 3 && canCreate ? (
+                          <button
+                            className="button danger"
+                            onClick={() => voidEntry(item.id)}
+                            disabled={voidMut.isPending}
+                          >
+                            {voidMut.isPending && selectedJournalId === item.id ? 'Voiding…' : 'Void'}
+                          </button>
+                        ) : null}
+
+                        {item.status === 5 && canPostReverse ? (
+                          <button
+                            className="button"
+                            onClick={() => openReverse(item.id)}
+                            disabled={reverseMut.isPending}
+                          >
+                            Reverse
+                          </button>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </section>
+
+
+      {detailJournal ? (
+        <div className="modal-backdrop" onMouseDown={() => setDetailJournal(null)}>
+          <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Journal Detail</h2>
+              <button className="button ghost" onClick={() => setDetailJournal(null)} aria-label="Close">✕</button>
+            </div>
+      
+            <div className="kv" style={{ marginBottom: 16 }}>
+              <div className="kv-row"><span>Reference</span><span>{detailJournal.reference}</span></div>
+              <div className="kv-row"><span>Description</span><span>{detailJournal.description}</span></div>
+              <div className="kv-row"><span>Date</span><span>{formatDateTime(detailJournal.entryDateUtc)}</span></div>
+              <div className="kv-row"><span>Type</span><span>{typeLabel(detailJournal.type)}</span></div>
+              <div className="kv-row"><span>Status</span><span>{statusLabel(detailJournal.status)}</span></div>
+              <div className="kv-row"><span>Submitted By</span><span>{actorName(detailJournal.submittedBy, detailJournal.submittedByDisplayName)}</span></div>
+              <div className="kv-row"><span>Submitted On</span><span>{formatDateTime(detailJournal.submittedOnUtc)}</span></div>
+              <div className="kv-row"><span>Approved By</span><span>{actorName(detailJournal.approvedBy, detailJournal.approvedByDisplayName)}</span></div>
+              <div className="kv-row"><span>Approved On</span><span>{formatDateTime(detailJournal.approvedOnUtc)}</span></div>
+              <div className="kv-row"><span>Rejected By</span><span>{actorName(detailJournal.rejectedBy, detailJournal.rejectedByDisplayName)}</span></div>
+              <div className="kv-row"><span>Rejected On</span><span>{formatDateTime(detailJournal.rejectedOnUtc)}</span></div>
+              <div className="kv-row"><span>Rejection Reason</span><span>{detailJournal.rejectionReason || '—'}</span></div>
+              <div className="kv-row"><span>Posted On</span><span>{formatDateTime(detailJournal.postedAtUtc)}</span></div>
+              <div className="kv-row"><span>Reversed On</span><span>{formatDateTime(detailJournal.reversedAtUtc)}</span></div>
+              <div className="kv-row"><span>Total Debit</span><span>{formatAmount(Number(detailJournal.totalDebit))}</span></div>
+              <div className="kv-row"><span>Total Credit</span><span>{formatAmount(Number(detailJournal.totalCredit))}</span></div>
+            </div>
+      
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Ledger Account</th>
+                    <th>Description</th>
+                    <th style={{ textAlign: 'right' }}>Debit</th>
+                    <th style={{ textAlign: 'right' }}>Credit</th>
+                  </tr>
+                </thead>
+      
+                <tbody>
+                  {detailJournal.lines.map((line) => {
+                    const account = accountMap.get(line.ledgerAccountId);
+      
+                    return (
+                      <tr key={line.id}>
+                        <td>{account ? `${account.code} - ${account.name}` : line.ledgerAccountId}</td>
+                        <td>{line.description}</td>
+                        <td style={{ textAlign: 'right' }}>{formatAmount(Number(line.debitAmount))}</td>
+                        <td style={{ textAlign: 'right' }}>{formatAmount(Number(line.creditAmount))}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+      
+                <tfoot>
+                  <tr>
+                    <th colSpan={2}>Total</th>
+                    <th style={{ textAlign: 'right' }}>{formatAmount(Number(detailJournal.totalDebit))}</th>
+                    <th style={{ textAlign: 'right' }}>{formatAmount(Number(detailJournal.totalCredit))}</th>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+      
+            <div className="modal-footer">
+              <button className="button" onClick={() => setDetailJournal(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {modal === 'create' || modal === 'opening' ? (
         <div className="modal-backdrop" onMouseDown={closeModal}>

@@ -462,42 +462,73 @@ public sealed class FinanceController : ControllerBase
             }
         }
 
-        var replacementJournal = new JournalEntry(
-            journalEntry.Id,
-            tenantContext.TenantId,
-            request.EntryDateUtc,
-            normalizedReference,
-            request.Description.Trim(),
-            JournalEntryStatus.Draft,
-            journalEntry.Type,
-            request.Lines.Select(x => new JournalEntryLine(
-                Guid.NewGuid(),
-                x.LedgerAccountId,
-                x.Description,
-                x.DebitAmount,
-                x.CreditAmount)),
-            journalEntry.ReversedJournalEntryId,
-            journalEntry.PostingRequiresApproval);
+        try
+{
+            var replacementLines = request.Lines
+                .Select(x => new JournalEntryLine(
+                    Guid.NewGuid(),
+                    x.LedgerAccountId,
+                    x.Description,
+                    x.DebitAmount,
+                    x.CreditAmount))
+                .ToList();
 
-        dbContext.JournalEntryLines.RemoveRange(journalEntry.Lines);
-        dbContext.Entry(journalEntry).CurrentValues.SetValues(replacementJournal);
-        await dbContext.JournalEntryLines.AddRangeAsync(replacementJournal.Lines, cancellationToken);
-        await dbContext.SaveChangesAsync(cancellationToken);
+            dbContext.JournalEntryLines.RemoveRange(journalEntry.Lines);
 
-        return Ok(new
+            journalEntry.ReplaceEditableDetails(
+                request.EntryDateUtc,
+                normalizedReference,
+                request.Description.Trim(),
+                replacementLines);
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return Ok(new
+            {
+                Message = journalEntry.Status == JournalEntryStatus.Rejected
+                    ? "Rejected journal correction saved successfully."
+                    : "Draft journal entry updated successfully.",
+                journalEntry.Id,
+                journalEntry.Reference,
+                journalEntry.Description,
+                journalEntry.EntryDateUtc,
+                journalEntry.Status,
+                journalEntry.Type,
+                journalEntry.PostingRequiresApproval,
+                journalEntry.SubmittedBy,
+                journalEntry.SubmittedOnUtc,
+                journalEntry.ApprovedBy,
+                journalEntry.ApprovedOnUtc,
+                journalEntry.RejectedBy,
+                journalEntry.RejectedOnUtc,
+                journalEntry.RejectionReason,
+                journalEntry.TotalDebit,
+                journalEntry.TotalCredit,
+                LineCount = journalEntry.Lines.Count
+            });
+        }
+        catch (InvalidOperationException ex)
         {
-            Message = "Draft journal entry updated successfully.",
-            replacementJournal.Id,
-            replacementJournal.Reference,
-            replacementJournal.Description,
-            replacementJournal.EntryDateUtc,
-            replacementJournal.Status,
-            replacementJournal.Type,
-            replacementJournal.PostingRequiresApproval,
-            replacementJournal.TotalDebit,
-            replacementJournal.TotalCredit,
-            LineCount = replacementJournal.Lines.Count
-        });
+            return Conflict(new
+            {
+                Message = ex.Message,
+                JournalEntryId = journalEntryId,
+                journalEntry.Status
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
+        catch (DbUpdateException ex)
+        {
+            return Conflict(new
+            {
+                Message = "Journal entry could not be updated because of a database relationship or constraint issue.",
+                Detail = ex.InnerException?.Message ?? ex.Message,
+                JournalEntryId = journalEntryId
+            });
+        }
     }
 
     [Authorize(Policy = AuthorizationPolicies.FinanceFiscalPeriodsManage)]
@@ -1590,64 +1621,84 @@ public sealed class FinanceController : ControllerBase
         }
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceView)]
-    [HttpGet("journal-entries")]
-    public async Task<IActionResult> GetJournalEntries(
-        [FromServices] ApplicationDbContext dbContext,
-        [FromServices] ITenantContextAccessor tenantContextAccessor,
-        CancellationToken cancellationToken)
-    {
-        var tenantContext = tenantContextAccessor.Current;
+   [Authorize(Policy = AuthorizationPolicies.FinanceView)]
+[HttpGet("journal-entries")]
+public async Task<IActionResult> GetJournalEntries(
+    [FromServices] ApplicationDbContext dbContext,
+    [FromServices] ITenantContextAccessor tenantContextAccessor,
+    CancellationToken cancellationToken)
+{
+    var tenantContext = tenantContextAccessor.Current;
 
-        var items = await dbContext.JournalEntries
-            .AsNoTracking()
-            .Include(x => x.Lines)
-            .OrderByDescending(x => x.EntryDateUtc)
-            .ThenBy(x => x.Reference)
-            .Select(x => new
-            {
-                x.Id,
-                x.TenantId,
-                x.EntryDateUtc,
-                x.Reference,
-                x.Description,
-                x.Status,
-                x.Type,
-                x.PostingRequiresApproval,
-                x.SubmittedBy,
-                x.SubmittedOnUtc,
-                x.ApprovedBy,
-                x.ApprovedOnUtc,
-                x.RejectedBy,
-                x.RejectedOnUtc,
-                x.RejectionReason,
-                x.PostedAtUtc,
-                x.ReversedAtUtc,
-                x.ReversalJournalEntryId,
-                x.ReversedJournalEntryId,
-                TotalDebit = x.Lines.Sum(line => line.DebitAmount),
-                TotalCredit = x.Lines.Sum(line => line.CreditAmount),
-                LineCount = x.Lines.Count,
-                Lines = x.Lines.Select(line => new
-                {
-                    line.Id,
-                    line.LedgerAccountId,
-                    line.Description,
-                    line.DebitAmount,
-                    line.CreditAmount
-                })
-            })
-            .ToListAsync(cancellationToken);
+    var journalEntries = await dbContext.JournalEntries
+        .AsNoTracking()
+        .Include(x => x.Lines)
+        .OrderByDescending(x => x.EntryDateUtc)
+        .ThenBy(x => x.Reference)
+        .ToListAsync(cancellationToken);
 
-        return Ok(new
+    var userNames = await GetUserDisplayNamesAsync(
+        dbContext,
+        journalEntries.SelectMany(x => new[]
         {
-            TenantContextAvailable = tenantContext.IsAvailable,
-            TenantId = tenantContext.IsAvailable ? tenantContext.TenantId : (Guid?)null,
-            TenantKey = tenantContext.IsAvailable ? tenantContext.TenantKey : null,
-            Count = items.Count,
-            Items = items
-        });
-    }
+            x.SubmittedBy,
+            x.ApprovedBy,
+            x.RejectedBy
+        }),
+        cancellationToken);
+
+    var items = journalEntries
+        .Select(x => new
+        {
+            x.Id,
+            x.TenantId,
+            x.EntryDateUtc,
+            x.Reference,
+            x.Description,
+            x.Status,
+            x.Type,
+            x.PostingRequiresApproval,
+
+            x.SubmittedBy,
+            SubmittedByDisplayName = ResolveUserDisplayName(x.SubmittedBy, userNames),
+            x.SubmittedOnUtc,
+
+            x.ApprovedBy,
+            ApprovedByDisplayName = ResolveUserDisplayName(x.ApprovedBy, userNames),
+            x.ApprovedOnUtc,
+
+            x.RejectedBy,
+            RejectedByDisplayName = ResolveUserDisplayName(x.RejectedBy, userNames),
+            x.RejectedOnUtc,
+            x.RejectionReason,
+
+            x.PostedAtUtc,
+            x.ReversedAtUtc,
+            x.ReversalJournalEntryId,
+            x.ReversedJournalEntryId,
+            TotalDebit = x.Lines.Sum(line => line.DebitAmount),
+            TotalCredit = x.Lines.Sum(line => line.CreditAmount),
+            LineCount = x.Lines.Count,
+            Lines = x.Lines.Select(line => new
+            {
+                line.Id,
+                line.LedgerAccountId,
+                line.Description,
+                line.DebitAmount,
+                line.CreditAmount
+            }).ToList()
+        })
+        .ToList();
+
+    return Ok(new
+    {
+        TenantContextAvailable = tenantContext.IsAvailable,
+        TenantId = tenantContext.IsAvailable ? tenantContext.TenantId : (Guid?)null,
+        TenantKey = tenantContext.IsAvailable ? tenantContext.TenantKey : null,
+        Count = items.Count,
+        Items = items
+    });
+}
 
     [Authorize(Policy = AuthorizationPolicies.FinanceJournalsCreate)]
     [HttpPost("journal-entries/{journalEntryId:guid}/submit")]
@@ -4217,6 +4268,58 @@ public sealed class FinanceController : ControllerBase
                      x.EndDate >= postingDate,
                 cancellationToken);
     }
+
+    private static async Task<Dictionary<string, string>> GetUserDisplayNamesAsync(
+    ApplicationDbContext dbContext,
+    IEnumerable<string?> rawUserIds,
+    CancellationToken cancellationToken)
+{
+    var userIds = rawUserIds
+        .Where(value => !string.IsNullOrWhiteSpace(value) && Guid.TryParse(value, out _))
+        .Select(value => Guid.Parse(value!))
+        .Distinct()
+        .ToList();
+
+    if (userIds.Count == 0)
+    {
+        return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    }
+
+    var users = await dbContext.UserAccounts
+        .AsNoTracking()
+        .Where(x => userIds.Contains(x.Id))
+        .Select(x => new
+        {
+            x.Id,
+            x.FirstName,
+            x.LastName,
+            x.Email
+        })
+        .ToListAsync(cancellationToken);
+
+    return users.ToDictionary(
+        x => x.Id.ToString(),
+        x =>
+        {
+            var fullName = $"{x.FirstName} {x.LastName}".Trim();
+            return string.IsNullOrWhiteSpace(fullName) ? x.Email : fullName;
+        },
+        StringComparer.OrdinalIgnoreCase);
+}
+
+private static string ResolveUserDisplayName(
+    string? rawUserId,
+    IReadOnlyDictionary<string, string> userNames)
+{
+    if (string.IsNullOrWhiteSpace(rawUserId))
+    {
+        return string.Empty;
+    }
+
+    return userNames.TryGetValue(rawUserId.Trim(), out var displayName)
+        ? displayName
+        : rawUserId.Trim();
+}
 
     private static string EnsureAuthenticatedUserId(ICurrentUserService currentUserService)
     {

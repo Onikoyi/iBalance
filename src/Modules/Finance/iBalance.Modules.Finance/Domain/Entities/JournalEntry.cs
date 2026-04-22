@@ -195,6 +195,39 @@ public sealed class JournalEntry : TenantOwnedEntity
         Status = JournalEntryStatus.Voided;
     }
 
+    public void ReplaceEditableDetails(
+    DateTime entryDateUtc,
+    string reference,
+    string description,
+    IEnumerable<JournalEntryLine> lines)
+{
+    if (Status != JournalEntryStatus.Draft && Status != JournalEntryStatus.Rejected)
+    {
+        throw new InvalidOperationException("Only draft or rejected journal entries can be edited.");
+    }
+
+    if (string.IsNullOrWhiteSpace(reference))
+    {
+        throw new ArgumentException("Reference cannot be null or whitespace.", nameof(reference));
+    }
+
+    if (string.IsNullOrWhiteSpace(description))
+    {
+        throw new ArgumentException("Description cannot be null or whitespace.", nameof(description));
+    }
+
+    var lineList = lines?.ToList() ?? throw new ArgumentNullException(nameof(lines));
+
+    ValidateLines(lineList);
+
+    EntryDateUtc = entryDateUtc;
+    Reference = reference.Trim();
+    Description = description.Trim();
+
+    _lines.Clear();
+    _lines.AddRange(lineList);
+}
+
     public void MarkReversed(Guid reversalJournalEntryId, DateTime reversedAtUtc)
     {
         if (Status != JournalEntryStatus.Posted)
