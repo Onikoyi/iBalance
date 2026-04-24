@@ -61,6 +61,12 @@ public class ApplicationDbContext : DbContext
     public DbSet<Budget> Budgets => Set<Budget>();
     public DbSet<BudgetLine> BudgetLines => Set<BudgetLine>();
     public DbSet<BudgetTransfer> BudgetTransfers => Set<BudgetTransfer>();
+    public DbSet<FixedAssetClass> FixedAssetClasses => Set<FixedAssetClass>();
+    public DbSet<FixedAsset> FixedAssets => Set<FixedAsset>();
+    public DbSet<FixedAssetTransaction> FixedAssetTransactions => Set<FixedAssetTransaction>();
+    public DbSet<FixedAssetDepreciationRun> FixedAssetDepreciationRuns => Set<FixedAssetDepreciationRun>();
+    public DbSet<FixedAssetDepreciationLine> FixedAssetDepreciationLines => Set<FixedAssetDepreciationLine>();
+    public DbSet<FixedAssetDisposal> FixedAssetDisposals => Set<FixedAssetDisposal>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -517,6 +523,93 @@ modelBuilder.Entity<BudgetTransfer>(entity =>
     entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
 });
 
+
+
+        modelBuilder.Entity<FixedAssetClass>(entity =>
+        {
+            entity.ToTable("FixedAssetClasses", "finance");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Code).HasMaxLength(50).IsRequired();
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.Property(x => x.CapitalizationThreshold).HasPrecision(18, 2);
+            entity.Property(x => x.ResidualValuePercentDefault).HasPrecision(9, 4);
+            entity.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<FixedAsset>(entity =>
+        {
+            entity.ToTable("FixedAssets", "finance");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.AssetNumber).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.AssetName).HasMaxLength(250).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(2000);
+            entity.Property(x => x.Location).HasMaxLength(250);
+            entity.Property(x => x.Custodian).HasMaxLength(250);
+            entity.Property(x => x.SerialNumber).HasMaxLength(250);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.Property(x => x.AcquisitionCost).HasPrecision(18, 2);
+            entity.Property(x => x.ResidualValue).HasPrecision(18, 2);
+            entity.Property(x => x.AccumulatedDepreciationAmount).HasPrecision(18, 2);
+            entity.Property(x => x.ImpairmentAmount).HasPrecision(18, 2);
+            entity.Property(x => x.DisposalProceedsAmount).HasPrecision(18, 2);
+            entity.HasIndex(x => new { x.TenantId, x.AssetNumber }).IsUnique();
+            entity.HasIndex(x => new { x.TenantId, x.PurchaseInvoiceId })
+                .HasFilter("\"PurchaseInvoiceId\" IS NOT NULL")
+                .IsUnique();
+            entity.HasOne<FixedAssetClass>().WithMany().HasForeignKey(x => x.FixedAssetClassId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<FixedAssetTransaction>(entity =>
+        {
+            entity.ToTable("FixedAssetTransactions", "finance");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Amount).HasPrecision(18, 2);
+            entity.Property(x => x.Description).HasMaxLength(1000).IsRequired();
+            entity.Property(x => x.Reference).HasMaxLength(100);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.HasIndex(x => new { x.TenantId, x.FixedAssetId, x.TransactionDateUtc, x.TransactionType });
+            entity.HasOne<FixedAsset>().WithMany().HasForeignKey(x => x.FixedAssetId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<FixedAssetDepreciationRun>(entity =>
+        {
+            entity.ToTable("FixedAssetDepreciationRuns", "finance");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Description).HasMaxLength(500).IsRequired();
+            entity.HasIndex(x => new { x.TenantId, x.PeriodStartUtc, x.PeriodEndUtc }).IsUnique();
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<FixedAssetDepreciationLine>(entity =>
+        {
+            entity.ToTable("FixedAssetDepreciationLines", "finance");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.DepreciationAmount).HasPrecision(18, 2);
+            entity.Property(x => x.OpeningNetBookValue).HasPrecision(18, 2);
+            entity.Property(x => x.ClosingNetBookValue).HasPrecision(18, 2);
+            entity.HasIndex(x => new { x.TenantId, x.DepreciationRunId, x.FixedAssetId }).IsUnique();
+            entity.HasOne<FixedAssetDepreciationRun>().WithMany().HasForeignKey(x => x.DepreciationRunId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<FixedAsset>().WithMany().HasForeignKey(x => x.FixedAssetId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<FixedAssetDisposal>(entity =>
+        {
+            entity.ToTable("FixedAssetDisposals", "finance");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.DisposalProceedsAmount).HasPrecision(18, 2);
+            entity.Property(x => x.NetBookValueAtDisposal).HasPrecision(18, 2);
+            entity.Property(x => x.GainOrLossAmount).HasPrecision(18, 2);
+            entity.Property(x => x.Notes).HasMaxLength(2000).IsRequired();
+            entity.HasIndex(x => new { x.TenantId, x.FixedAssetId }).IsUnique();
+            entity.HasOne<FixedAsset>().WithMany().HasForeignKey(x => x.FixedAssetId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
         modelBuilder.Entity<JournalEntry>(entity =>
         {
             entity.ToTable("JournalEntries", "finance");
@@ -619,6 +712,24 @@ modelBuilder.Entity<BudgetTransfer>(entity =>
             .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
 
         modelBuilder.Entity<BudgetTransfer>()
+            .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+
+        modelBuilder.Entity<FixedAssetClass>()
+            .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+
+        modelBuilder.Entity<FixedAsset>()
+            .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+
+        modelBuilder.Entity<FixedAssetTransaction>()
+            .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+
+        modelBuilder.Entity<FixedAssetDepreciationRun>()
+            .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+
+        modelBuilder.Entity<FixedAssetDepreciationLine>()
+            .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+
+        modelBuilder.Entity<FixedAssetDisposal>()
             .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
     }
 

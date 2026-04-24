@@ -85,6 +85,23 @@ export function Sidebar() {
               </NavLink>
             </div>
 
+
+            <div className="sidebar-section">
+              <div className="sidebar-section-title">Fixed Assets</div>
+
+              <NavLink to="/fixed-assets" className={({ isActive }) => linkClassName(isActive)}>
+                Fixed Assets
+              </NavLink>
+
+              <NavLink to="/fixed-assets/depreciation-runs" className={({ isActive }) => linkClassName(isActive)}>
+                Depreciation Runs
+              </NavLink>
+
+              <NavLink to="/fixed-assets/register/print" className={({ isActive }) => linkClassName(isActive)}>
+                Asset Register Print
+              </NavLink>
+            </div>
+
             <div className="sidebar-section">
               <div className="sidebar-section-title">Accounts Receivable</div>
 
@@ -173,7 +190,7 @@ export function Sidebar() {
                 Platform Tenant Console
               </NavLink>
             ) : null}
-          </div>
+          </div>  
         ) : null}
       </nav>
     </aside>

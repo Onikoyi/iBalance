@@ -94,6 +94,7 @@ public sealed class JournalEntry : TenantOwnedEntity
     public decimal TotalDebit => _lines.Sum(x => x.DebitAmount);
 
     public decimal TotalCredit => _lines.Sum(x => x.CreditAmount);
+    
 
     public void SubmitForApproval(string submittedBy)
     {

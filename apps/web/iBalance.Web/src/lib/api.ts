@@ -108,6 +108,100 @@ export type DashboardSummaryResponse = {
   } | null;
 };
 
+export type BudgetAwareApiResponse = {
+  message?: string;
+  Message?: string;
+  budgetWarning?: string | null;
+  BudgetWarning?: string | null;
+  budgetId?: string | null;
+  BudgetId?: string | null;
+  budgetLineId?: string | null;
+  BudgetLineId?: string | null;
+  budgetNumber?: string | null;
+  BudgetNumber?: string | null;
+  budgetName?: string | null;
+  BudgetName?: string | null;
+  budgetAmount?: number | null;
+  BudgetAmount?: number | null;
+  actualAmount?: number | null;
+  ActualAmount?: number | null;
+  projectedAmount?: number | null;
+  ProjectedAmount?: number | null;
+  remainingAmount?: number | null;
+  RemainingAmount?: number | null;
+  overrunPolicy?: number | null;
+  OverrunPolicy?: number | null;
+};
+
+function pickBudgetValue<T>(camelValue: T | undefined, pascalValue: T | undefined): T | undefined {
+  return camelValue ?? pascalValue;
+}
+
+export function formatBudgetAwareSuccessMessage(
+  response: BudgetAwareApiResponse | undefined,
+  fallback: string
+) {
+  const baseMessage =
+    (typeof response?.message === 'string' && response.message.trim()) ||
+    (typeof response?.Message === 'string' && response.Message.trim()) ||
+    fallback;
+
+  const budgetWarning =
+    (typeof response?.budgetWarning === 'string' && response.budgetWarning.trim()) ||
+    (typeof response?.BudgetWarning === 'string' && response.BudgetWarning.trim()) ||
+    '';
+
+  if (!budgetWarning) {
+    return baseMessage;
+  }
+
+  return `${baseMessage} Budget warning: ${budgetWarning}`;
+}
+
+export function getBudgetAwareReadableError(error: unknown, fallback: string) {
+  const anyErr = error as any;
+  const data: BudgetAwareApiResponse | undefined = anyErr?.response?.data;
+
+  const message = getTenantReadableError(error, fallback);
+
+  const budgetNumber = pickBudgetValue(data?.budgetNumber, data?.BudgetNumber);
+  const budgetName = pickBudgetValue(data?.budgetName, data?.BudgetName);
+  const budgetAmount = pickBudgetValue(data?.budgetAmount, data?.BudgetAmount);
+  const actualAmount = pickBudgetValue(data?.actualAmount, data?.ActualAmount);
+  const projectedAmount = pickBudgetValue(data?.projectedAmount, data?.ProjectedAmount);
+  const remainingAmount = pickBudgetValue(data?.remainingAmount, data?.RemainingAmount);
+
+  const detailParts: string[] = [];
+
+  if (budgetNumber || budgetName) {
+    detailParts.push(
+      [budgetNumber, budgetName].filter(Boolean).join(' - ')
+    );
+  }
+
+  if (typeof budgetAmount === 'number') {
+    detailParts.push(`Budget ${budgetAmount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+  }
+
+  if (typeof actualAmount === 'number') {
+    detailParts.push(`Actual ${actualAmount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+  }
+
+  if (typeof projectedAmount === 'number') {
+    detailParts.push(`Projected ${projectedAmount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+  }
+
+  if (typeof remainingAmount === 'number') {
+    detailParts.push(`Remaining ${remainingAmount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+  }
+
+  if (detailParts.length === 0) {
+    return message;
+  }
+
+  return `${message} (${detailParts.join(' | ')})`;
+}
+
 export type CurrentTenantLicenseResponse = {
   isConfigured: boolean;
   tenantId: string;
@@ -465,6 +559,8 @@ export type JournalEntryDto = {
   description: string;
   status: number;
   type: number;
+  sourceCode?: string | null;
+  sourceLabel?: string | null;
   postingRequiresApproval?: boolean;
   submittedByDisplayName?: string | null;
   approvedByDisplayName?: string | null;
@@ -1884,7 +1980,10 @@ export async function rejectPurchaseInvoice(purchaseInvoiceId: string, payload: 
 }
 
 
-export async function postPurchaseInvoice(purchaseInvoiceId: string, payload: PostPurchaseInvoiceRequest) {
+export async function postPurchaseInvoice(
+  purchaseInvoiceId: string,
+  payload: PostPurchaseInvoiceRequest
+): Promise<BudgetAwareApiResponse> {
   const response = await api.post(
     `/api/finance/ap/purchase-invoices/${encodeURIComponent(purchaseInvoiceId)}/post`,
     payload
@@ -2001,7 +2100,10 @@ export async function deleteRejectedVendorPayment(vendorPaymentId: string) {
   return response.data;
 }
 
-export async function postVendorPayment(vendorPaymentId: string, payload: PostVendorPaymentRequest) {
+export async function postVendorPayment(
+  vendorPaymentId: string,
+  payload: PostVendorPaymentRequest
+): Promise<BudgetAwareApiResponse> {
   const response = await api.post(
     `/api/finance/ap/vendor-payments/${encodeURIComponent(vendorPaymentId)}/post`,
     payload
@@ -2226,7 +2328,10 @@ export async function createSalesInvoice(payload: CreateSalesInvoiceRequest) {
   return response.data;
 }
 
-export async function postSalesInvoice(salesInvoiceId: string, payload: PostSalesInvoiceRequest) {
+export async function postSalesInvoice(
+  salesInvoiceId: string,
+  payload: PostSalesInvoiceRequest
+): Promise<BudgetAwareApiResponse> {
   const response = await api.post(
     `/api/finance/ar/sales-invoices/${encodeURIComponent(salesInvoiceId)}/post`,
     payload
@@ -2338,7 +2443,10 @@ export async function rejectCustomerReceipt(customerReceiptId: string, payload: 
   return response.data;
 }
 
-export async function postCustomerReceipt(customerReceiptId: string, payload: PostCustomerReceiptRequest) {
+export async function postCustomerReceipt(
+  customerReceiptId: string,
+  payload: PostCustomerReceiptRequest
+): Promise<BudgetAwareApiResponse> {
   const response = await api.post(
     `/api/finance/ar/customer-receipts/${encodeURIComponent(customerReceiptId)}/post`,
     payload
@@ -2814,8 +2922,13 @@ export async function rejectJournalEntry(journalEntryId: string, payload: Reject
   return response.data;
 }
 
-export async function postJournalEntry(journalEntryId: string) {
-  const response = await api.post(`/api/finance/journal-entries/${encodeURIComponent(journalEntryId)}/post`, {});
+export async function postJournalEntry(
+  journalEntryId: string
+): Promise<BudgetAwareApiResponse> {
+  const response = await api.post(
+    `/api/finance/journal-entries/${encodeURIComponent(journalEntryId)}/post`,
+    {}
+  );
   return response.data;
 }
 
@@ -2868,3 +2981,379 @@ export async function closeFiscalPeriod(fiscalPeriodId: string) {
   const response = await api.post(`/api/finance/fiscal-periods/${encodeURIComponent(fiscalPeriodId)}/close`, {});
   return response.data;
 }
+// ----------- FIXED ASSETS -----------
+
+export type FixedAssetClassStatus = 1 | 2;
+export type FixedAssetStatus = 1 | 2 | 3 | 4 | 5 | 6;
+export type FixedAssetDepreciationMethod = 1 | 2 | 3;
+export type FixedAssetTransactionType = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+export type FixedAssetDisposalType = 1 | 2 | 3 | 4;
+
+export type FixedAssetClassDto = {
+  id: string;
+  tenantId: string;
+  code: string;
+  name: string;
+  description?: string | null;
+  capitalizationThreshold: number;
+  residualValuePercentDefault: number;
+  usefulLifeMonthsDefault: number;
+  depreciationMethodDefault: FixedAssetDepreciationMethod;
+  assetCostLedgerAccountId: string;
+  accumulatedDepreciationLedgerAccountId: string;
+  depreciationExpenseLedgerAccountId: string;
+  disposalGainLossLedgerAccountId: string;
+  status: FixedAssetClassStatus;
+};
+
+export type FixedAssetDto = {
+  id: string;
+  tenantId: string;
+  fixedAssetClassId: string;
+  assetNumber: string;
+  assetName: string;
+  description?: string | null;
+  acquisitionDateUtc: string;
+  capitalizationDateUtc?: string | null;
+  acquisitionCost: number;
+  residualValue: number;
+  usefulLifeMonths: number;
+  depreciationMethod: FixedAssetDepreciationMethod;
+  accumulatedDepreciationAmount: number;
+  impairmentAmount: number;
+  netBookValue: number;
+  status: FixedAssetStatus;
+  assetCostLedgerAccountId: string;
+  accumulatedDepreciationLedgerAccountId: string;
+  depreciationExpenseLedgerAccountId: string;
+  disposalGainLossLedgerAccountId: string;
+  vendorId?: string | null;
+  purchaseInvoiceId?: string | null;
+  location?: string | null;
+  custodian?: string | null;
+  serialNumber?: string | null;
+  notes?: string | null;
+  lastDepreciationPostedOnUtc?: string | null;
+  disposedOnUtc?: string | null;
+  disposalProceedsAmount?: number | null;
+};
+
+export type FixedAssetRegisterItemDto = FixedAssetDto & {
+  fixedAssetClassCode?: string | null;
+  fixedAssetClassName?: string | null;
+};
+
+export type FixedAssetTransactionDto = {
+  id: string;
+  tenantId: string;
+  fixedAssetId: string;
+  transactionType: FixedAssetTransactionType;
+  transactionTypeName: string;
+  transactionDateUtc: string;
+  amount: number;
+  description: string;
+  journalEntryId?: string | null;
+  reference?: string | null;
+  notes?: string | null;
+};
+
+export type FixedAssetDepreciationLineDto = {
+  id: string;
+  tenantId: string;
+  depreciationRunId: string;
+  fixedAssetId: string;
+  depreciationPeriodStartUtc: string;
+  depreciationPeriodEndUtc: string;
+  depreciationAmount: number;
+  journalEntryId?: string | null;
+};
+
+export type FixedAssetDisposalDto = {
+  id: string;
+  tenantId: string;
+  fixedAssetId: string;
+  disposalType: FixedAssetDisposalType;
+  disposalDateUtc: string;
+  disposalProceedsAmount: number;
+  netBookValueAtDisposal: number;
+  gainOrLossAmount: number;
+  notes?: string | null;
+  journalEntryId?: string | null;
+};
+
+export type FixedAssetDetailResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string;
+  tenantKey: string;
+  fixedAsset: FixedAssetDto;
+  transactions: FixedAssetTransactionDto[];
+  depreciationLines: FixedAssetDepreciationLineDto[];
+  disposal?: FixedAssetDisposalDto | null;
+};
+
+export type FixedAssetDepreciationPreviewItemDto = {
+  fixedAssetId: string;
+  assetNumber: string;
+  assetName: string;
+  periodStartUtc: string;
+  periodEndUtc: string;
+  depreciationAmount: number;
+  projectedAccumulatedDepreciationAmount: number;
+  projectedNetBookValue: number;
+  depreciationExpenseLedgerAccountId: string;
+  accumulatedDepreciationLedgerAccountId: string;
+};
+
+export type FixedAssetDepreciationPreviewResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string;
+  tenantKey: string;
+  periodStartUtc: string;
+  periodEndUtc: string;
+  count: number;
+  totalDepreciationAmount: number;
+  items: FixedAssetDepreciationPreviewItemDto[];
+};
+
+export type FixedAssetDepreciationRunDto = {
+  id: string;
+  tenantId: string;
+  periodStartUtc: string;
+  periodEndUtc: string;
+  runDateUtc: string;
+  description: string;
+  journalEntryId?: string | null;
+  lineCount: number;
+  totalDepreciationAmount: number;
+};
+
+export type FixedAssetClassesResponse = ListEnvelope<FixedAssetClassDto>;
+export type FixedAssetsResponse = ListEnvelope<FixedAssetDto>;
+export type FixedAssetRegisterResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string;
+  tenantKey: string;
+  count: number;
+  totalAcquisitionCost: number;
+  totalAccumulatedDepreciation: number;
+  totalImpairment: number;
+  totalNetBookValue: number;
+  items: FixedAssetRegisterItemDto[];
+};
+export type FixedAssetDepreciationRunsResponse = ListEnvelope<FixedAssetDepreciationRunDto>;
+
+export type CreateFixedAssetClassRequest = {
+  code: string;
+  name: string;
+  description?: string | null;
+  capitalizationThreshold: number;
+  residualValuePercentDefault: number;
+  usefulLifeMonthsDefault: number;
+  depreciationMethodDefault: FixedAssetDepreciationMethod;
+  assetCostLedgerAccountId: string;
+  accumulatedDepreciationLedgerAccountId: string;
+  depreciationExpenseLedgerAccountId: string;
+  disposalGainLossLedgerAccountId: string;
+};
+
+export type CreateFixedAssetRequest = {
+  fixedAssetClassId: string;
+  assetNumber: string;
+  assetName: string;
+  description?: string | null;
+  acquisitionDateUtc: string;
+  acquisitionCost: number;
+  residualValue: number;
+  usefulLifeMonths: number;
+  depreciationMethod: FixedAssetDepreciationMethod;
+  assetCostLedgerAccountId?: string | null;
+  accumulatedDepreciationLedgerAccountId?: string | null;
+  depreciationExpenseLedgerAccountId?: string | null;
+  disposalGainLossLedgerAccountId?: string | null;
+  vendorId?: string | null;
+  purchaseInvoiceId?: string | null;
+  location?: string | null;
+  custodian?: string | null;
+  serialNumber?: string | null;
+  notes?: string | null;
+};
+
+export type CapitalizeFixedAssetRequest = {
+  capitalizationDateUtc: string;
+  creditLedgerAccountId: string;
+  reference?: string | null;
+  description?: string | null;
+};
+
+export type FixedAssetDepreciationPeriodRequest = {
+  periodStartUtc: string;
+  periodEndUtc: string;
+};
+
+export type RunFixedAssetDepreciationRequest = {
+  periodStartUtc: string;
+  periodEndUtc: string;
+  runDateUtc: string;
+  reference?: string | null;
+  description?: string | null;
+};
+
+export type FixedAssetImprovementRequest = {
+  transactionDateUtc: string;
+  amount: number;
+  creditLedgerAccountId: string;
+  usefulLifeMonthsOverride?: number | null;
+  reference?: string | null;
+  description?: string | null;
+};
+
+export type TransferFixedAssetRequest = {
+  transactionDateUtc: string;
+  location?: string | null;
+  custodian?: string | null;
+  notes?: string | null;
+};
+
+export type ReclassifyFixedAssetRequest = {
+  transactionDateUtc: string;
+  targetFixedAssetClassId: string;
+  notes?: string | null;
+};
+
+export type ImpairFixedAssetRequest = {
+  transactionDateUtc: string;
+  amount: number;
+  reference?: string | null;
+  description?: string | null;
+};
+
+export type DisposeFixedAssetRequest = {
+  disposalDateUtc: string;
+  disposalType: FixedAssetDisposalType;
+  disposalProceedsAmount: number;
+  cashOrBankLedgerAccountId?: string | null;
+  reference?: string | null;
+  description?: string | null;
+  notes?: string | null;
+};
+
+export async function getFixedAssetClasses(): Promise<FixedAssetClassesResponse> {
+  const response = await api.get('/api/finance/fixed-assets/classes');
+  return response.data;
+}
+
+export async function createFixedAssetClass(payload: CreateFixedAssetClassRequest) {
+  const response = await api.post('/api/finance/fixed-assets/classes', payload);
+  return response.data;
+}
+
+export async function getFixedAssets(): Promise<FixedAssetsResponse> {
+  const response = await api.get('/api/finance/fixed-assets');
+  return response.data;
+}
+
+export async function getFixedAssetRegister(
+  status?: number | null,
+  fixedAssetClassId?: string | null
+): Promise<FixedAssetRegisterResponse> {
+  const response = await api.get('/api/finance/fixed-assets/reports/register', {
+    params: {
+      ...(typeof status === 'number' ? { status } : {}),
+      ...(fixedAssetClassId ? { fixedAssetClassId } : {}),
+    },
+  });
+  return response.data;
+}
+
+export async function createFixedAsset(payload: CreateFixedAssetRequest) {
+  const response = await api.post('/api/finance/fixed-assets', payload);
+  return response.data;
+}
+
+export async function getFixedAssetDetail(fixedAssetId: string): Promise<FixedAssetDetailResponse> {
+  const response = await api.get(`/api/finance/fixed-assets/${encodeURIComponent(fixedAssetId)}`);
+  return response.data;
+}
+
+export async function capitalizeFixedAsset(fixedAssetId: string, payload: CapitalizeFixedAssetRequest) {
+  const response = await api.post(`/api/finance/fixed-assets/${encodeURIComponent(fixedAssetId)}/capitalize`, payload);
+  return response.data;
+}
+
+export async function previewFixedAssetDepreciation(
+  payload: FixedAssetDepreciationPeriodRequest
+): Promise<FixedAssetDepreciationPreviewResponse> {
+  const response = await api.post('/api/finance/fixed-assets/depreciation/preview', payload);
+  return response.data;
+}
+
+export async function getFixedAssetDepreciationRuns(): Promise<FixedAssetDepreciationRunsResponse> {
+  const response = await api.get('/api/finance/fixed-assets/depreciation-runs');
+  return response.data;
+}
+
+export async function runFixedAssetDepreciation(payload: RunFixedAssetDepreciationRequest) {
+  const response = await api.post('/api/finance/fixed-assets/depreciation-runs', payload);
+  return response.data;
+}
+
+export async function recordFixedAssetImprovement(fixedAssetId: string, payload: FixedAssetImprovementRequest) {
+  const response = await api.post(`/api/finance/fixed-assets/${encodeURIComponent(fixedAssetId)}/improvements`, payload);
+  return response.data;
+}
+
+export async function transferFixedAsset(fixedAssetId: string, payload: TransferFixedAssetRequest) {
+  const response = await api.post(`/api/finance/fixed-assets/${encodeURIComponent(fixedAssetId)}/transfer`, payload);
+  return response.data;
+}
+
+export async function reclassifyFixedAsset(fixedAssetId: string, payload: ReclassifyFixedAssetRequest) {
+  const response = await api.post(`/api/finance/fixed-assets/${encodeURIComponent(fixedAssetId)}/reclassify`, payload);
+  return response.data;
+}
+
+export async function impairFixedAsset(fixedAssetId: string, payload: ImpairFixedAssetRequest) {
+  const response = await api.post(`/api/finance/fixed-assets/${encodeURIComponent(fixedAssetId)}/impair`, payload);
+  return response.data;
+}
+
+export async function disposeFixedAsset(fixedAssetId: string, payload: DisposeFixedAssetRequest) {
+  const response = await api.post(`/api/finance/fixed-assets/${encodeURIComponent(fixedAssetId)}/dispose`, payload);
+  return response.data;
+}
+
+// ==========================================
+// FIXED ASSETS — AP CAPITALIZATION (ADDITIVE)
+// ==========================================
+
+export type CapitalizeFromPurchaseInvoiceRequest = {
+  purchaseInvoiceId: string;
+  fixedAssetClassId: string;
+  assetNumber: string;
+  assetName: string;
+  description?: string | null;
+  usefulLifeMonths: number;
+  residualValue: number;
+  depreciationStartDateUtc: string;
+  capitalizationDateUtc?: string | null;
+};
+
+export async function capitalizeFromPurchaseInvoice(
+  request: CapitalizeFromPurchaseInvoiceRequest
+) {
+  const { data } = await api.post(
+    '/api/finance/fixed-assets/capitalize-from-purchase-invoice',
+    request
+  );
+  return data;
+}
+
+
+export type CapitalizePurchaseInvoiceToFixedAssetRequest = CapitalizeFromPurchaseInvoiceRequest;
+
+export async function capitalizePurchaseInvoiceToFixedAsset(
+  payload: CapitalizePurchaseInvoiceToFixedAssetRequest
+) {
+  return capitalizeFromPurchaseInvoice(payload);
+}
+

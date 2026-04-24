@@ -1378,6 +1378,55 @@ public async Task<IActionResult> DeleteRejectedSalesInvoice(
                 0m));
         }
 
+        var revenueLedgerAccount = await dbContext.LedgerAccounts
+    .AsNoTracking()
+    .FirstOrDefaultAsync(x => x.Id == request.RevenueLedgerAccountId, cancellationToken);
+
+if (revenueLedgerAccount is null)
+{
+    return BadRequest(new { Message = "Revenue ledger account was not found for the current tenant." });
+}
+
+BudgetCheckResult? budgetResult = null;
+
+var salesBudgetImpact = BudgetEvaluationSupport.ComputeBudgetConsumptionAmount(
+    revenueLedgerAccount,
+    0m,
+    invoice.TotalAmount);
+
+if (BudgetEvaluationSupport.IsBudgetConsumableAccountCategory(revenueLedgerAccount.Category) && salesBudgetImpact > 0m)
+{
+    budgetResult = await BudgetEvaluationSupport.EvaluateBudgetImpactAsync(
+        dbContext,
+        tenantContext.TenantId,
+        new BudgetCheckImpact(
+            request.RevenueLedgerAccountId,
+            invoice.InvoiceDateUtc,
+            salesBudgetImpact,
+            "Sales Invoice",
+            invoice.Id),
+        cancellationToken);
+
+    if (!budgetResult.Allowed)
+    {
+        return Conflict(new
+        {
+            Message = budgetResult.Message,
+            SalesInvoiceId = invoice.Id,
+            budgetResult.BudgetId,
+            budgetResult.BudgetLineId,
+            budgetResult.BudgetNumber,
+            budgetResult.BudgetName,
+            budgetResult.BudgetAmount,
+            budgetResult.ActualAmount,
+            budgetResult.ProjectedAmount,
+            budgetResult.RemainingAmount,
+            budgetResult.OverrunPolicy
+        });
+    }
+}
+
+
         var journalEntry = new JournalEntry(
             Guid.NewGuid(),
             tenantContext.TenantId,
@@ -1459,7 +1508,8 @@ public async Task<IActionResult> DeleteRejectedSalesInvoice(
                 GrossInvoiceAmount = grossInvoiceAmount,
                 NetReceivableAmount = netReceivableAmount,
                 invoice.JournalEntryId,
-                invoice.PostedOnUtc
+                invoice.PostedOnUtc,
+                BudgetWarning = budgetResult is { HasWarning: true } ? budgetResult.Message : null,
             },
             JournalEntry = new
             {

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using iBalance.BuildingBlocks.Infrastructure.Persistence;
 namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260424085820_AddFixedAssetsModule")]
+    partial class AddFixedAssetsModule
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -776,10 +779,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId", "AssetNumber")
                         .IsUnique();
-
-                    b.HasIndex("TenantId", "PurchaseInvoiceId")
-                        .IsUnique()
-                        .HasFilter("\"PurchaseInvoiceId\" IS NOT NULL");
 
                     b.ToTable("FixedAssets", "finance");
                 });

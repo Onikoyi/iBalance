@@ -13,6 +13,9 @@ import {
   rejectVendorPayment,
   submitVendorPaymentForApproval,
   type CreateVendorPaymentRequest,
+  formatBudgetAwareSuccessMessage,
+  getBudgetAwareReadableError,
+  type BudgetAwareApiResponse,
 } from '../lib/api';
 import { canApproveWorkflows, canManageFinanceSetup, canViewFinance } from '../lib/auth';
 
@@ -199,7 +202,7 @@ export function VendorPaymentsPage() {
 
   const postMut = useMutation({
     mutationFn: () => postVendorPayment(selectedPaymentId, postForm),
-    onSuccess: async () => {
+    onSuccess: async (data: BudgetAwareApiResponse) => {
       await refreshAfterWorkflow();
       setShowPost(false);
       setSelectedPaymentId('');
@@ -208,10 +211,10 @@ export function VendorPaymentsPage() {
         payableLedgerAccountId: '',
       });
       setErrorText('');
-      setInfoText('Vendor payment posted successfully.');
+      setInfoText(formatBudgetAwareSuccessMessage(data, 'Vendor payment posted successfully.'));
     },
     onError: (e) => {
-      setErrorText(getTenantReadableError(e, 'We could not post the vendor payment at this time.'));
+      setErrorText(getBudgetAwareReadableError(e, 'We could not post the vendor payment at this time.'));
       setInfoText('');
     },
   });

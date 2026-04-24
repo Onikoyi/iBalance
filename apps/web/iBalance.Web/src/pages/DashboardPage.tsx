@@ -235,6 +235,25 @@ const budgetSummary = {
   )}
 </section>
 
+
+      <section className="panel">
+        <div className="section-heading">
+          <h2>Fixed assets</h2>
+          <span className="muted">Asset register, capitalization, and depreciation operations</span>
+        </div>
+
+        <div className="muted" style={{ marginBottom: 16 }}>
+          Open the Fixed Assets workspace to manage asset classes, capitalization, improvements,
+          transfers, reclassification, impairment, disposals, and depreciation runs.
+        </div>
+
+        <div className="hero-actions" style={{ marginTop: 16 }}>
+          <Link to="/fixed-assets" className="button primary">Open Fixed Assets</Link>
+          <Link to="/fixed-assets/depreciation-runs" className="button">Depreciation Runs</Link>
+          <Link to="/fixed-assets/register/print" className="button">Asset Register Print</Link>
+        </div>
+      </section>
+
       <section className="panel">
         <div className="section-heading">
           <h2>Accounts receivable overview</h2>

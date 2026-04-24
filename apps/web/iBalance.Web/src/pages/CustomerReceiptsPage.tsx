@@ -13,6 +13,9 @@ import {
   rejectCustomerReceipt,
   submitCustomerReceiptForApproval,
   type CreateCustomerReceiptRequest,
+  formatBudgetAwareSuccessMessage,
+  getBudgetAwareReadableError,
+  type BudgetAwareApiResponse,
 } from '../lib/api';
 import { canApproveWorkflows, canCreateJournals, canViewFinance } from '../lib/auth';
 
@@ -272,13 +275,13 @@ export function CustomerReceiptsPage() {
         cashOrBankLedgerAccountId: cashLedgerId,
         receivableLedgerAccountId: receivableLedgerId,
       }),
-    onSuccess: async () => {
+    onSuccess: async (data: BudgetAwareApiResponse) => {
       await refreshAll();
-      setMessage('Customer receipt posted successfully.');
+      setMessage(formatBudgetAwareSuccessMessage(data, 'Customer receipt posted successfully.'));
       setSelectedReceiptId('');
     },
     onError: (error) => {
-      setMessage(getTenantReadableError(error, 'Unable to post customer receipt.'));
+      setMessage(getBudgetAwareReadableError(error, 'Unable to post customer receipt.'));
     },
   });
 

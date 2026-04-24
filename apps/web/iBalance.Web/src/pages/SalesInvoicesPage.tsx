@@ -15,6 +15,9 @@ import {
   previewTaxCalculation,
   type CreateSalesInvoiceRequest,
   type TaxCodeDto,
+  formatBudgetAwareSuccessMessage,
+  getBudgetAwareReadableError,
+  type BudgetAwareApiResponse,
 } from '../lib/api';
 import { canCreateJournals, canViewFinance } from '../lib/auth';
 
@@ -287,17 +290,17 @@ const taxPreviewQ = useQuery({
         receivableLedgerAccountId: receivableAccountId,
         revenueLedgerAccountId: revenueAccountId,
       }),
-    onSuccess: async () => {
+    onSuccess: async (data: BudgetAwareApiResponse) => {
       await qc.invalidateQueries({ queryKey: ['ar-sales-invoices'] });
       await qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
       await qc.invalidateQueries({ queryKey: ['journal-entries'] });
       await qc.invalidateQueries({ queryKey: ['trial-balance'] });
       await qc.invalidateQueries({ queryKey: ['balance-sheet'] });
       await qc.invalidateQueries({ queryKey: ['income-statement'] });
-      setMessage('Sales invoice posted successfully.');
+      setMessage(formatBudgetAwareSuccessMessage(data, 'Sales invoice posted successfully.'));
     },
     onError: (error) => {
-      setMessage(getTenantReadableError(error, 'Unable to post sales invoice.'));
+      setMessage(getBudgetAwareReadableError(error, 'Unable to post sales invoice.'));
     },
   });
 

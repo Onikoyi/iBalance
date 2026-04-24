@@ -1621,7 +1621,7 @@ public sealed class FinanceController : ControllerBase
         }
     }
 
-   [Authorize(Policy = AuthorizationPolicies.FinanceView)]
+  [Authorize(Policy = AuthorizationPolicies.FinanceView)]
 [HttpGet("journal-entries")]
 public async Task<IActionResult> GetJournalEntries(
     [FromServices] ApplicationDbContext dbContext,
@@ -1648,45 +1648,55 @@ public async Task<IActionResult> GetJournalEntries(
         cancellationToken);
 
     var items = journalEntries
-        .Select(x => new
+        .Select(x =>
         {
-            x.Id,
-            x.TenantId,
-            x.EntryDateUtc,
-            x.Reference,
-            x.Description,
-            x.Status,
-            x.Type,
-            x.PostingRequiresApproval,
+            var sourceCode = ResolveJournalSourceCode(x);
+            var sourceLabel = ResolveJournalSourceLabel(sourceCode);
 
-            x.SubmittedBy,
-            SubmittedByDisplayName = ResolveUserDisplayName(x.SubmittedBy, userNames),
-            x.SubmittedOnUtc,
-
-            x.ApprovedBy,
-            ApprovedByDisplayName = ResolveUserDisplayName(x.ApprovedBy, userNames),
-            x.ApprovedOnUtc,
-
-            x.RejectedBy,
-            RejectedByDisplayName = ResolveUserDisplayName(x.RejectedBy, userNames),
-            x.RejectedOnUtc,
-            x.RejectionReason,
-
-            x.PostedAtUtc,
-            x.ReversedAtUtc,
-            x.ReversalJournalEntryId,
-            x.ReversedJournalEntryId,
-            TotalDebit = x.Lines.Sum(line => line.DebitAmount),
-            TotalCredit = x.Lines.Sum(line => line.CreditAmount),
-            LineCount = x.Lines.Count,
-            Lines = x.Lines.Select(line => new
+            return new
             {
-                line.Id,
-                line.LedgerAccountId,
-                line.Description,
-                line.DebitAmount,
-                line.CreditAmount
-            }).ToList()
+                x.Id,
+                x.TenantId,
+                x.EntryDateUtc,
+                x.Reference,
+                x.Description,
+                x.Status,
+                x.Type,
+                SourceCode = sourceCode,
+                SourceLabel = sourceLabel,
+                x.PostingRequiresApproval,
+
+                x.SubmittedBy,
+                SubmittedByDisplayName = ResolveUserDisplayName(x.SubmittedBy, userNames),
+                x.SubmittedOnUtc,
+
+                x.ApprovedBy,
+                ApprovedByDisplayName = ResolveUserDisplayName(x.ApprovedBy, userNames),
+                x.ApprovedOnUtc,
+
+                x.RejectedBy,
+                RejectedByDisplayName = ResolveUserDisplayName(x.RejectedBy, userNames),
+                x.RejectedOnUtc,
+                x.RejectionReason,
+
+                x.PostedAtUtc,
+                x.ReversedAtUtc,
+                x.ReversalJournalEntryId,
+                x.ReversedJournalEntryId,
+
+                TotalDebit = x.Lines.Sum(line => line.DebitAmount),
+                TotalCredit = x.Lines.Sum(line => line.CreditAmount),
+                LineCount = x.Lines.Count,
+
+                Lines = x.Lines.Select(line => new
+                {
+                    line.Id,
+                    line.LedgerAccountId,
+                    line.Description,
+                    line.DebitAmount,
+                    line.CreditAmount
+                }).ToList()
+            };
         })
         .ToList();
 
@@ -2008,6 +2018,61 @@ public async Task<IActionResult> GetJournalEntries(
                 line.CreditAmount))
             .ToList();
 
+        var postingLedgerAccountIds = journalEntry.Lines
+    .Select(x => x.LedgerAccountId)
+    .Distinct()
+    .ToList();
+
+var postingLedgerAccounts = await dbContext.LedgerAccounts
+    .AsNoTracking()
+    .Where(x => postingLedgerAccountIds.Contains(x.Id))
+    .ToDictionaryAsync(x => x.Id, cancellationToken);
+
+var budgetImpacts = journalEntry.Lines
+    .Where(line => postingLedgerAccounts.ContainsKey(line.LedgerAccountId))
+    .Select(line =>
+    {
+        var ledgerAccount = postingLedgerAccounts[line.LedgerAccountId];
+        var amount = BudgetEvaluationSupport.ComputeBudgetConsumptionAmount(ledgerAccount, line.DebitAmount, line.CreditAmount);
+
+        return new
+        {
+            LedgerAccount = ledgerAccount,
+            Impact = new BudgetCheckImpact(
+                line.LedgerAccountId,
+                journalEntry.EntryDateUtc,
+                amount,
+                "Manual Journal",
+                journalEntry.Id)
+        };
+    })
+    .Where(x => BudgetEvaluationSupport.IsBudgetConsumableAccountCategory(x.LedgerAccount.Category) && x.Impact.Amount > 0m)
+    .Select(x => x.Impact)
+    .ToList();
+
+var budgetResult = await BudgetEvaluationSupport.EvaluateBudgetImpactsAsync(
+    dbContext,
+    tenantContext.TenantId,
+    budgetImpacts,
+    cancellationToken);
+
+if (budgetResult is not null && !budgetResult.Allowed)
+{
+    return Conflict(new
+    {
+        Message = budgetResult.Message,
+        budgetResult.BudgetId,
+        budgetResult.BudgetLineId,
+        budgetResult.BudgetNumber,
+        budgetResult.BudgetName,
+        budgetResult.BudgetAmount,
+        budgetResult.ActualAmount,
+        budgetResult.ProjectedAmount,
+        budgetResult.RemainingAmount,
+        budgetResult.OverrunPolicy
+    });
+}    
+
         journalEntry.MarkPosted(postedAtUtc);
         dbContext.LedgerMovements.AddRange(movements);
 
@@ -2026,7 +2091,8 @@ public async Task<IActionResult> GetJournalEntries(
             FiscalPeriodName = postingPeriod.Name,
             MovementCount = movements.Count,
             TotalDebit = journalEntry.TotalDebit,
-            TotalCredit = journalEntry.TotalCredit
+            TotalCredit = journalEntry.TotalCredit,
+            BudgetWarning = budgetResult is { HasWarning: true } ? budgetResult.Message : null,
         });
     }
 
@@ -4269,6 +4335,60 @@ public async Task<IActionResult> GetJournalEntries(
                 cancellationToken);
     }
 
+    private static string ResolveJournalSourceCode(JournalEntry journalEntry)
+{
+    if (journalEntry.Type == JournalEntryType.OpeningBalance)
+    {
+        return "OPENING_BALANCE";
+    }
+
+    if (journalEntry.Type == JournalEntryType.Reversal)
+    {
+        return "REVERSAL";
+    }
+
+    var reference = journalEntry.Reference?.Trim() ?? string.Empty;
+    var description = journalEntry.Description?.Trim() ?? string.Empty;
+    var combined = $"{reference} {description}".ToUpperInvariant();
+
+    if (combined.Contains("SALES INVOICE") || combined.Contains("SALESINVOICE") || combined.Contains("SINV"))
+    {
+        return "SALES_INVOICE";
+    }
+
+    if (combined.Contains("CUSTOMER RECEIPT") || combined.Contains("CUSTOMERRECEIPT") || combined.Contains("RECEIPT"))
+    {
+        return "CUSTOMER_RECEIPT";
+    }
+
+    if (combined.Contains("PURCHASE INVOICE") || combined.Contains("PURCHASEINVOICE") || combined.Contains("PINV"))
+    {
+        return "PURCHASE_INVOICE";
+    }
+
+    if (combined.Contains("VENDOR PAYMENT") || combined.Contains("PAYMENT VOUCHER") || combined.Contains("VPV"))
+    {
+        return "VENDOR_PAYMENT";
+    }
+
+    return "MANUAL_JOURNAL";
+}
+
+private static string ResolveJournalSourceLabel(string sourceCode)
+{
+    return sourceCode switch
+    {
+        "OPENING_BALANCE" => "Opening Balance",
+        "REVERSAL" => "Reversal",
+        "SALES_INVOICE" => "Sales Invoice",
+        "CUSTOMER_RECEIPT" => "Customer Receipt",
+        "PURCHASE_INVOICE" => "Purchase Invoice",
+        "VENDOR_PAYMENT" => "Vendor Payment",
+        "MANUAL_JOURNAL" => "Manual Journal",
+        _ => "Other System Journal"
+    };
+}
+
     private static async Task<Dictionary<string, string>> GetUserDisplayNamesAsync(
     ApplicationDbContext dbContext,
     IEnumerable<string?> rawUserIds,
@@ -4454,4 +4574,205 @@ private static string ResolveUserDisplayName(
 
     public sealed record RejectJournalEntryRequest(
         string Reason);
+
+}
+
+internal sealed record BudgetCheckImpact(
+    Guid LedgerAccountId,
+    DateTime TransactionDateUtc,
+    decimal Amount,
+    string SourceLabel,
+    Guid? SourceDocumentId = null);
+
+internal sealed record BudgetCheckResult(
+    bool Allowed,
+    bool HasWarning,
+    string Message,
+    string? BudgetNumber = null,
+    string? BudgetName = null,
+    Guid? BudgetId = null,
+    Guid? BudgetLineId = null,
+    decimal BudgetAmount = 0m,
+    decimal ActualAmount = 0m,
+    decimal ProjectedAmount = 0m,
+    decimal RemainingAmount = 0m,
+    BudgetOverrunPolicy? OverrunPolicy = null);
+
+internal static class BudgetEvaluationSupport
+{
+    internal static bool IsBudgetConsumableAccountCategory(AccountCategory category)
+    {
+        return category == AccountCategory.Expense || category == AccountCategory.Income;
+    }
+
+    internal static decimal ComputeBudgetConsumptionAmount(
+        LedgerAccount ledgerAccount,
+        decimal debitAmount,
+        decimal creditAmount)
+    {
+        return ledgerAccount.NormalBalance == AccountNature.Debit
+            ? debitAmount - creditAmount
+            : creditAmount - debitAmount;
+    }
+
+    internal static async Task<BudgetCheckResult> EvaluateBudgetImpactAsync(
+        ApplicationDbContext dbContext,
+        Guid tenantId,
+        BudgetCheckImpact impact,
+        CancellationToken cancellationToken)
+    {
+        if (impact.Amount <= 0m)
+        {
+            return new BudgetCheckResult(true, false, "No positive budget impact to evaluate.");
+        }
+
+        var budgetLine = await dbContext.BudgetLines
+            .AsNoTracking()
+            .Include(x => x.Budget)
+            .FirstOrDefaultAsync(x =>
+                x.LedgerAccountId == impact.LedgerAccountId &&
+                x.PeriodStartUtc <= impact.TransactionDateUtc &&
+                x.PeriodEndUtc >= impact.TransactionDateUtc &&
+                (x.Budget.Status == BudgetStatus.Approved ||
+                 x.Budget.Status == BudgetStatus.Locked ||
+                 x.Budget.Status == BudgetStatus.Closed),
+                cancellationToken);
+
+        if (budgetLine is null)
+        {
+            return new BudgetCheckResult(
+                false,
+                false,
+                $"No approved, locked, or closed budget line exists for the selected account and transaction date. Source: {impact.SourceLabel}.");
+        }
+
+        var actualLines = await dbContext.JournalEntryLines
+            .AsNoTracking()
+            .Include(x => x.JournalEntry)
+            .Where(x =>
+                x.LedgerAccountId == impact.LedgerAccountId &&
+                x.JournalEntry.Status == JournalEntryStatus.Posted &&
+                x.JournalEntry.EntryDateUtc >= budgetLine.PeriodStartUtc &&
+                x.JournalEntry.EntryDateUtc <= budgetLine.PeriodEndUtc)
+            .ToListAsync(cancellationToken);
+
+        var ledgerAccount = await dbContext.LedgerAccounts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == impact.LedgerAccountId, cancellationToken);
+
+        if (ledgerAccount is null)
+        {
+            return new BudgetCheckResult(false, false, "Ledger account was not found for budget evaluation.");
+        }
+
+        var actualAmount = actualLines.Sum(x => ComputeBudgetConsumptionAmount(
+            ledgerAccount,
+            x.DebitAmount,
+            x.CreditAmount));
+
+        var projectedAmount = actualAmount + impact.Amount;
+        var remainingAmount = budgetLine.BudgetAmount - projectedAmount;
+        var isOverrun = projectedAmount > budgetLine.BudgetAmount;
+
+        if (!isOverrun)
+        {
+            return new BudgetCheckResult(
+                true,
+                false,
+                "Budget check passed.",
+                budgetLine.Budget.BudgetNumber,
+                budgetLine.Budget.Name,
+                budgetLine.BudgetId,
+                budgetLine.Id,
+                budgetLine.BudgetAmount,
+                actualAmount,
+                projectedAmount,
+                remainingAmount,
+                budgetLine.Budget.OverrunPolicy);
+        }
+
+        var overrunMessage =
+            $"Budget overrun detected for {impact.SourceLabel}. " +
+            $"Budget {budgetLine.Budget.BudgetNumber} / {budgetLine.Budget.Name}, " +
+            $"budget amount {budgetLine.BudgetAmount:N2}, actual {actualAmount:N2}, " +
+            $"projected {projectedAmount:N2}, remaining {remainingAmount:N2}.";
+
+        return budgetLine.Budget.OverrunPolicy switch
+        {
+            BudgetOverrunPolicy.Allow => new BudgetCheckResult(
+                true,
+                false,
+                overrunMessage,
+                budgetLine.Budget.BudgetNumber,
+                budgetLine.Budget.Name,
+                budgetLine.BudgetId,
+                budgetLine.Id,
+                budgetLine.BudgetAmount,
+                actualAmount,
+                projectedAmount,
+                remainingAmount,
+                budgetLine.Budget.OverrunPolicy),
+
+            BudgetOverrunPolicy.WarnOnly => new BudgetCheckResult(
+                true,
+                true,
+                overrunMessage,
+                budgetLine.Budget.BudgetNumber,
+                budgetLine.Budget.Name,
+                budgetLine.BudgetId,
+                budgetLine.Id,
+                budgetLine.BudgetAmount,
+                actualAmount,
+                projectedAmount,
+                remainingAmount,
+                budgetLine.Budget.OverrunPolicy),
+
+            BudgetOverrunPolicy.RequireApproval => new BudgetCheckResult(
+                false,
+                false,
+                overrunMessage + " Budget overrun requires approval.",
+                budgetLine.Budget.BudgetNumber,
+                budgetLine.Budget.Name,
+                budgetLine.BudgetId,
+                budgetLine.Id,
+                budgetLine.BudgetAmount,
+                actualAmount,
+                projectedAmount,
+                remainingAmount,
+                budgetLine.Budget.OverrunPolicy),
+
+            _ => new BudgetCheckResult(
+                false,
+                false,
+                overrunMessage + " Budget overrun is disallowed.",
+                budgetLine.Budget.BudgetNumber,
+                budgetLine.Budget.Name,
+                budgetLine.BudgetId,
+                budgetLine.Id,
+                budgetLine.BudgetAmount,
+                actualAmount,
+                projectedAmount,
+                remainingAmount,
+                budgetLine.Budget.OverrunPolicy)
+        };
+    }
+
+    internal static async Task<BudgetCheckResult?> EvaluateBudgetImpactsAsync(
+        ApplicationDbContext dbContext,
+        Guid tenantId,
+        IEnumerable<BudgetCheckImpact> impacts,
+        CancellationToken cancellationToken)
+    {
+        foreach (var impact in impacts.Where(x => x.Amount > 0m))
+        {
+            var result = await EvaluateBudgetImpactAsync(dbContext, tenantId, impact, cancellationToken);
+
+            if (!result.Allowed || result.HasWarning)
+            {
+                return result;
+            }
+        }
+
+        return null;
+    }
 }

@@ -42,6 +42,9 @@ function pageTitleForPath(pathname: string) {
   if (pathname.startsWith('/vendor-payments/rejected')) return 'Rejected Vendor Payments';
   if (pathname.startsWith('/vendor-payments')) return 'Vendor Payment Management';
   if (pathname.startsWith('/fiscal-periods')) return 'Fiscal Period Management';
+  if (pathname.startsWith('/fixed-assets/depreciation-runs')) return 'Fixed Asset Depreciation Runs';
+  if (pathname.startsWith('/fixed-assets/register/print')) return 'Fixed Asset Register';
+  if (pathname.startsWith('/fixed-assets')) return 'Fixed Asset Management';
   if (pathname.startsWith('/reports')) return 'Financial Reports';
   if (pathname.startsWith('/admin')) return 'Administration';
   if (pathname.startsWith('/budgets/rejected')) return 'Rejected Budgets';
@@ -65,6 +68,9 @@ function pageSubtitleForPath(pathname: string) {
   if (pathname.startsWith('/vendor-payments/rejected')) return 'Correct, resubmit, or delete rejected vendor payments.';
   if (pathname.startsWith('/vendor-payments')) return 'Capture supplier payments and route them through approval.';
   if (pathname.startsWith('/fiscal-periods')) return 'Manage accounting periods and open or close operations.';
+  if (pathname.startsWith('/fixed-assets/depreciation-runs')) return 'Preview, run, and review posted fixed asset depreciation cycles.';
+  if (pathname.startsWith('/fixed-assets/register/print')) return 'Review and print the fixed asset register in a clean standalone layout.';
+  if (pathname.startsWith('/fixed-assets')) return 'Manage fixed asset classes, register records, capitalization, and lifecycle actions.';
   if (pathname.startsWith('/reports')) return 'Review financial performance and print-ready reports.';
   if (pathname.startsWith('/admin')) return 'Manage tenant operations, users, subscriptions, and recovery.';
   if (pathname.startsWith('/budgets/rejected')) return 'Correct, resubmit, or delete rejected budgets.';
@@ -200,6 +206,7 @@ export function AppShell({ children }: PropsWithChildren) {
               <Link to="/customers" className="button">Customers</Link>
               <Link to="/sales-invoices" className="button">Sales Invoices</Link>
               <Link to="/customer-receipts" className="button">Customer Receipts</Link>
+              <Link to="/fixed-assets" className="button">Fixed Assets</Link>
               {canAccessAdmin() ? <Link to="/admin" className="button">Administration</Link> : null}
               <Link to="/license-status" className="button">Subscription Status</Link>
               <button className="button" onClick={signOut}>Sign Out</button>
@@ -235,7 +242,7 @@ export function AppShell({ children }: PropsWithChildren) {
               </div>
             </div>
           </div>
-        </section>
+        </section> 
 
         <main className="page-content">{children}</main>
 

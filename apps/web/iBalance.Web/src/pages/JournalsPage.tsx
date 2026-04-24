@@ -17,6 +17,9 @@ import {
   type LedgerAccountDto,
   type JournalEntryDto,
   type JournalLineRequest,
+  formatBudgetAwareSuccessMessage,
+  getBudgetAwareReadableError,
+  type BudgetAwareApiResponse,
 } from '../lib/api';
 import {
   canCreateJournals,
@@ -62,6 +65,10 @@ function formatAmount(value: number) {
 
 function actorName(value?: string | null, displayName?: string | null) {
   return displayName || value || '—';
+}
+
+function sourceLabel(value?: string | null) {
+  return value || 'Unclassified';
 }
 
 type LineForm = {
@@ -122,6 +129,13 @@ export function JournalsPage() {
   const [selectedJournalId, setSelectedJournalId] = useState('');
   const [detailJournal, setDetailJournal] = useState<JournalEntryDto | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+
+  const [searchText, setSearchText] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   const canView = canViewFinance();
   const canCreate = canCreateJournals();
@@ -255,14 +269,14 @@ export function JournalsPage() {
 
   const postMut = useMutation({
     mutationFn: postJournalEntry,
-    onSuccess: async () => {
+    onSuccess: async (data: BudgetAwareApiResponse) => {
       await refreshAll();
       setSelectedJournalId('');
-      setInfoText('The journal entry has been posted successfully.');
+      setInfoText(formatBudgetAwareSuccessMessage(data, 'The journal entry has been posted successfully.'));
       setErrorText('');
     },
     onError: (e) => {
-      setErrorText(getTenantReadableError(e, 'We could not post the journal entry at this time.'));
+      setErrorText(getBudgetAwareReadableError(e, 'We could not post the journal entry at this time.'));
       setInfoText('');
     },
   });
@@ -304,9 +318,55 @@ export function JournalsPage() {
 
   const journals = journalsQ.data?.items ?? [];
 
-const activeRegisterJournals = useMemo(() => {
-  return journals.filter((journal: JournalEntryDto) => journal.status !== 4);
-}, [journals]);
+  const activeRegisterJournals = useMemo(() => {
+    return journals.filter((journal: JournalEntryDto) => journal.status !== 4);
+  }, [journals]);
+
+  const filteredRegisterJournals = useMemo(() => {
+    const text = searchText.trim().toLowerCase();
+
+    return activeRegisterJournals.filter((journal: JournalEntryDto) => {
+      const matchesSearch =
+        !text ||
+        journal.reference.toLowerCase().includes(text) ||
+        journal.description.toLowerCase().includes(text) ||
+        sourceLabel(journal.sourceLabel).toLowerCase().includes(text) ||
+        typeLabel(journal.type).toLowerCase().includes(text);
+
+      const matchesSource =
+        sourceFilter === 'all' ||
+        (journal.sourceCode || '').toUpperCase() === sourceFilter;
+
+      const matchesStatus =
+        statusFilter === 'all' || String(journal.status) === statusFilter;
+
+      const matchesType =
+        typeFilter === 'all' || String(journal.type) === typeFilter;
+
+      const entryDate = new Date(journal.entryDateUtc);
+      const entryDateOnly = Number.isNaN(entryDate.getTime()) ? '' : entryDate.toISOString().slice(0, 10);
+
+      const matchesFrom = !fromDate || entryDateOnly >= fromDate;
+      const matchesTo = !toDate || entryDateOnly <= toDate;
+
+      return matchesSearch && matchesSource && matchesStatus && matchesType && matchesFrom && matchesTo;
+    });
+  }, [activeRegisterJournals, searchText, sourceFilter, statusFilter, typeFilter, fromDate, toDate]);
+
+  const sourceOptions = useMemo(() => {
+    const unique = new Map<string, string>();
+
+    activeRegisterJournals.forEach((journal) => {
+      const code = (journal.sourceCode || '').toUpperCase();
+      const label = sourceLabel(journal.sourceLabel);
+
+      if (code && !unique.has(code)) {
+        unique.set(code, label);
+      }
+    });
+
+    return Array.from(unique.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+  }, [activeRegisterJournals]);
 
   const totals = useMemo(() => {
     const debit = journalForm.lines.reduce((s, l) => s + parseMoney(l.debitAmount), 0);
@@ -581,46 +641,16 @@ const activeRegisterJournals = useMemo(() => {
         </div>
 
         <div className="kv">
-          <div className="kv-row">
-            <span>Total Journals</span>
-            <span>{journalSummary.total}</span>
-          </div>
-          <div className="kv-row">
-            <span>Draft Journals</span>
-            <span>{journalSummary.drafts}</span>
-          </div>
-          <div className="kv-row">
-            <span>Submitted for Approval</span>
-            <span>{journalSummary.submitted}</span>
-          </div>
-          <div className="kv-row">
-            <span>Approved Journals</span>
-            <span>{journalSummary.approved}</span>
-          </div>
-          <div className="kv-row">
-            <span>Rejected Journals</span>
-            <span>{journalSummary.rejected}</span>
-          </div>
-          <div className="kv-row">
-            <span>Posted Journals</span>
-            <span>{journalSummary.posted}</span>
-          </div>
-          <div className="kv-row">
-            <span>Voided Journals</span>
-            <span>{journalSummary.voided}</span>
-          </div>
-          <div className="kv-row">
-            <span>Reversed Journals</span>
-            <span>{journalSummary.reversed}</span>
-          </div>
-          <div className="kv-row">
-            <span>Current Fiscal Period</span>
-            <span>{hasOpenPeriod ? dashboardQ.data?.openFiscalPeriod?.name : 'No open period available'}</span>
-          </div>
-          <div className="kv-row">
-            <span>Posting Accounts</span>
-            <span>{hasPostingAccounts ? `${postingAccounts.length} available` : 'Not yet available'}</span>
-          </div>
+          <div className="kv-row"><span>Total Journals</span><span>{journalSummary.total}</span></div>
+          <div className="kv-row"><span>Draft Journals</span><span>{journalSummary.drafts}</span></div>
+          <div className="kv-row"><span>Submitted for Approval</span><span>{journalSummary.submitted}</span></div>
+          <div className="kv-row"><span>Approved Journals</span><span>{journalSummary.approved}</span></div>
+          <div className="kv-row"><span>Rejected Journals</span><span>{journalSummary.rejected}</span></div>
+          <div className="kv-row"><span>Posted Journals</span><span>{journalSummary.posted}</span></div>
+          <div className="kv-row"><span>Voided Journals</span><span>{journalSummary.voided}</span></div>
+          <div className="kv-row"><span>Reversed Journals</span><span>{journalSummary.reversed}</span></div>
+          <div className="kv-row"><span>Current Fiscal Period</span><span>{hasOpenPeriod ? dashboardQ.data?.openFiscalPeriod?.name : 'No open period available'}</span></div>
+          <div className="kv-row"><span>Posting Accounts</span><span>{hasPostingAccounts ? `${postingAccounts.length} available` : 'Not yet available'}</span></div>
         </div>
 
         <div className="hero-actions" style={{ marginTop: 16 }}>
@@ -675,8 +705,72 @@ const activeRegisterJournals = useMemo(() => {
 
       <section className="panel">
         <div className="section-heading">
+          <h2>Journal register filters</h2>
+          <span className="muted">Filter by source, workflow state, type, date, and search text.</span>
+        </div>
+
+        <div className="form-grid two">
+          <div className="form-row">
+            <label>Search</label>
+            <input
+              className="input"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              placeholder="Reference, description, source, type"
+            />
+          </div>
+
+          <div className="form-row">
+            <label>Source</label>
+            <select className="select" value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
+              <option value="all">All Sources</option>
+              {sourceOptions.map(([code, label]) => (
+                <option key={code} value={code}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-row">
+            <label>Status</label>
+            <select className="select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="all">All Statuses</option>
+              <option value="1">Draft</option>
+              <option value="2">Submitted for Approval</option>
+              <option value="3">Approved</option>
+              <option value="5">Posted</option>
+              <option value="6">Voided</option>
+              <option value="7">Reversed</option>
+            </select>
+          </div>
+
+          <div className="form-row">
+            <label>Type</label>
+            <select className="select" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+              <option value="all">All Types</option>
+              <option value="1">Journal Entry</option>
+              <option value="2">Opening Balance</option>
+              <option value="3">Reversal Entry</option>
+            </select>
+          </div>
+
+          <div className="form-row">
+            <label>From Date</label>
+            <input className="input" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+          </div>
+
+          <div className="form-row">
+            <label>To Date</label>
+            <input className="input" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+          </div>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="section-heading">
           <h2>Journal register</h2>
-          <span className="muted">{activeRegisterJournals.length} active journal(s)</span>
+          <span className="muted">{filteredRegisterJournals.length} active journal(s)</span>
         </div>
 
         <div className="table-wrap">
@@ -686,6 +780,7 @@ const activeRegisterJournals = useMemo(() => {
                 <th>Date</th>
                 <th>Reference</th>
                 <th>Description</th>
+                <th>Source</th>
                 <th>Type</th>
                 <th>Status</th>
                 <th style={{ textAlign: 'right' }}>Debit</th>
@@ -694,22 +789,20 @@ const activeRegisterJournals = useMemo(() => {
               </tr>
             </thead>
             <tbody>
-              {activeRegisterJournals.length === 0 ? (
+              {filteredRegisterJournals.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="muted">
-                    No active journals found. Rejected journals are managed from the Rejected Journals page.
+                  <td colSpan={9} className="muted">
+                    No active journals matched the selected filter. Rejected journals are managed from the Rejected Journals page.
                   </td>
                 </tr>
               ) : (
-                activeRegisterJournals.map((item: JournalEntryDto) => (
+                filteredRegisterJournals.map((item: JournalEntryDto) => (
                   <tr key={item.id}>
                     <td>{formatDateTime(item.entryDateUtc)}</td>
-
                     <td>{item.reference}</td>
 
                     <td>
                       <div>{item.description}</div>
-
                       <div className="muted" style={{ marginTop: 4 }}>
                         {item.submittedOnUtc ? `Submitted: ${formatDateTime(item.submittedOnUtc)}` : ''}
                         {item.approvedOnUtc ? ` • Approved: ${formatDateTime(item.approvedOnUtc)}` : ''}
@@ -717,17 +810,11 @@ const activeRegisterJournals = useMemo(() => {
                       </div>
                     </td>
 
+                    <td>{sourceLabel(item.sourceLabel)}</td>
                     <td>{typeLabel(item.type)}</td>
-
                     <td>{statusLabel(item.status)}</td>
-
-                    <td style={{ textAlign: 'right' }}>
-                      {formatAmount(Number(item.totalDebit))}
-                    </td>
-
-                    <td style={{ textAlign: 'right' }}>
-                      {formatAmount(Number(item.totalCredit))}
-                    </td>
+                    <td style={{ textAlign: 'right' }}>{formatAmount(Number(item.totalDebit))}</td>
+                    <td style={{ textAlign: 'right' }}>{formatAmount(Number(item.totalCredit))}</td>
 
                     <td>
                       <div className="inline-actions" style={{ flexWrap: 'wrap' }}>
@@ -804,7 +891,6 @@ const activeRegisterJournals = useMemo(() => {
         </div>
       </section>
 
-
       {detailJournal ? (
         <div className="modal-backdrop" onMouseDown={() => setDetailJournal(null)}>
           <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
@@ -812,10 +898,11 @@ const activeRegisterJournals = useMemo(() => {
               <h2>Journal Detail</h2>
               <button className="button ghost" onClick={() => setDetailJournal(null)} aria-label="Close">✕</button>
             </div>
-      
+
             <div className="kv" style={{ marginBottom: 16 }}>
               <div className="kv-row"><span>Reference</span><span>{detailJournal.reference}</span></div>
               <div className="kv-row"><span>Description</span><span>{detailJournal.description}</span></div>
+              <div className="kv-row"><span>Source</span><span>{sourceLabel(detailJournal.sourceLabel)}</span></div>
               <div className="kv-row"><span>Date</span><span>{formatDateTime(detailJournal.entryDateUtc)}</span></div>
               <div className="kv-row"><span>Type</span><span>{typeLabel(detailJournal.type)}</span></div>
               <div className="kv-row"><span>Status</span><span>{statusLabel(detailJournal.status)}</span></div>
@@ -831,7 +918,7 @@ const activeRegisterJournals = useMemo(() => {
               <div className="kv-row"><span>Total Debit</span><span>{formatAmount(Number(detailJournal.totalDebit))}</span></div>
               <div className="kv-row"><span>Total Credit</span><span>{formatAmount(Number(detailJournal.totalCredit))}</span></div>
             </div>
-      
+
             <div className="table-wrap">
               <table className="data-table">
                 <thead>
@@ -842,11 +929,11 @@ const activeRegisterJournals = useMemo(() => {
                     <th style={{ textAlign: 'right' }}>Credit</th>
                   </tr>
                 </thead>
-      
+
                 <tbody>
                   {detailJournal.lines.map((line) => {
                     const account = accountMap.get(line.ledgerAccountId);
-      
+
                     return (
                       <tr key={line.id}>
                         <td>{account ? `${account.code} - ${account.name}` : line.ledgerAccountId}</td>
@@ -857,7 +944,7 @@ const activeRegisterJournals = useMemo(() => {
                     );
                   })}
                 </tbody>
-      
+
                 <tfoot>
                   <tr>
                     <th colSpan={2}>Total</th>
@@ -867,7 +954,7 @@ const activeRegisterJournals = useMemo(() => {
                 </tfoot>
               </table>
             </div>
-      
+
             <div className="modal-footer">
               <button className="button" onClick={() => setDetailJournal(null)}>Close</button>
             </div>

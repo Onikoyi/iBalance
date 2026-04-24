@@ -29,6 +29,9 @@ import { SubscriptionRequestPage } from './pages/SubscriptionRequestPage';
 import { LicenseStatusPage } from './pages/LicenseStatusPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { RejectedJournalEntriesPage } from './pages/RejectedJournalEntriesPage';
+import { FixedAssetsPage } from './pages/FixedAssetsPage';
+import { FixedAssetDepreciationRunsPage } from './pages/FixedAssetDepreciationRunsPage';
+import { FixedAssetRegisterPrintPage } from './pages/FixedAssetRegisterPrintPage';
 
 import { LoginPage } from './pages/auth/LoginPage';
 import { SignUpPage } from './pages/auth/SignUpPage';
@@ -317,6 +320,38 @@ export default function App() {
             </RequireAuth>
           }
         />
+
+
+      <Route
+        path="/fixed-assets"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <FixedAssetsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/fixed-assets/depreciation-runs"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <FixedAssetDepreciationRunsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/fixed-assets/register/print"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <FixedAssetRegisterPrintPage />
+          </RequireAuth>
+        }
+      />
 
       <Route
         path="/reports"

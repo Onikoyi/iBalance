@@ -277,6 +277,7 @@ function ReportPrintHeader({ title, subtitle }: ReportHeaderProps) {
         <h2>{title}</h2>
         <div className="muted">{subtitle}</div>
       </div>
+
     </div>
   );
 }
@@ -4446,6 +4447,27 @@ Print Tax Report
           </table>
         </div>
       </section>
+
+      <ReportSectionDivider
+        title="Fixed Asset Reports"
+        subtitle="Open the fixed asset register and depreciation workspace in clean standalone pages."
+      />
+
+      <section className="panel">
+        <div className="section-heading">
+          <div>
+            <h2>Fixed Asset Reporting</h2>
+            <div className="muted">Fixed asset register, depreciation operations, and lifecycle reporting entry points.</div>
+          </div>
+        </div>
+
+        <div className="hero-actions" style={{ marginTop: 12 }}>
+          <Link to="/fixed-assets" className="button primary">Open Fixed Assets</Link>
+          <Link to="/fixed-assets/depreciation-runs" className="button">Depreciation Runs</Link>
+          <Link to="/fixed-assets/register/print" className="button">Asset Register Print</Link>
+        </div>
+      </section>
+
     </div>
   );
 }

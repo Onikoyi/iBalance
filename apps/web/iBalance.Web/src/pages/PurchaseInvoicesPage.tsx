@@ -2,8 +2,11 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   approvePurchaseInvoice,
+  capitalizePurchaseInvoiceToFixedAsset,
   createPurchaseInvoice,
   getAccounts,
+  getFixedAssetClasses,
+  getFixedAssets,
   getPurchaseInvoices,
   getTaxCodes,
   getTenantReadableError,
@@ -12,9 +15,15 @@ import {
   previewTaxCalculation,
   rejectPurchaseInvoice,
   submitPurchaseInvoiceForApproval,
+  type CapitalizePurchaseInvoiceToFixedAssetRequest,
   type CreatePurchaseInvoiceRequest,
+  type FixedAssetClassDto,
+  type PurchaseInvoiceDto,
   type PurchaseInvoiceLineDto,
   type TaxCodeDto,
+  formatBudgetAwareSuccessMessage,
+  getBudgetAwareReadableError,
+  type BudgetAwareApiResponse,
 } from '../lib/api';
 import { canApproveWorkflows, canManageFinanceSetup, canViewFinance } from '../lib/auth';
 
@@ -94,6 +103,44 @@ function taxApplicationModeLabel(value: number) {
   }
 }
 
+function toDateInputValue(value?: string | null) {
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toISOString().slice(0, 10);
+}
+
+function dateInputToUtc(value: string) {
+  return value ? new Date(value + 'T00:00:00.000Z').toISOString() : '';
+}
+
+function normalizeAssetNumberFromInvoice(invoiceNumber: string) {
+  const cleaned = invoiceNumber.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return cleaned ? 'FA-' + cleaned : 'FA-';
+}
+
+type CapitalizeFormState = {
+  fixedAssetClassId: string;
+  assetNumber: string;
+  assetName: string;
+  description: string;
+  capitalizationDateUtc: string;
+  depreciationStartDateUtc: string;
+  residualValue: string;
+  usefulLifeMonths: string;
+};
+
+const emptyCapitalizeForm: CapitalizeFormState = {
+  fixedAssetClassId: '',
+  assetNumber: '',
+  assetName: '',
+  description: '',
+  capitalizationDateUtc: '',
+  depreciationStartDateUtc: '',
+  residualValue: '0',
+  usefulLifeMonths: '',
+};
+
 export function PurchaseInvoicesPage() {
   const qc = useQueryClient();
   const canView = canViewFinance();
@@ -102,7 +149,9 @@ export function PurchaseInvoicesPage() {
 
   const [showCreate, setShowCreate] = useState(false);
   const [showPost, setShowPost] = useState(false);
+  const [showCapitalize, setShowCapitalize] = useState(false);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState('');
+  const [selectedCapitalizationInvoiceId, setSelectedCapitalizationInvoiceId] = useState('');
   const [form, setForm] = useState<CreatePurchaseInvoiceRequest>({
     ...emptyForm,
     invoiceDateUtc: new Date().toISOString(),
@@ -111,6 +160,7 @@ export function PurchaseInvoicesPage() {
     payableLedgerAccountId: '',
     expenseLedgerAccountId: '',
   });
+  const [capitalizeForm, setCapitalizeForm] = useState<CapitalizeFormState>(emptyCapitalizeForm);
   const [errorText, setErrorText] = useState('');
   const [infoText, setInfoText] = useState('');
   const [rejectReason, setRejectReason] = useState('');
@@ -130,6 +180,18 @@ export function PurchaseInvoicesPage() {
   const accountsQ = useQuery({
     queryKey: ['accounts'],
     queryFn: getAccounts,
+    enabled: canView,
+  });
+
+  const fixedAssetClassesQ = useQuery({
+    queryKey: ['fixed-asset-classes'],
+    queryFn: getFixedAssetClasses,
+    enabled: canView,
+  });
+
+  const fixedAssetsQ = useQuery({
+    queryKey: ['fixed-assets'],
+    queryFn: getFixedAssets,
     enabled: canView,
   });
 
@@ -200,7 +262,7 @@ export function PurchaseInvoicesPage() {
 
   const postMut = useMutation({
     mutationFn: () => postPurchaseInvoice(selectedInvoiceId, postForm),
-    onSuccess: async () => {
+    onSuccess: async (data: BudgetAwareApiResponse) => {
       await qc.invalidateQueries({ queryKey: ['ap-purchase-invoices'] });
       await qc.invalidateQueries({ queryKey: ['ap-vendor-payments'] });
       await qc.invalidateQueries({ queryKey: ['accounts'] });
@@ -215,10 +277,31 @@ export function PurchaseInvoicesPage() {
         expenseLedgerAccountId: '',
       });
       setErrorText('');
-      setInfoText('Purchase invoice posted successfully.');
+      setInfoText(formatBudgetAwareSuccessMessage(data, 'Purchase invoice posted successfully.'));
     },
     onError: (e) => {
-      setErrorText(getTenantReadableError(e, 'We could not post the purchase invoice at this time.'));
+      setErrorText(getBudgetAwareReadableError(e, 'We could not post the purchase invoice at this time.'));
+      setInfoText('');
+    },
+  });
+
+  const capitalizeMut = useMutation({
+    mutationFn: (payload: CapitalizePurchaseInvoiceToFixedAssetRequest) => capitalizePurchaseInvoiceToFixedAsset(payload),
+    onSuccess: async (data: { message?: string; Message?: string; glPostingReason?: string; GlPostingReason?: string }) => {
+      await qc.invalidateQueries({ queryKey: ['ap-purchase-invoices'] });
+      await qc.invalidateQueries({ queryKey: ['fixed-assets'] });
+      await qc.invalidateQueries({ queryKey: ['fixed-asset-register'] });
+      await qc.invalidateQueries({ queryKey: ['fixed-asset-detail'] });
+      setShowCapitalize(false);
+      setSelectedCapitalizationInvoiceId('');
+      setCapitalizeForm(emptyCapitalizeForm);
+      setErrorText('');
+      const baseMessage = data?.message || data?.Message || 'Purchase invoice capitalized into fixed asset successfully.';
+      const glReason = data?.glPostingReason || data?.GlPostingReason || '';
+      setInfoText(glReason ? baseMessage + ' ' + glReason : baseMessage);
+    },
+    onError: (error) => {
+      setErrorText(getTenantReadableError(error, 'Unable to capitalize purchase invoice into fixed asset.'));
       setInfoText('');
     },
   });
@@ -252,6 +335,19 @@ export function PurchaseInvoicesPage() {
   const postingAccounts = useMemo(() => {
     return (accountsQ.data?.items ?? []).filter((x) => x.isActive && !x.isHeader && x.isPostingAllowed);
   }, [accountsQ.data?.items]);
+  const fixedAssetClassMap = useMemo(() => {
+    const map = new Map<string, FixedAssetClassDto>();
+    (fixedAssetClassesQ.data?.items ?? []).forEach((item) => map.set(item.id, item));
+    return map;
+  }, [fixedAssetClassesQ.data?.items]);
+
+  const capitalizedPurchaseInvoiceIds = useMemo(() => {
+    return new Set((fixedAssetsQ.data?.items ?? []).map((asset) => asset.purchaseInvoiceId).filter(Boolean) as string[]);
+  }, [fixedAssetsQ.data?.items]);
+
+  const selectedCapitalizationInvoice = useMemo(() => {
+    return visibleInvoices.find((item) => item.id === selectedCapitalizationInvoiceId) ?? null;
+  }, [selectedCapitalizationInvoiceId, visibleInvoices]);
 
   const invoiceBaseAmount = useMemo(() => {
     return form.lines.reduce((sum, line) => {
@@ -370,6 +466,123 @@ export function PurchaseInvoicesPage() {
       setSelectedInvoiceId('');
       setErrorText('');
     }
+  }
+
+
+  function applyCapitalizationClassDefaults(fixedAssetClassId: string) {
+    const assetClass = fixedAssetClassMap.get(fixedAssetClassId);
+    setCapitalizeForm((state) => ({
+      ...state,
+      fixedAssetClassId,
+      usefulLifeMonths: assetClass?.usefulLifeMonthsDefault ? String(assetClass.usefulLifeMonthsDefault) : state.usefulLifeMonths,
+    }));
+  }
+
+  function openCapitalizeModal(invoice: PurchaseInvoiceDto) {
+    if (!canManage) {
+      setErrorText('You do not have permission to capitalize purchase invoices into fixed assets.');
+      setInfoText('');
+      return;
+    }
+    if (!invoice.postedOnUtc || !invoice.journalEntryId) {
+      setErrorText('Only posted purchase invoices can be capitalized into fixed assets.');
+      setInfoText('');
+      return;
+    }
+    if (capitalizedPurchaseInvoiceIds.has(invoice.id)) {
+      setErrorText('This purchase invoice has already been capitalized into a fixed asset.');
+      setInfoText('');
+      return;
+    }
+    const firstActiveClass = (fixedAssetClassesQ.data?.items ?? []).find((item) => item.status === 1);
+    const assetNumber = normalizeAssetNumberFromInvoice(invoice.invoiceNumber);
+    const invoiceDate = toDateInputValue(invoice.postedOnUtc || invoice.invoiceDateUtc);
+    setSelectedCapitalizationInvoiceId(invoice.id);
+    setCapitalizeForm({
+      ...emptyCapitalizeForm,
+      fixedAssetClassId: firstActiveClass?.id || '',
+      assetNumber,
+      assetName: invoice.description || 'Asset from invoice ' + invoice.invoiceNumber,
+      description: invoice.description || '',
+      capitalizationDateUtc: invoiceDate,
+      depreciationStartDateUtc: invoiceDate,
+      usefulLifeMonths: firstActiveClass?.usefulLifeMonthsDefault ? String(firstActiveClass.usefulLifeMonthsDefault) : '',
+    });
+    setErrorText('');
+    setInfoText('');
+    setShowCapitalize(true);
+  }
+
+  function closeCapitalizeModal() {
+    if (!capitalizeMut.isPending) {
+      setShowCapitalize(false);
+      setSelectedCapitalizationInvoiceId('');
+      setCapitalizeForm(emptyCapitalizeForm);
+      setErrorText('');
+    }
+  }
+
+  async function submitCapitalize() {
+    setErrorText('');
+    setInfoText('');
+    const invoice = selectedCapitalizationInvoice;
+    if (!invoice) {
+      setErrorText('Select a posted purchase invoice to capitalize.');
+      return;
+    }
+    if (!canManage) {
+      setErrorText('You do not have permission to capitalize purchase invoices into fixed assets.');
+      return;
+    }
+    if (!capitalizeForm.fixedAssetClassId) {
+      setErrorText('Fixed asset class is required.');
+      return;
+    }
+    if (!capitalizeForm.assetNumber.trim()) {
+      setErrorText('Asset number is required.');
+      return;
+    }
+    if (!capitalizeForm.assetName.trim()) {
+      setErrorText('Asset name is required.');
+      return;
+    }
+    const residualValue = Number(capitalizeForm.residualValue || 0);
+    const usefulLifeMonths = Number(capitalizeForm.usefulLifeMonths || 0);
+    if (residualValue < 0) {
+      setErrorText('Residual value cannot be negative.');
+      return;
+    }
+    if (residualValue >= invoice.totalAmount) {
+      setErrorText('Residual value must be less than the invoice base amount.');
+      return;
+    }
+    if (usefulLifeMonths <= 0) {
+      setErrorText('Useful life months must be greater than zero.');
+      return;
+    }
+    if (!capitalizeForm.capitalizationDateUtc) {
+      setErrorText('Capitalization date is required.');
+      return;
+    }
+    if (!capitalizeForm.depreciationStartDateUtc) {
+      setErrorText('Depreciation start date is required.');
+      return;
+    }
+    await capitalizeMut.mutateAsync({
+      purchaseInvoiceId: invoice.id,
+      fixedAssetClassId: capitalizeForm.fixedAssetClassId,
+      assetNumber: capitalizeForm.assetNumber.trim(),
+      assetName: capitalizeForm.assetName.trim(),
+      description: capitalizeForm.description.trim() || null,
+      capitalizationDateUtc: capitalizeForm.capitalizationDateUtc
+        ? dateInputToUtc(capitalizeForm.capitalizationDateUtc)
+        : null,
+      residualValue,
+      usefulLifeMonths,
+      depreciationStartDateUtc: capitalizeForm.depreciationStartDateUtc
+        ? dateInputToUtc(capitalizeForm.depreciationStartDateUtc)
+        : dateInputToUtc(capitalizeForm.capitalizationDateUtc),
+    });
   }
 
   async function submitCreate() {
@@ -504,7 +717,7 @@ export function PurchaseInvoicesPage() {
     return <div className="panel error-panel">You do not have access to view purchase invoices.</div>;
   }
 
-  if (invoicesQ.isLoading || vendorsQ.isLoading || accountsQ.isLoading || taxCodesQ.isLoading) {
+  if (invoicesQ.isLoading || vendorsQ.isLoading || accountsQ.isLoading || taxCodesQ.isLoading || fixedAssetClassesQ.isLoading || fixedAssetsQ.isLoading) {
     return <div className="panel">Loading purchase invoices...</div>;
   }
 
@@ -513,10 +726,14 @@ export function PurchaseInvoicesPage() {
     vendorsQ.isError ||
     accountsQ.isError ||
     taxCodesQ.isError ||
+    fixedAssetClassesQ.isError ||
+    fixedAssetsQ.isError ||
     !invoicesQ.data ||
     !vendorsQ.data ||
     !accountsQ.data ||
-    !taxCodesQ.data
+    !taxCodesQ.data ||
+    !fixedAssetClassesQ.data ||
+    !fixedAssetsQ.data
   ) {
     return <div className="panel error-panel">We could not load purchase invoices at this time.</div>;
   }
@@ -634,51 +851,33 @@ export function PurchaseInvoicesPage() {
                     <td style={{ textAlign: 'right' }}>{formatAmount(item.balanceAmount)}</td>
                     <td>{formatDateTime(item.postedOnUtc)}</td>
                     <td>
-                    {[1, 2, 3].includes(item.status) ? (
-                        <div className="inline-actions">
-                          {item.status === 1 && canManage ? (
-                            <button
-                              className="button"
-                              onClick={() => submitForApproval(item.id)}
-                              disabled={submitApprovalMut.isPending}
-                            >
-                              {submitApprovalMut.isPending ? 'Submitting…' : 'Submit'}
+                      <div className="inline-actions" style={{ flexWrap: 'wrap' }}>
+                        {item.status === 1 && canManage ? (
+                          <button className="button" onClick={() => submitForApproval(item.id)} disabled={submitApprovalMut.isPending}>
+                            {submitApprovalMut.isPending ? 'Submitting…' : 'Submit'}
+                          </button>
+                        ) : null}
+                        {item.status === 2 && canApprove ? (
+                          <>
+                            <button className="button" onClick={() => approveInvoice(item.id)} disabled={approveMut.isPending}>
+                              {approveMut.isPending ? 'Approving…' : 'Approve'}
                             </button>
-                          ) : null}
-
-                          {item.status === 2 && canApprove ? (
-                            <>
-                              <button
-                                className="button"
-                                onClick={() => approveInvoice(item.id)}
-                                disabled={approveMut.isPending}
-                              >
-                                {approveMut.isPending ? 'Approving…' : 'Approve'}
-                              </button>
-
-                              <button
-                                className="button danger"
-                                onClick={() => rejectInvoice(item.id)}
-                                disabled={rejectMut.isPending}
-                              >
-                                {rejectMut.isPending ? 'Rejecting…' : 'Reject'}
-                              </button>
-                            </>
-                          ) : null}
-
-                          {item.status === 3 && canApprove ? (
-                            <button
-                              className="button primary"
-                              onClick={() => openPostModal(item.id)}
-                              disabled={postMut.isPending}
-                            >
-                              Post Invoice
+                            <button className="button danger" onClick={() => rejectInvoice(item.id)} disabled={rejectMut.isPending}>
+                              {rejectMut.isPending ? 'Rejecting…' : 'Reject'}
                             </button>
-                          ) : null}
-                        </div>
-                      ) : (
-                        <span className="muted">No action required</span>
-                      )}
+                          </>
+                        ) : null}
+                        {item.status === 3 && canApprove ? (
+                          <button className="button primary" onClick={() => openPostModal(item.id)} disabled={postMut.isPending}>Post Invoice</button>
+                        ) : null}
+                        {[4, 5, 6].includes(item.status) && canManage && item.journalEntryId && item.postedOnUtc && !capitalizedPurchaseInvoiceIds.has(item.id) ? (
+                          <button className="button" onClick={() => openCapitalizeModal(item)} disabled={capitalizeMut.isPending}>Capitalize to Fixed Asset</button>
+                        ) : null}
+                        {capitalizedPurchaseInvoiceIds.has(item.id) ? <span className="muted">Capitalized</span> : null}
+                        {item.status !== 1 && item.status !== 2 && item.status !== 3 && !([4, 5, 6].includes(item.status) && canManage && item.journalEntryId && item.postedOnUtc && !capitalizedPurchaseInvoiceIds.has(item.id)) && !capitalizedPurchaseInvoiceIds.has(item.id) ? (
+                          <span className="muted">No action required</span>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -957,6 +1156,35 @@ export function PurchaseInvoicesPage() {
                 {postMut.isPending ? 'Posting…' : 'Post Purchase Invoice'}
               </button>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showCapitalize && selectedCapitalizationInvoice ? (
+        <div className="modal-backdrop" onMouseDown={closeCapitalizeModal}>
+          <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="modal-header"><h2>Capitalize Purchase Invoice to Fixed Asset</h2><button className="button ghost" onClick={closeCapitalizeModal} aria-label="Close">✕</button></div>
+            {errorText ? <div className="error-panel">{errorText}</div> : null}
+            <div className="panel" style={{ marginBottom: 16 }}>
+              <div className="kv">
+                <div className="kv-row"><span>Invoice</span><span>{selectedCapitalizationInvoice.invoiceNumber}</span></div>
+                <div className="kv-row"><span>Vendor</span><span>{selectedCapitalizationInvoice.vendorCode} - {selectedCapitalizationInvoice.vendorName}</span></div>
+                <div className="kv-row"><span>Base Amount Capitalized</span><span>{formatAmount(selectedCapitalizationInvoice.totalAmount)}</span></div>
+                <div className="kv-row"><span>Posted On</span><span>{formatDateTime(selectedCapitalizationInvoice.postedOnUtc)}</span></div>
+              </div>
+              <div className="muted" style={{ marginTop: 8 }}>This creates the fixed asset register record only. The backend skips duplicate GL posting because the AP invoice is already posted.</div>
+            </div>
+            <div className="form-grid two">
+              <div className="form-row"><label>Fixed Asset Class</label><select className="select" value={capitalizeForm.fixedAssetClassId} onChange={(e) => applyCapitalizationClassDefaults(e.target.value)}><option value="">— Select Fixed Asset Class —</option>{fixedAssetClassesQ.data.items.filter((assetClass) => assetClass.status === 1).map((assetClass) => <option key={assetClass.id} value={assetClass.id}>{assetClass.code} - {assetClass.name}</option>)}</select></div>
+              <div className="form-row"><label>Asset Number</label><input className="input" value={capitalizeForm.assetNumber} onChange={(e) => setCapitalizeForm((state) => ({ ...state, assetNumber: e.target.value }))} /></div>
+              <div className="form-row"><label>Asset Name</label><input className="input" value={capitalizeForm.assetName} onChange={(e) => setCapitalizeForm((state) => ({ ...state, assetName: e.target.value }))} /></div>
+              <div className="form-row"><label>Capitalization Date</label><input className="input" type="date" value={capitalizeForm.capitalizationDateUtc} onChange={(e) => setCapitalizeForm((state) => ({ ...state, capitalizationDateUtc: e.target.value }))} /></div>
+              <div className="form-row"><label>Depreciation Start Date</label><input className="input" type="date" value={capitalizeForm.depreciationStartDateUtc} onChange={(e) => setCapitalizeForm((state) => ({ ...state, depreciationStartDateUtc: e.target.value }))} /></div>
+              <div className="form-row"><label>Useful Life Months</label><input className="input" type="number" value={capitalizeForm.usefulLifeMonths} onChange={(e) => setCapitalizeForm((state) => ({ ...state, usefulLifeMonths: e.target.value }))} /></div>
+              <div className="form-row"><label>Residual Value</label><input className="input" type="number" value={capitalizeForm.residualValue} onChange={(e) => setCapitalizeForm((state) => ({ ...state, residualValue: e.target.value }))} /></div>
+              <div className="form-row" style={{ gridColumn: '1 / -1' }}><label>Description</label><textarea className="input" rows={3} value={capitalizeForm.description} onChange={(e) => setCapitalizeForm((state) => ({ ...state, description: e.target.value }))} /></div>
+            </div>
+            <div className="modal-footer"><button className="button" onClick={closeCapitalizeModal} disabled={capitalizeMut.isPending}>Cancel</button><button className="button primary" onClick={submitCapitalize} disabled={capitalizeMut.isPending}>{capitalizeMut.isPending ? 'Capitalizing…' : 'Capitalize to Fixed Asset'}</button></div>
           </div>
         </div>
       ) : null}
