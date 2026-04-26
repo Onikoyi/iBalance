@@ -5,6 +5,9 @@ import { DashboardPage } from './pages/DashboardPage';
 import { FiscalPeriodsPage } from './pages/FiscalPeriodsPage';
 import { JournalsPage } from './pages/JournalsPage';
 import { ReportsPage } from './pages/ReportsPage';
+import { AgeingAnalysisPage } from './pages/AgeingAnalysisPage';
+import { BankAccountsPage } from './pages/BankAccountsPage';
+import { InventoryPage } from './pages/InventoryPage';
 import { CustomersPage } from './pages/CustomersPage';
 import { SalesInvoicesPage } from './pages/SalesInvoicesPage';
 import { RejectedSalesInvoicesPage } from './pages/RejectedSalesInvoicesPage';
@@ -352,6 +355,27 @@ export default function App() {
           </RequireAuth>
         }
       />
+      <Route
+        path="/bank-accounts"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <BankAccountsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/inventory"
+        element={
+          <RequireAuth allowedRoles={["PlatformAdmin", "TenantAdmin", "Accountant", "Approver", "Viewer"]}>
+            <AppShell>
+              <InventoryPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
 
       <Route
         path="/reports"
@@ -359,6 +383,17 @@ export default function App() {
           <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
             <AppShell>
               <ReportsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/ageing-analysis"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <AgeingAnalysisPage />
             </AppShell>
           </RequireAuth>
         }
@@ -420,3 +455,5 @@ export default function App() {
     </Routes>
   );
 }
+
+

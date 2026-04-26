@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using iBalance.BuildingBlocks.Infrastructure.Persistence;
 namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260426141309_AddInventoryGlIntegration")]
+    partial class AddInventoryGlIntegration
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1228,9 +1231,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
-                    b.Property<Guid?>("JournalEntryId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("LastModifiedBy")
                         .HasColumnType("text");
 
@@ -1263,8 +1263,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("JournalEntryId");
 
                     b.HasIndex("TenantId", "TransactionNumber")
                         .IsUnique();
@@ -3014,14 +3012,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                         .HasForeignKey("FixedAssetId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.InventoryTransaction", b =>
-                {
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.JournalEntry", null)
-                        .WithMany()
-                        .HasForeignKey("JournalEntryId")
-                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.InventoryTransactionLine", b =>

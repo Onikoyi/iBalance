@@ -4449,6 +4449,24 @@ Print Tax Report
       </section>
 
       <ReportSectionDivider
+        title="Ageing Analysis"
+        subtitle="Review customer receivables and vendor payables by current, 1-30, 31-60, 61-90, 91-120, and 120+ ageing buckets."
+      />
+
+      <section className="panel">
+        <div className="section-heading">
+          <div>
+            <h2>AR / AP Ageing Analysis</h2>
+            <div className="muted">Open detailed and summary ageing reports with as-of date, party filters, and print-ready output.</div>
+          </div>
+        </div>
+
+        <div className="hero-actions" style={{ marginTop: 12 }}>
+          <Link to="/ageing-analysis" className="button primary">Open Ageing Analysis</Link>
+        </div>
+      </section>
+
+      <ReportSectionDivider
         title="Fixed Asset Reports"
         subtitle="Open the fixed asset register and depreciation workspace in clean standalone pages."
       />

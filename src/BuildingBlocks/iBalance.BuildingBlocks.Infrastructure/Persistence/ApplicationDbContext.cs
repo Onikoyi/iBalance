@@ -40,6 +40,12 @@ public class ApplicationDbContext : DbContext
     public DbSet<JournalEntryLine> JournalEntryLines => Set<JournalEntryLine>();
     public DbSet<LedgerMovement> LedgerMovements => Set<LedgerMovement>();
     public DbSet<BankReconciliation> BankReconciliations => Set<BankReconciliation>();
+    public DbSet<BankAccount> BankAccounts => Set<BankAccount>();
+    public DbSet<InventoryItem> InventoryItems => Set<InventoryItem>();
+    public DbSet<Warehouse> Warehouses => Set<Warehouse>();
+    public DbSet<InventoryTransaction> InventoryTransactions => Set<InventoryTransaction>();
+    public DbSet<InventoryTransactionLine> InventoryTransactionLines => Set<InventoryTransactionLine>();
+    public DbSet<StockLedgerEntry> StockLedgerEntries => Set<StockLedgerEntry>();
     public DbSet<BankReconciliationLine> BankReconciliationLines => Set<BankReconciliationLine>();
     public DbSet<BankStatementImport> BankStatementImports => Set<BankStatementImport>();
     public DbSet<BankStatementImportLine> BankStatementImportLines => Set<BankStatementImportLine>();
@@ -139,6 +145,126 @@ public class ApplicationDbContext : DbContext
             builder.Property(x => x.CurrencyCode).HasMaxLength(10).IsRequired();
             builder.Property(x => x.AmountPaid).HasPrecision(18, 2);
             builder.HasIndex(x => x.TenantId).IsUnique();
+        });
+        modelBuilder.Entity<BankAccount>(entity =>
+        {
+            entity.ToTable("BankAccounts", "finance");
+
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Name)
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.Property(x => x.BankName)
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.Property(x => x.AccountNumber)
+                .HasMaxLength(80)
+                .IsRequired();
+
+            entity.Property(x => x.Branch)
+                .HasMaxLength(200);
+
+            entity.Property(x => x.CurrencyCode)
+                .HasMaxLength(10)
+                .IsRequired();
+
+            entity.Property(x => x.Notes)
+                .HasMaxLength(1000);
+
+            entity.HasIndex(x => new { x.TenantId, x.AccountNumber })
+                .IsUnique();
+
+            entity.HasIndex(x => new { x.TenantId, x.LedgerAccountId })
+                .IsUnique();
+
+            entity.HasOne<LedgerAccount>()
+                .WithMany()
+                .HasForeignKey(x => x.LedgerAccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
+        });
+
+        modelBuilder.Entity<InventoryItem>(entity =>
+        {
+            entity.ToTable("InventoryItems", "finance");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ItemCode).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.ItemName).HasMaxLength(250).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(2000);
+            entity.Property(x => x.UnitOfMeasure).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.ReorderLevel).HasPrecision(18, 4);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.HasIndex(x => new { x.TenantId, x.ItemCode }).IsUnique();
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<Warehouse>(entity =>
+        {
+            entity.ToTable("Warehouses", "finance");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.WarehouseCode).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.WarehouseName).HasMaxLength(250).IsRequired();
+            entity.Property(x => x.Location).HasMaxLength(500);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.HasIndex(x => new { x.TenantId, x.WarehouseCode }).IsUnique();
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<InventoryTransaction>(entity =>
+        {
+            entity.ToTable("InventoryTransactions", "finance");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.TransactionNumber).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(1000).IsRequired();
+            entity.Property(x => x.Reference).HasMaxLength(100);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.HasIndex(x => x.JournalEntryId);
+            entity.HasOne<JournalEntry>()
+                .WithMany()
+                .HasForeignKey(x => x.JournalEntryId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => new { x.TenantId, x.TransactionNumber }).IsUnique();
+            entity.HasMany(x => x.Lines)
+                .WithOne()
+                .HasForeignKey(x => x.InventoryTransactionId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<InventoryTransactionLine>(entity =>
+        {
+            entity.ToTable("InventoryTransactionLines", "finance");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Quantity).HasPrecision(18, 4);
+            entity.Property(x => x.UnitCost).HasPrecision(18, 4);
+            entity.Property(x => x.TotalCost).HasPrecision(18, 2);
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.HasOne<InventoryItem>().WithMany().HasForeignKey(x => x.InventoryItemId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Warehouse>().WithMany().HasForeignKey(x => x.WarehouseId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => new { x.TenantId, x.InventoryTransactionId });
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<StockLedgerEntry>(entity =>
+        {
+            entity.ToTable("StockLedgerEntries", "finance");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.QuantityIn).HasPrecision(18, 4);
+            entity.Property(x => x.QuantityOut).HasPrecision(18, 4);
+            entity.Property(x => x.UnitCost).HasPrecision(18, 4);
+            entity.Property(x => x.TotalCost).HasPrecision(18, 2);
+            entity.Property(x => x.Reference).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(1000).IsRequired();
+            entity.HasIndex(x => new { x.TenantId, x.InventoryItemId, x.WarehouseId, x.MovementDateUtc });
+            entity.HasOne<InventoryItem>().WithMany().HasForeignKey(x => x.InventoryItemId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Warehouse>().WithMany().HasForeignKey(x => x.WarehouseId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<InventoryTransaction>().WithMany().HasForeignKey(x => x.InventoryTransactionId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<InventoryTransactionLine>().WithMany().HasForeignKey(x => x.InventoryTransactionLineId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
         });
 
         modelBuilder.Entity<CustomerReceipt>(entity =>
@@ -800,3 +926,7 @@ modelBuilder.Entity<BudgetTransfer>(entity =>
         }
     }
 }
+
+
+
+

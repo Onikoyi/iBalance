@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using iBalance.BuildingBlocks.Infrastructure.Persistence;
 namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260426105333_AddBankAccountSetup")]
+    partial class AddBankAccountSetup
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1146,191 +1149,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.ToTable("FixedAssetTransactions", "finance");
                 });
 
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.InventoryItem", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CreatedBy")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("ItemCode")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
-
-                    b.Property<string>("ItemName")
-                        .IsRequired()
-                        .HasMaxLength(250)
-                        .HasColumnType("character varying(250)");
-
-                    b.Property<int>("ItemType")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("LastModifiedBy")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("LastModifiedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<decimal>("ReorderLevel")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("UnitOfMeasure")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<int>("ValuationMethod")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId", "ItemCode")
-                        .IsUnique();
-
-                    b.ToTable("InventoryItems", "finance");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.InventoryTransaction", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CreatedBy")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<Guid?>("JournalEntryId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("LastModifiedBy")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("LastModifiedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<string>("Reference")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("TransactionDateUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("TransactionNumber")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<int>("TransactionType")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("JournalEntryId");
-
-                    b.HasIndex("TenantId", "TransactionNumber")
-                        .IsUnique();
-
-                    b.ToTable("InventoryTransactions", "finance");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.InventoryTransactionLine", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CreatedBy")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<Guid>("InventoryItemId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("InventoryTransactionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("LastModifiedBy")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("LastModifiedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal>("Quantity")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("TotalCost")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<decimal>("UnitCost")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<Guid>("WarehouseId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("InventoryItemId");
-
-                    b.HasIndex("InventoryTransactionId");
-
-                    b.HasIndex("WarehouseId");
-
-                    b.HasIndex("TenantId", "InventoryTransactionId");
-
-                    b.ToTable("InventoryTransactionLines", "finance");
-                });
-
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.JournalEntry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2039,86 +1857,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.ToTable("SalesInvoiceTaxLines", "public");
                 });
 
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.StockLedgerEntry", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CreatedBy")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<Guid>("InventoryItemId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("InventoryTransactionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("InventoryTransactionLineId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("LastModifiedBy")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("LastModifiedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("MovementDateUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("MovementType")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("QuantityIn")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<decimal>("QuantityOut")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<string>("Reference")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("TotalCost")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<decimal>("UnitCost")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<Guid>("WarehouseId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("InventoryItemId");
-
-                    b.HasIndex("InventoryTransactionId");
-
-                    b.HasIndex("InventoryTransactionLineId");
-
-                    b.HasIndex("WarehouseId");
-
-                    b.HasIndex("TenantId", "InventoryItemId", "WarehouseId", "MovementDateUtc");
-
-                    b.ToTable("StockLedgerEntries", "finance");
-                });
-
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.TaxCode", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2418,56 +2156,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("VendorPayments", "finance");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.Warehouse", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CreatedBy")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("LastModifiedBy")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("LastModifiedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Location")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("WarehouseCode")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
-
-                    b.Property<string>("WarehouseName")
-                        .IsRequired()
-                        .HasMaxLength(250)
-                        .HasColumnType("character varying(250)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId", "WarehouseCode")
-                        .IsUnique();
-
-                    b.ToTable("Warehouses", "finance");
                 });
 
             modelBuilder.Entity("iBalance.Modules.Platform.Domain.Entities.BillingSettings", b =>
@@ -3016,35 +2704,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.InventoryTransaction", b =>
-                {
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.JournalEntry", null)
-                        .WithMany()
-                        .HasForeignKey("JournalEntryId")
-                        .OnDelete(DeleteBehavior.Restrict);
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.InventoryTransactionLine", b =>
-                {
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.InventoryItem", null)
-                        .WithMany()
-                        .HasForeignKey("InventoryItemId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.InventoryTransaction", null)
-                        .WithMany("Lines")
-                        .HasForeignKey("InventoryTransactionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.Warehouse", null)
-                        .WithMany()
-                        .HasForeignKey("WarehouseId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.JournalEntry", b =>
                 {
                     b.HasOne("iBalance.Modules.Finance.Domain.Entities.JournalEntry", null)
@@ -3212,32 +2871,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.Navigation("TaxLedgerAccount");
                 });
 
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.StockLedgerEntry", b =>
-                {
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.InventoryItem", null)
-                        .WithMany()
-                        .HasForeignKey("InventoryItemId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.InventoryTransaction", null)
-                        .WithMany()
-                        .HasForeignKey("InventoryTransactionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.InventoryTransactionLine", null)
-                        .WithMany()
-                        .HasForeignKey("InventoryTransactionLineId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.Warehouse", null)
-                        .WithMany()
-                        .HasForeignKey("WarehouseId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.TaxCode", b =>
                 {
                     b.HasOne("iBalance.Modules.Finance.Domain.Entities.LedgerAccount", "TaxLedgerAccount")
@@ -3320,11 +2953,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.Customer", b =>
                 {
                     b.Navigation("SalesInvoices");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.InventoryTransaction", b =>
-                {
-                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.JournalEntry", b =>

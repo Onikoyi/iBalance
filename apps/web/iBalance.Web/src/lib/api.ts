@@ -3357,3 +3357,678 @@ export async function capitalizePurchaseInvoiceToFixedAsset(
   return capitalizeFromPurchaseInvoice(payload);
 }
 
+// ==========================================
+// AGEING ANALYSIS — AR/AP (ADDITIVE)
+// ==========================================
+
+export type AgeingAnalysisSummaryRowDto = {
+  partyId: string;
+  partyCode: string;
+  partyName: string;
+  invoiceCount: number;
+  invoiceAmount: number;
+  paidAmount: number;
+  outstandingAmount: number;
+  currentAmount: number;
+  days1To30Amount: number;
+  days31To60Amount: number;
+  days61To90Amount: number;
+  days91To120Amount: number;
+  over120Amount: number;
+};
+
+export type AgeingAnalysisDetailRowDto = {
+  invoiceId: string;
+  partyId: string;
+  partyCode: string;
+  partyName: string;
+  invoiceDateUtc: string;
+  invoiceNumber: string;
+  description: string;
+  invoiceAmount: number;
+  paidAmount: number;
+  outstandingAmount: number;
+  daysOutstanding: number;
+  ageBucket: string;
+  currentAmount: number;
+  days1To30Amount: number;
+  days31To60Amount: number;
+  days61To90Amount: number;
+  days91To120Amount: number;
+  over120Amount: number;
+  status: number;
+  postedOnUtc?: string | null;
+  journalEntryId?: string | null;
+};
+
+export type AgeingAnalysisResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  scope: 'AR' | 'AP';
+  title: string;
+  asOfUtc: string;
+  partyFilterId?: string | null;
+  includeZeroBalances: boolean;
+  summaryCount: number;
+  detailCount: number;
+  totalInvoiceAmount: number;
+  totalPaidAmount: number;
+  totalOutstandingAmount: number;
+  totalCurrentAmount: number;
+  totalDays1To30Amount: number;
+  totalDays31To60Amount: number;
+  totalDays61To90Amount: number;
+  totalDays91To120Amount: number;
+  totalOver120Amount: number;
+  summaryItems: AgeingAnalysisSummaryRowDto[];
+  detailItems: AgeingAnalysisDetailRowDto[];
+};
+
+export type AgeingAnalysisQuery = {
+  asOfUtc?: string | null;
+  customerId?: string | null;
+  vendorId?: string | null;
+  includeZeroBalances?: boolean;
+};
+
+function buildAgeingParams(query?: AgeingAnalysisQuery) {
+  const params: Record<string, string | boolean> = {};
+
+  if (query?.asOfUtc) params.asOfUtc = query.asOfUtc;
+  if (query?.customerId) params.customerId = query.customerId;
+  if (query?.vendorId) params.vendorId = query.vendorId;
+  if (typeof query?.includeZeroBalances === 'boolean') {
+    params.includeZeroBalances = query.includeZeroBalances;
+  }
+
+  return params;
+}
+
+export async function getAccountsReceivableAgeingAnalysis(query?: AgeingAnalysisQuery) {
+  const response = await api.get<AgeingAnalysisResponse>('/api/finance/ageing-analysis/ar', {
+    params: buildAgeingParams(query),
+  });
+  return response.data;
+}
+
+export async function getAccountsPayableAgeingAnalysis(query?: AgeingAnalysisQuery) {
+  const response = await api.get<AgeingAnalysisResponse>('/api/finance/ageing-analysis/ap', {
+    params: buildAgeingParams(query),
+  });
+  return response.data;
+}
+
+// ==========================================
+// BANK & CASH SETUP
+// ==========================================
+
+export type BankAccountDto = {
+  id: string;
+  tenantId: string;
+  name: string;
+  bankName: string;
+  accountNumber: string;
+  branch?: string | null;
+  currencyCode: string;
+  ledgerAccountId: string;
+  ledgerAccountCode?: string | null;
+  ledgerAccountName?: string | null;
+  notes?: string | null;
+  isActive: boolean;
+  createdOnUtc?: string | null;
+  lastModifiedOnUtc?: string | null;
+};
+
+export type BankAccountsResponse = ListEnvelope<BankAccountDto>;
+
+export type CreateBankAccountRequest = {
+  name: string;
+  bankName: string;
+  accountNumber: string;
+  branch?: string | null;
+  currencyCode: string;
+  ledgerAccountId: string;
+  notes?: string | null;
+};
+
+export type UpdateBankAccountRequest = {
+  name: string;
+  bankName: string;
+  accountNumber: string;
+  branch?: string | null;
+  currencyCode: string;
+  ledgerAccountId: string;
+  isActive: boolean;
+  notes?: string | null;
+};
+
+export async function getBankAccounts() {
+  const { data } = await api.get<BankAccountsResponse>('/api/finance/bank-accounts');
+  return data;
+}
+
+export async function createBankAccount(request: CreateBankAccountRequest) {
+  const { data } = await api.post('/api/finance/bank-accounts', request);
+  return data;
+}
+
+export async function updateBankAccount(bankAccountId: string, request: UpdateBankAccountRequest) {
+  const { data } = await api.put(`/api/finance/bank-accounts/${bankAccountId}`, request);
+  return data;
+}
+
+export async function activateBankAccount(bankAccountId: string) {
+  const { data } = await api.post(`/api/finance/bank-accounts/${bankAccountId}/activate`);
+  return data;
+}
+
+export async function deactivateBankAccount(bankAccountId: string) {
+  const { data } = await api.post(`/api/finance/bank-accounts/${bankAccountId}/deactivate`);
+  return data;
+}
+
+// ==========================================
+// INVENTORY PHASE 2 — GL INTEGRATION
+// Replace your existing INVENTORY PHASE 1 block in api.ts with this block.
+// ==========================================
+
+export type InventoryItemDto = {
+  id: string;
+  tenantId?: string;
+  code: string;
+  name: string;
+  itemCode?: string;
+  itemName?: string;
+  description?: string | null;
+  type: number;
+  itemType?: number;
+  unitOfMeasure: string;
+  valuationMethod: number;
+  reorderLevel?: number;
+  isActive: boolean;
+  notes?: string | null;
+  createdOnUtc?: string | null;
+  lastModifiedOnUtc?: string | null;
+};
+
+export type WarehouseDto = {
+  id: string;
+  tenantId?: string;
+  code?: string;
+  name: string;
+  warehouseCode?: string;
+  warehouseName?: string;
+  location?: string | null;
+  isActive: boolean;
+  notes?: string | null;
+  createdOnUtc?: string | null;
+  lastModifiedOnUtc?: string | null;
+};
+
+export type StockLedgerEntryDto = {
+  id: string;
+  inventoryItemId?: string;
+  itemId: string;
+  itemCode?: string;
+  itemName?: string;
+  unitOfMeasure?: string | null;
+  warehouseId: string;
+  warehouseCode?: string;
+  warehouseName?: string;
+  warehouseLocation?: string | null;
+  inventoryTransactionId?: string;
+  inventoryTransactionLineId?: string | null;
+  movementType: number;
+  quantity: number;
+  quantityIn?: number;
+  quantityOut?: number;
+  unitCost: number;
+  totalCost: number;
+  referenceType: number;
+  referenceId?: string | null;
+  reference?: string | null;
+  description?: string | null;
+  movementDateUtc: string;
+};
+
+export type StockPositionRowDto = {
+  inventoryItemId?: string;
+  itemId: string;
+  itemCode: string;
+  itemName: string;
+  unitOfMeasure: string;
+  reorderLevel: number;
+  warehouseId: string;
+  warehouseCode: string;
+  warehouseName: string;
+  warehouseLocation?: string | null;
+  quantityOnHand: number;
+  inventoryValue: number;
+  averageUnitCost: number;
+  isBelowReorderLevel: boolean;
+};
+
+export type InventoryTransactionDto = {
+  id: string;
+  tenantId: string;
+  transactionNumber: string;
+  transactionType: number;
+  transactionDateUtc: string;
+  description: string;
+  reference?: string | null;
+  notes?: string | null;
+  status: number;
+  journalEntryId?: string | null;
+  createdOnUtc?: string | null;
+  lineCount: number;
+  totalQuantity: number;
+  totalCost: number;
+};
+
+export type InventoryItemsResponse = ListEnvelope<InventoryItemDto>;
+export type WarehousesResponse = ListEnvelope<WarehouseDto>;
+export type StockLedgerResponse = ListEnvelope<StockLedgerEntryDto>;
+export type InventoryTransactionsResponse = ListEnvelope<InventoryTransactionDto>;
+export type StockPositionResponse = ListEnvelope<StockPositionRowDto> & {
+  totalQuantityOnHand?: number;
+  totalInventoryValue?: number;
+};
+
+export type CreateInventoryItemRequest = {
+  code: string;
+  name: string;
+  itemCode?: string;
+  itemName?: string;
+  description?: string | null;
+  type: number;
+  itemType?: number;
+  unitOfMeasure: string;
+  valuationMethod: number;
+  reorderLevel?: number;
+  notes?: string | null;
+};
+
+export type UpdateInventoryItemRequest = Omit<CreateInventoryItemRequest, 'code' | 'itemCode'> & {
+  isActive: boolean;
+};
+
+export type CreateWarehouseRequest = {
+  code?: string;
+  name: string;
+  warehouseCode?: string;
+  warehouseName?: string;
+  location?: string | null;
+  notes?: string | null;
+};
+
+export type UpdateWarehouseRequest = Omit<CreateWarehouseRequest, 'code' | 'warehouseCode'> & {
+  isActive: boolean;
+};
+
+export type CreateStockInRequest = {
+  warehouseId: string;
+  transactionNumber?: string | null;
+  transactionDateUtc?: string;
+  description?: string;
+  reference?: string | null;
+  journalReference?: string | null;
+  inventoryLedgerAccountId: string;
+  creditLedgerAccountId: string; 
+  notes?: string | null;
+  lines: {
+    itemId: string;
+    inventoryItemId?: string;
+    warehouseId?: string;
+    quantity: number;
+    unitCost: number;
+    description?: string | null;
+  }[];
+};
+
+export type CreateStockAdjustmentRequest = {
+  warehouseId: string;
+  transactionNumber?: string | null;
+  transactionDateUtc?: string;
+  description?: string;
+  reference?: string | null;
+  journalReference?: string | null;
+  inventoryLedgerAccountId: string;
+  adjustmentLedgerAccountId: string;
+  notes?: string | null;
+  lines: {
+    itemId: string;
+    inventoryItemId?: string;
+    warehouseId?: string;
+    quantity: number;
+    quantityChange?: number;
+    unitCost: number;
+    description?: string | null;
+  }[];
+};
+
+export async function getInventoryItems() {
+  const { data } = await api.get<InventoryItemsResponse>('/api/finance/inventory/items');
+  return data;
+}
+
+export async function createInventoryItem(request: CreateInventoryItemRequest) {
+  const { data } = await api.post('/api/finance/inventory/items', request);
+  return data;
+}
+
+export async function updateInventoryItem(inventoryItemId: string, request: UpdateInventoryItemRequest) {
+  const { data } = await api.put(`/api/finance/inventory/items/${inventoryItemId}`, request);
+  return data;
+}
+
+export async function activateInventoryItem(inventoryItemId: string) {
+  const { data } = await api.post(`/api/finance/inventory/items/${inventoryItemId}/activate`);
+  return data;
+}
+
+export async function deactivateInventoryItem(inventoryItemId: string) {
+  const { data } = await api.post(`/api/finance/inventory/items/${inventoryItemId}/deactivate`);
+  return data;
+}
+
+export async function getWarehouses() {
+  const { data } = await api.get<WarehousesResponse>('/api/finance/inventory/warehouses');
+  return data;
+}
+
+export async function createWarehouse(request: CreateWarehouseRequest) {
+  const { data } = await api.post('/api/finance/inventory/warehouses', request);
+  return data;
+}
+
+export async function updateWarehouse(warehouseId: string, request: UpdateWarehouseRequest) {
+  const { data } = await api.put(`/api/finance/inventory/warehouses/${warehouseId}`, request);
+  return data;
+}
+
+export async function activateWarehouse(warehouseId: string) {
+  const { data } = await api.post(`/api/finance/inventory/warehouses/${warehouseId}/activate`);
+  return data;
+}
+
+export async function deactivateWarehouse(warehouseId: string) {
+  const { data } = await api.post(`/api/finance/inventory/warehouses/${warehouseId}/deactivate`);
+  return data;
+}
+
+export async function getStockPosition(itemId?: string | null, warehouseId?: string | null) {
+  const { data } = await api.get<StockPositionResponse>('/api/finance/inventory/stock-position', {
+    params: {
+      ...(itemId ? { itemId } : {}),
+      ...(warehouseId ? { warehouseId } : {}),
+    },
+  });
+  return data;
+}
+
+export async function stockIn(request: CreateStockInRequest) {
+  const { data } = await api.post('/api/finance/inventory/stock-in', request);
+  return data;
+}
+
+export async function postStockIn(request: CreateStockInRequest) {
+  return stockIn(request);
+}
+
+export async function stockAdjust(request: CreateStockAdjustmentRequest) {
+  const { data } = await api.post('/api/finance/inventory/adjust', request);
+  return data;
+}
+
+export async function postStockAdjustment(request: CreateStockAdjustmentRequest) {
+  return stockAdjust(request);
+}
+
+export async function getStockLedger(itemId?: string | null, warehouseId?: string | null) {
+  const { data } = await api.get<StockLedgerResponse>('/api/finance/inventory/stock-ledger', {
+    params: {
+      ...(itemId ? { itemId } : {}),
+      ...(warehouseId ? { warehouseId } : {}),
+    },
+  });
+  return data;
+}
+
+export async function getInventoryTransactions() {
+  const { data } = await api.get<InventoryTransactionsResponse>('/api/finance/inventory/transactions');
+  return data;
+}
+
+// ==========================================
+// INVENTORY PHASE 3 - AP/AR INTEGRATION
+// Append to apps/web/iBalance.Web/src/lib/api.ts
+// ==========================================
+
+export type ReceivePurchaseInvoiceIntoInventoryLineRequest = {
+  purchaseInvoiceLineId?: string | null;
+  inventoryItemId: string;
+  quantity: number;
+  unitCost: number;
+  description?: string | null;
+};
+
+export type ReceivePurchaseInvoiceIntoInventoryRequest = {
+  purchaseInvoiceId: string;
+  warehouseId: string;
+  inventoryLedgerAccountId: string;
+  creditLedgerAccountId: string;
+  transactionDateUtc?: string;
+  transactionNumber?: string | null;
+  journalReference?: string | null;
+  description?: string | null;
+  notes?: string | null;
+  lines: ReceivePurchaseInvoiceIntoInventoryLineRequest[];
+};
+
+export type IssueInventoryForSalesInvoiceLineRequest = {
+  salesInvoiceLineId?: string | null;
+  inventoryItemId: string;
+  quantity: number;
+  unitCost: number;
+  description?: string | null;
+};
+
+export type IssueInventoryForSalesInvoiceRequest = {
+  salesInvoiceId: string;
+  warehouseId: string;
+  inventoryLedgerAccountId: string;
+  cogsLedgerAccountId: string;
+  transactionDateUtc?: string;
+  transactionNumber?: string | null;
+  journalReference?: string | null;
+  description?: string | null;
+  notes?: string | null;
+  lines: IssueInventoryForSalesInvoiceLineRequest[];
+};
+
+export async function receivePurchaseInvoiceIntoInventory(request: ReceivePurchaseInvoiceIntoInventoryRequest) {
+  const { data } = await api.post('/api/finance/inventory/purchase-invoice-receipts', request);
+  return data;
+}
+
+export async function issueInventoryForSalesInvoice(request: IssueInventoryForSalesInvoiceRequest) {
+  const { data } = await api.post('/api/finance/inventory/sales-invoice-issues', request);
+  return data;
+}
+
+
+// ==========================================
+// FINAL INVENTORY PHASE - REPORTING
+// Append to apps/web/iBalance.Web/src/lib/api.ts
+// ==========================================
+
+export type InventoryValuationRowDto = {
+  inventoryItemId: string;
+  itemId: string;
+  itemCode: string;
+  itemName: string;
+  unitOfMeasure: string;
+  valuationMethod?: number | null;
+  warehouseId: string;
+  warehouseCode: string;
+  warehouseName: string;
+  warehouseLocation?: string | null;
+  quantityIn: number;
+  quantityOut: number;
+  quantityOnHand: number;
+  valueIn: number;
+  valueOut: number;
+  inventoryValue: number;
+  averageUnitCost: number;
+  movementCount: number;
+};
+
+export type InventoryValuationReportResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  asOfUtc: string;
+  count: number;
+  totalQuantityOnHand: number;
+  totalInventoryValue: number;
+  items: InventoryValuationRowDto[];
+};
+
+export type InventoryGlReconciliationResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  asOfUtc: string;
+  inventoryLedgerAccount: {
+    id: string;
+    code: string;
+    name: string;
+    category: number;
+    normalBalance: number;
+  };
+  stockValue: number;
+  glDebit: number;
+  glCredit: number;
+  glBalance: number;
+  difference: number;
+  isReconciled: boolean;
+  stockMovementCount: number;
+  ledgerMovementCount: number;
+};
+
+export type InventoryAuditTraceResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  count: number;
+  items: {
+    transaction: {
+      id: string;
+      transactionNumber: string;
+      transactionType: number;
+      transactionDateUtc: string;
+      description: string;
+      reference?: string | null;
+      status: number;
+      journalEntryId?: string | null;
+      createdOnUtc?: string | null;
+    };
+    stockLedgerEntries: {
+      id: string;
+      inventoryTransactionId: string;
+      inventoryTransactionLineId?: string | null;
+      movementType: number;
+      movementDateUtc: string;
+      quantityIn: number;
+      quantityOut: number;
+      quantity: number;
+      unitCost: number;
+      totalCost: number;
+      reference: string;
+      description: string;
+      inventoryItemId: string;
+      itemCode: string;
+      itemName: string;
+      warehouseId: string;
+      warehouseCode: string;
+      warehouseName: string;
+    }[];
+    journalEntry?: {
+      id: string;
+      entryDateUtc: string;
+      reference: string;
+      description: string;
+      status: number;
+      type: number;
+      totalDebit: number;
+      totalCredit: number;
+      postedAtUtc?: string | null;
+    } | null;
+    ledgerMovements: {
+      id: string;
+      journalEntryId: string;
+      journalEntryLineId: string;
+      movementDateUtc: string;
+      reference: string;
+      description: string;
+      debitAmount: number;
+      creditAmount: number;
+      ledgerAccountId: string;
+      ledgerAccountCode: string;
+      ledgerAccountName: string;
+    }[];
+  }[];
+};
+
+export async function getInventoryValuationReport(params?: {
+  asOfUtc?: string | null;
+  inventoryItemId?: string | null;
+  warehouseId?: string | null;
+}) {
+  const searchParams = new URLSearchParams();
+
+  if (params?.asOfUtc) searchParams.set('asOfUtc', params.asOfUtc);
+  if (params?.inventoryItemId) searchParams.set('inventoryItemId', params.inventoryItemId);
+  if (params?.warehouseId) searchParams.set('warehouseId', params.warehouseId);
+
+  const suffix = searchParams.toString() ? `?${searchParams.toString()}` : '';
+  const { data } = await api.get<InventoryValuationReportResponse>(`/api/finance/inventory/reports/valuation${suffix}`);
+  return data;
+}
+
+export async function getInventoryGlReconciliation(params: {
+  inventoryLedgerAccountId: string;
+  asOfUtc?: string | null;
+}) {
+  const searchParams = new URLSearchParams();
+
+  searchParams.set('inventoryLedgerAccountId', params.inventoryLedgerAccountId);
+  if (params.asOfUtc) searchParams.set('asOfUtc', params.asOfUtc);
+
+  const { data } = await api.get<InventoryGlReconciliationResponse>(
+    `/api/finance/inventory/reports/stock-gl-reconciliation?${searchParams.toString()}`
+  );
+  return data;
+}
+
+export async function getInventoryAuditTrace(params?: {
+  inventoryTransactionId?: string | null;
+  journalEntryId?: string | null;
+  reference?: string | null;
+  fromUtc?: string | null;
+  toUtc?: string | null;
+}) {
+  const searchParams = new URLSearchParams();
+
+  if (params?.inventoryTransactionId) searchParams.set('inventoryTransactionId', params.inventoryTransactionId);
+  if (params?.journalEntryId) searchParams.set('journalEntryId', params.journalEntryId);
+  if (params?.reference) searchParams.set('reference', params.reference);
+  if (params?.fromUtc) searchParams.set('fromUtc', params.fromUtc);
+  if (params?.toUtc) searchParams.set('toUtc', params.toUtc);
+
+  const suffix = searchParams.toString() ? `?${searchParams.toString()}` : '';
+  const { data } = await api.get<InventoryAuditTraceResponse>(`/api/finance/inventory/reports/audit-trace${suffix}`);
+  return data;
+}
+

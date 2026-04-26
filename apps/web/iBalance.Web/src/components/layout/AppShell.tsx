@@ -28,6 +28,7 @@ function licenseLabel(value?: number) {
 }
 
 function pageTitleForPath(pathname: string) {
+  if (pathname.startsWith('/ageing-analysis')) return 'Ageing Analysis';
   if (pathname.startsWith('/accounts')) return 'Chart of Accounts';
   if (pathname.startsWith('/journals')) return 'Journal Management';
   if (pathname.startsWith('/journals/rejected')) return 'Rejected Journals';
@@ -45,6 +46,8 @@ function pageTitleForPath(pathname: string) {
   if (pathname.startsWith('/fixed-assets/depreciation-runs')) return 'Fixed Asset Depreciation Runs';
   if (pathname.startsWith('/fixed-assets/register/print')) return 'Fixed Asset Register';
   if (pathname.startsWith('/fixed-assets')) return 'Fixed Asset Management';
+  if (pathname.startsWith('/bank-accounts')) return 'Bank & Cash Setup';
+  if (pathname.startsWith('/inventory')) return 'Inventory Management';
   if (pathname.startsWith('/reports')) return 'Financial Reports';
   if (pathname.startsWith('/admin')) return 'Administration';
   if (pathname.startsWith('/budgets/rejected')) return 'Rejected Budgets';
@@ -54,6 +57,7 @@ function pageTitleForPath(pathname: string) {
 }
 
 function pageSubtitleForPath(pathname: string) {
+  if (pathname.startsWith('/ageing-analysis')) return 'Review receivables and payables ageing by customer, vendor, and ageing bucket.';
   if (pathname.startsWith('/accounts')) return 'Manage ledger structure and posting accounts.';
   if (pathname.startsWith('/journals')) return 'Manage journals, posting workflow, and reversals.';
   if (pathname.startsWith('/journals/rejected')) return 'Correct, resubmit, or void rejected journal entries.';
@@ -71,6 +75,8 @@ function pageSubtitleForPath(pathname: string) {
   if (pathname.startsWith('/fixed-assets/depreciation-runs')) return 'Preview, run, and review posted fixed asset depreciation cycles.';
   if (pathname.startsWith('/fixed-assets/register/print')) return 'Review and print the fixed asset register in a clean standalone layout.';
   if (pathname.startsWith('/fixed-assets')) return 'Manage fixed asset classes, register records, capitalization, and lifecycle actions.';
+  if (pathname.startsWith('/bank-accounts')) return 'Maintain operational bank accounts linked to cash and bank ledger accounts.';
+  if (pathname.startsWith('/inventory')) return 'Manage inventory items, warehouses, stock movements, and stock position.';
   if (pathname.startsWith('/reports')) return 'Review financial performance and print-ready reports.';
   if (pathname.startsWith('/admin')) return 'Manage tenant operations, users, subscriptions, and recovery.';
   if (pathname.startsWith('/budgets/rejected')) return 'Correct, resubmit, or delete rejected budgets.';
