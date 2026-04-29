@@ -56,6 +56,21 @@ function formatAmount(value: number) {
   }).format(value);
 }
 
+function formatFiscalPeriodUiError(message: string) {
+  const lower = message.toLowerCase();
+  if (
+    lower.includes('fiscal') ||
+    lower.includes('period') ||
+    lower.includes('posting is blocked') ||
+    lower.includes('fiscal month is closed')
+  ) {
+    return 'Posting blocked: the selected fiscal month is closed or not open for posting.';
+  }
+
+  return message;
+}
+
+
 function purchaseInvoiceStatusLabel(value: number) {
   switch (value) {
     case 1:
@@ -301,7 +316,7 @@ export function PurchaseInvoicesPage() {
       setInfoText(glReason ? baseMessage + ' ' + glReason : baseMessage);
     },
     onError: (error) => {
-      setErrorText(getTenantReadableError(error, 'Unable to capitalize purchase invoice into fixed asset.'));
+      setErrorText(formatFiscalPeriodUiError(getTenantReadableError(error, 'Unable to capitalize purchase invoice into fixed asset.')));
       setInfoText('');
     },
   });

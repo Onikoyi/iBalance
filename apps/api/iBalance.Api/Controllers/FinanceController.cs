@@ -1,4 +1,5 @@
 using iBalance.Api.Security;
+using iBalance.Api.Services;
 using iBalance.BuildingBlocks.Application.Security;
 using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
@@ -42,19 +43,18 @@ public sealed class FinanceController : ControllerBase
             });
         }
 
-        var postingPeriod = await GetOpenFiscalPeriodForDateAsync(
+        var postingPeriodGuard = await FiscalPeriodPostingGuard.EnsureOpenPeriodAsync(
             dbContext,
             request.EntryDateUtc,
+            "Opening Balance",
             cancellationToken);
 
-        if (postingPeriod is null)
+        if (!postingPeriodGuard.Allowed)
         {
-            return Conflict(new
-            {
-                Message = "No open fiscal period exists for the opening balance date.",
-                request.EntryDateUtc
-            });
+            return Conflict(postingPeriodGuard.ToProblem());
         }
+
+        var postingPeriod = postingPeriodGuard.FiscalPeriod!;
 
         var effectiveReference = request.Reference?.Trim();
 
@@ -532,6 +532,92 @@ public sealed class FinanceController : ControllerBase
     }
 
     [Authorize(Policy = AuthorizationPolicies.FinanceFiscalPeriodsManage)]
+    [HttpPost("fiscal-years")]
+    public async Task<IActionResult> CreateFiscalYear(
+        [FromBody] CreateFiscalYearRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.FiscalYearName))
+        {
+            return BadRequest(new { Message = "Fiscal year name is required." });
+        }
+
+        var normalizedYearName = request.FiscalYearName.Trim();
+        var fiscalYearStartDate = request.FiscalYearStartDate;
+        var fiscalYearEndDate = fiscalYearStartDate.AddMonths(12).AddDays(-1);
+
+        var overlaps = await dbContext.FiscalPeriods
+            .AsNoTracking()
+            .AnyAsync(x => fiscalYearStartDate <= x.EndDate && fiscalYearEndDate >= x.StartDate, cancellationToken);
+
+        if (overlaps)
+        {
+            return Conflict(new
+            {
+                Message = "The requested fiscal year overlaps existing fiscal periods.",
+                FiscalYearStartDate = fiscalYearStartDate,
+                FiscalYearEndDate = fiscalYearEndDate
+            });
+        }
+
+        var fiscalPeriods = new List<FiscalPeriod>();
+
+        for (var monthIndex = 0; monthIndex < 12; monthIndex++)
+        {
+            var monthStart = fiscalYearStartDate.AddMonths(monthIndex);
+            var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+            var monthName = $"{normalizedYearName} - {monthStart:MMM yyyy}";
+
+            fiscalPeriods.Add(new FiscalPeriod(
+                Guid.NewGuid(),
+                tenantContext.TenantId,
+                monthName,
+                monthStart,
+                monthEnd,
+                request.CreateMonthsOpen ? FiscalPeriodStatus.Open : FiscalPeriodStatus.Closed));
+        }
+
+        dbContext.FiscalPeriods.AddRange(fiscalPeriods);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Fiscal year created successfully.",
+            TenantId = tenantContext.TenantId,
+            TenantKey = tenantContext.TenantKey,
+            FiscalYearName = normalizedYearName,
+            FiscalYearStartDate = fiscalYearStartDate,
+            FiscalYearEndDate = fiscalYearEndDate,
+            Count = fiscalPeriods.Count,
+            Items = fiscalPeriods
+                .OrderBy(x => x.StartDate)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.TenantId,
+                    x.Name,
+                    x.StartDate,
+                    x.EndDate,
+                    x.Status
+                })
+                .ToList()
+        });
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceFiscalPeriodsManage)]
     [HttpPost("fiscal-periods")]
     public async Task<IActionResult> CreateFiscalPeriod(
         [FromBody] CreateFiscalPeriodRequest request,
@@ -719,6 +805,88 @@ public sealed class FinanceController : ControllerBase
             });
         }
 
+        var periodStartUtc = fiscalPeriod.StartDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var periodEndUtc = fiscalPeriod.EndDate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
+
+        var draftJournalCount = await dbContext.JournalEntries
+            .AsNoTracking()
+            .CountAsync(x =>
+                x.EntryDateUtc >= periodStartUtc &&
+                x.EntryDateUtc <= periodEndUtc &&
+                x.Status != JournalEntryStatus.Posted &&
+                x.Status != JournalEntryStatus.Voided &&
+                x.Status != JournalEntryStatus.Reversed,
+                cancellationToken);
+
+        var unpostedSalesInvoiceCount = await dbContext.SalesInvoices
+            .AsNoTracking()
+            .CountAsync(x =>
+                x.InvoiceDateUtc >= periodStartUtc &&
+                x.InvoiceDateUtc <= periodEndUtc &&
+                x.Status != SalesInvoiceStatus.Posted &&
+                x.Status != SalesInvoiceStatus.PartPaid &&
+                x.Status != SalesInvoiceStatus.Paid &&
+                x.Status != SalesInvoiceStatus.Rejected &&
+                x.Status != SalesInvoiceStatus.Cancelled,
+                cancellationToken);
+
+        var unpostedPurchaseInvoiceCount = await dbContext.PurchaseInvoices
+            .AsNoTracking()
+            .CountAsync(x =>
+                x.InvoiceDateUtc >= periodStartUtc &&
+                x.InvoiceDateUtc <= periodEndUtc &&
+                x.Status != PurchaseInvoiceStatus.Posted &&
+                x.Status != PurchaseInvoiceStatus.PartPaid &&
+                x.Status != PurchaseInvoiceStatus.Paid &&
+                x.Status != PurchaseInvoiceStatus.Rejected &&
+                x.Status != PurchaseInvoiceStatus.Cancelled,
+                cancellationToken);
+
+        var unpostedCustomerReceiptCount = await dbContext.CustomerReceipts
+            .AsNoTracking()
+            .CountAsync(x =>
+                x.ReceiptDateUtc >= periodStartUtc &&
+                x.ReceiptDateUtc <= periodEndUtc &&
+                x.Status != CustomerReceiptStatus.Posted &&
+                x.Status != CustomerReceiptStatus.Rejected &&
+                x.Status != CustomerReceiptStatus.Cancelled,
+                cancellationToken);
+
+        var unpostedVendorPaymentCount = await dbContext.VendorPayments
+            .AsNoTracking()
+            .CountAsync(x =>
+                x.PaymentDateUtc >= periodStartUtc &&
+                x.PaymentDateUtc <= periodEndUtc &&
+                x.Status != VendorPaymentStatus.Posted &&
+                x.Status != VendorPaymentStatus.Rejected &&
+                x.Status != VendorPaymentStatus.Cancelled,
+                cancellationToken);
+
+        var blockingCount =
+            draftJournalCount +
+            unpostedSalesInvoiceCount +
+            unpostedPurchaseInvoiceCount +
+            unpostedCustomerReceiptCount +
+            unpostedVendorPaymentCount;
+
+        if (blockingCount > 0)
+        {
+            return Conflict(new
+            {
+                Message = "Fiscal period cannot be closed because unposted or unresolved finance documents still exist in the period.",
+                fiscalPeriod.Id,
+                fiscalPeriod.Name,
+                fiscalPeriod.StartDate,
+                fiscalPeriod.EndDate,
+                DraftOrUnresolvedJournalCount = draftJournalCount,
+                UnpostedSalesInvoiceCount = unpostedSalesInvoiceCount,
+                UnpostedPurchaseInvoiceCount = unpostedPurchaseInvoiceCount,
+                UnpostedCustomerReceiptCount = unpostedCustomerReceiptCount,
+                UnpostedVendorPaymentCount = unpostedVendorPaymentCount,
+                BlockingCount = blockingCount
+            });
+        }
+
         fiscalPeriod.Close();
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -729,8 +897,289 @@ public sealed class FinanceController : ControllerBase
             fiscalPeriod.Name,
             fiscalPeriod.StartDate,
             fiscalPeriod.EndDate,
-            fiscalPeriod.Status
+            fiscalPeriod.Status,
+            CloseValidation = new
+            {
+                DraftOrUnresolvedJournalCount = draftJournalCount,
+                UnpostedSalesInvoiceCount = unpostedSalesInvoiceCount,
+                UnpostedPurchaseInvoiceCount = unpostedPurchaseInvoiceCount,
+                UnpostedCustomerReceiptCount = unpostedCustomerReceiptCount,
+                UnpostedVendorPaymentCount = unpostedVendorPaymentCount,
+                BlockingCount = blockingCount
+            }
         });
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceFiscalPeriodsManage)]
+    [HttpPost("fiscal-periods/year-end-close")]
+    public async Task<IActionResult> RunYearEndClose(
+        [FromBody] YearEndCloseRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        if (request.FiscalYearEndDate < request.FiscalYearStartDate)
+        {
+            return BadRequest(new { Message = "Fiscal year end date cannot be earlier than fiscal year start date." });
+        }
+
+        if (request.RetainedEarningsLedgerAccountId == Guid.Empty)
+        {
+            return BadRequest(new { Message = "Retained earnings ledger account is required." });
+        }
+
+        var yearStartUtc = request.FiscalYearStartDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var yearEndUtc = request.FiscalYearEndDate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
+
+        var periods = await dbContext.FiscalPeriods
+            .Where(x => x.StartDate >= request.FiscalYearStartDate && x.EndDate <= request.FiscalYearEndDate)
+            .OrderBy(x => x.StartDate)
+            .ToListAsync(cancellationToken);
+
+        if (periods.Count == 0)
+        {
+            return BadRequest(new
+            {
+                Message = "No fiscal periods were found inside the requested fiscal year range.",
+                request.FiscalYearStartDate,
+                request.FiscalYearEndDate
+            });
+        }
+
+        var openPeriods = periods.Where(x => x.Status == FiscalPeriodStatus.Open).ToList();
+
+        if (openPeriods.Count > 0)
+        {
+            return Conflict(new
+            {
+                Message = "Year end close cannot run while fiscal periods in the selected year are still open.",
+                OpenPeriodCount = openPeriods.Count,
+                OpenPeriods = openPeriods.Select(x => new { x.Id, x.Name, x.StartDate, x.EndDate, x.Status })
+            });
+        }
+
+        var periodStart = periods.Min(x => x.StartDate);
+        var periodEnd = periods.Max(x => x.EndDate);
+
+        if (periodStart > request.FiscalYearStartDate || periodEnd < request.FiscalYearEndDate)
+        {
+            return Conflict(new
+            {
+                Message = "The selected fiscal periods do not fully cover the requested year range.",
+                RequestedStartDate = request.FiscalYearStartDate,
+                RequestedEndDate = request.FiscalYearEndDate,
+                CoveredStartDate = periodStart,
+                CoveredEndDate = periodEnd
+            });
+        }
+
+        var retainedEarningsAccount = await dbContext.LedgerAccounts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == request.RetainedEarningsLedgerAccountId, cancellationToken);
+
+        if (retainedEarningsAccount is null)
+        {
+            return BadRequest(new { Message = "Retained earnings ledger account was not found for the current tenant." });
+        }
+
+        if (!retainedEarningsAccount.IsActive || retainedEarningsAccount.IsHeader || !retainedEarningsAccount.IsPostingAllowed)
+        {
+            return BadRequest(new
+            {
+                Message = "Retained earnings ledger account must be active, non-header, and posting-enabled.",
+                retainedEarningsAccount.Id,
+                retainedEarningsAccount.Code
+            });
+        }
+
+        var reference = string.IsNullOrWhiteSpace(request.Reference)
+            ? $"YEC-{request.FiscalYearEndDate:yyyyMMdd}"
+            : request.Reference.Trim().ToUpperInvariant();
+
+        var duplicateReferenceExists = await dbContext.JournalEntries
+            .AsNoTracking()
+            .AnyAsync(x => x.Reference == reference, cancellationToken);
+
+        if (duplicateReferenceExists)
+        {
+            return Conflict(new
+            {
+                Message = "A journal entry with the same year end close reference already exists.",
+                Reference = reference
+            });
+        }
+
+        var movements = await dbContext.LedgerMovements
+            .AsNoTracking()
+            .Join(
+                dbContext.LedgerAccounts.AsNoTracking(),
+                movement => movement.LedgerAccountId,
+                account => account.Id,
+                (movement, account) => new
+                {
+                    account.Id,
+                    account.Code,
+                    account.Name,
+                    account.Category,
+                    movement.MovementDateUtc,
+                    movement.DebitAmount,
+                    movement.CreditAmount
+                })
+            .Where(x =>
+                x.MovementDateUtc >= yearStartUtc &&
+                x.MovementDateUtc <= yearEndUtc &&
+                (x.Category == AccountCategory.Income || x.Category == AccountCategory.Expense))
+            .ToListAsync(cancellationToken);
+
+        var groupedBalances = movements
+            .GroupBy(x => new { x.Id, x.Code, x.Name, x.Category })
+            .Select(x => new
+            {
+                LedgerAccountId = x.Key.Id,
+                x.Key.Code,
+                x.Key.Name,
+                x.Key.Category,
+                TotalDebit = x.Sum(y => y.DebitAmount),
+                TotalCredit = x.Sum(y => y.CreditAmount),
+                ClosingBalance = x.Key.Category == AccountCategory.Income
+                    ? x.Sum(y => y.CreditAmount) - x.Sum(y => y.DebitAmount)
+                    : x.Sum(y => y.DebitAmount) - x.Sum(y => y.CreditAmount)
+            })
+            .Where(x => Math.Abs(x.ClosingBalance) >= 0.01m)
+            .OrderBy(x => x.Code)
+            .ToList();
+
+        if (groupedBalances.Count == 0)
+        {
+            return Conflict(new
+            {
+                Message = "No income or expense balances were found to close for the selected fiscal year.",
+                request.FiscalYearStartDate,
+                request.FiscalYearEndDate
+            });
+        }
+
+        var journalLines = new List<JournalEntryLine>();
+        var totalIncomeClosed = 0m;
+        var totalExpenseClosed = 0m;
+
+        foreach (var balance in groupedBalances)
+        {
+            if (balance.Category == AccountCategory.Income)
+            {
+                totalIncomeClosed += balance.ClosingBalance;
+
+                journalLines.Add(new JournalEntryLine(
+                    Guid.NewGuid(),
+                    balance.LedgerAccountId,
+                    $"Year end close - {balance.Code} - {balance.Name}",
+                    balance.ClosingBalance,
+                    0m));
+            }
+            else
+            {
+                totalExpenseClosed += balance.ClosingBalance;
+
+                journalLines.Add(new JournalEntryLine(
+                    Guid.NewGuid(),
+                    balance.LedgerAccountId,
+                    $"Year end close - {balance.Code} - {balance.Name}",
+                    0m,
+                    balance.ClosingBalance));
+            }
+        }
+
+        var netIncome = totalIncomeClosed - totalExpenseClosed;
+
+        if (Math.Abs(netIncome) >= 0.01m)
+        {
+            journalLines.Add(new JournalEntryLine(
+                Guid.NewGuid(),
+                retainedEarningsAccount.Id,
+                netIncome >= 0m
+                    ? "Year end close - transfer net income to retained earnings"
+                    : "Year end close - transfer net loss to retained earnings",
+                netIncome < 0m ? Math.Abs(netIncome) : 0m,
+                netIncome > 0m ? netIncome : 0m));
+        }
+
+        try
+        {
+            var closingJournal = new JournalEntry(
+                Guid.NewGuid(),
+                tenantContext.TenantId,
+                yearEndUtc,
+                reference,
+                string.IsNullOrWhiteSpace(request.Description)
+                    ? $"Year end close for {request.FiscalYearStartDate:yyyy-MM-dd} to {request.FiscalYearEndDate:yyyy-MM-dd}"
+                    : request.Description.Trim(),
+                JournalEntryStatus.Draft,
+                JournalEntryType.Normal,
+                journalLines,
+                postingRequiresApproval: false);
+
+            closingJournal.MarkPosted(DateTime.UtcNow);
+
+            var closingMovements = closingJournal.Lines
+                .Select(line => new LedgerMovement(
+                    Guid.NewGuid(),
+                    tenantContext.TenantId,
+                    closingJournal.Id,
+                    line.Id,
+                    line.LedgerAccountId,
+                    closingJournal.EntryDateUtc,
+                    closingJournal.Reference,
+                    line.Description,
+                    line.DebitAmount,
+                    line.CreditAmount))
+                .ToList();
+
+            dbContext.JournalEntries.Add(closingJournal);
+            dbContext.LedgerMovements.AddRange(closingMovements);
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return Ok(new
+            {
+                Message = "Year end close completed successfully.",
+                closingJournal.Id,
+                closingJournal.Reference,
+                closingJournal.Description,
+                closingJournal.EntryDateUtc,
+                closingJournal.Status,
+                closingJournal.Type,
+                closingJournal.TotalDebit,
+                closingJournal.TotalCredit,
+                MovementCount = closingMovements.Count,
+                FiscalYearStartDate = request.FiscalYearStartDate,
+                FiscalYearEndDate = request.FiscalYearEndDate,
+                RetainedEarningsLedgerAccount = new
+                {
+                    retainedEarningsAccount.Id,
+                    retainedEarningsAccount.Code,
+                    retainedEarningsAccount.Name
+                },
+                TotalIncomeClosed = totalIncomeClosed,
+                TotalExpenseClosed = totalExpenseClosed,
+                NetIncome = netIncome,
+                ClosedAccountCount = groupedBalances.Count,
+                PeriodCount = periods.Count
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
     }
 
     [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
@@ -1957,16 +2406,18 @@ public async Task<IActionResult> GetJournalEntries(
             });
         }
 
-        var postingPeriod = await GetOpenFiscalPeriodForDateAsync(dbContext, journalEntry.EntryDateUtc, cancellationToken);
+        var postingPeriodGuard = await FiscalPeriodPostingGuard.EnsureOpenPeriodAsync(
+            dbContext,
+            journalEntry.EntryDateUtc,
+            "Journal Entry",
+            cancellationToken);
 
-        if (postingPeriod is null)
+        if (!postingPeriodGuard.Allowed)
         {
-            return Conflict(new
-            {
-                Message = "No open fiscal period exists for the journal entry posting date.",
-                PostingDateUtc = journalEntry.EntryDateUtc
-            });
+            return Conflict(postingPeriodGuard.ToProblem());
         }
+
+        var postingPeriod = postingPeriodGuard.FiscalPeriod!;
 
         var existingMovementCount = await dbContext.LedgerMovements
             .AsNoTracking()
@@ -2181,16 +2632,18 @@ if (budgetResult is not null && !budgetResult.Allowed)
             return BadRequest(new { Message = "Description is required." });
         }
 
-        var reversalPeriod = await GetOpenFiscalPeriodForDateAsync(dbContext, request.ReversalDateUtc, cancellationToken);
+        var reversalPeriodGuard = await FiscalPeriodPostingGuard.EnsureOpenPeriodAsync(
+            dbContext,
+            request.ReversalDateUtc,
+            "Journal Reversal",
+            cancellationToken);
 
-        if (reversalPeriod is null)
+        if (!reversalPeriodGuard.Allowed)
         {
-            return Conflict(new
-            {
-                Message = "No open fiscal period exists for the requested reversal date.",
-                ReversalDateUtc = request.ReversalDateUtc
-            });
+            return Conflict(reversalPeriodGuard.ToProblem());
         }
+
+        var reversalPeriod = reversalPeriodGuard.FiscalPeriod!;
 
         var journalEntry = await dbContext.JournalEntries
             .Include(x => x.Lines)
@@ -4324,15 +4777,13 @@ if (budgetResult is not null && !budgetResult.Allowed)
         DateTime dateUtc,
         CancellationToken cancellationToken)
     {
-        var postingDate = DateOnly.FromDateTime(dateUtc.Date);
+        var guard = await FiscalPeriodPostingGuard.EnsureOpenPeriodAsync(
+            dbContext,
+            dateUtc,
+            "Posting",
+            cancellationToken);
 
-        return await dbContext.FiscalPeriods
-            .AsNoTracking()
-            .FirstOrDefaultAsync(
-                x => x.Status == FiscalPeriodStatus.Open &&
-                     x.StartDate <= postingDate &&
-                     x.EndDate >= postingDate,
-                cancellationToken);
+        return guard.FiscalPeriod;
     }
 
     private static string ResolveJournalSourceCode(JournalEntry journalEntry)
@@ -4468,6 +4919,18 @@ private static string ResolveUserDisplayName(
         DateOnly StartDate,
         DateOnly EndDate,
         bool IsOpen);
+
+    public sealed record CreateFiscalYearRequest(
+        string FiscalYearName,
+        DateOnly FiscalYearStartDate,
+        bool CreateMonthsOpen);
+
+    public sealed record YearEndCloseRequest(
+        DateOnly FiscalYearStartDate,
+        DateOnly FiscalYearEndDate,
+        Guid RetainedEarningsLedgerAccountId,
+        string? Reference,
+        string? Description);
 
     public sealed record CreateLedgerAccountRequest(
         string Code,

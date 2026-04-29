@@ -63,6 +63,21 @@ function formatAmount(value: number) {
   }).format(value);
 }
 
+function formatFiscalPeriodUiError(message: string) {
+  const lower = message.toLowerCase();
+  if (
+    lower.includes('fiscal') ||
+    lower.includes('period') ||
+    lower.includes('posting is blocked') ||
+    lower.includes('fiscal month is closed')
+  ) {
+    return 'Posting blocked: the selected fiscal month is closed or not open for posting.';
+  }
+
+  return message;
+}
+
+
 function actorName(value?: string | null, displayName?: string | null) {
   return displayName || value || '—';
 }
@@ -218,7 +233,7 @@ export function JournalsPage() {
       setInfoText('The opening balance has been created and posted successfully.');
     },
     onError: (e) => {
-      setErrorText(getTenantReadableError(e, 'We could not create the opening balance at this time.'));
+      setErrorText(formatFiscalPeriodUiError(getTenantReadableError(e, 'We could not create the opening balance at this time.')));
       setInfoText('');
     },
   });
@@ -276,7 +291,7 @@ export function JournalsPage() {
       setErrorText('');
     },
     onError: (e) => {
-      setErrorText(getBudgetAwareReadableError(e, 'We could not post the journal entry at this time.'));
+      setErrorText(formatFiscalPeriodUiError(getBudgetAwareReadableError(e, 'We could not post the journal entry at this time.')));
       setInfoText('');
     },
   });

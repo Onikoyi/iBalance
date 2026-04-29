@@ -1,3 +1,4 @@
+using iBalance.Api.Services;
 using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
 using iBalance.Modules.Finance.Domain.Entities;
@@ -339,8 +340,18 @@ public sealed class FixedAssetsController : ControllerBase
         }
 
         var capitalizationDateUtc = request.CapitalizationDateUtc ?? invoice.PostedOnUtc.Value;
-        var postingPeriod = await GetOpenFiscalPeriodForDateAsync(dbContext, capitalizationDateUtc, cancellationToken);
-        if (postingPeriod is null) return Conflict(new { Message = "No open fiscal period exists for the fixed asset capitalization date.", CapitalizationDateUtc = capitalizationDateUtc });
+        var postingGuard = await FiscalPeriodPostingGuard.EnsureOpenPeriodAsync(
+            dbContext,
+            capitalizationDateUtc,
+            "Fixed Asset Capitalization",
+            cancellationToken);
+
+        if (!postingGuard.Allowed)
+        {
+            return Conflict(postingGuard.ToProblem());
+        }
+
+        var postingPeriod = postingGuard.FiscalPeriod!;
 
         var assetCostLedgerAccountId = request.AssetCostLedgerAccountId == Guid.Empty ? assetClass.AssetCostLedgerAccountId : request.AssetCostLedgerAccountId;
         var accumulatedDepreciationLedgerAccountId = request.AccumulatedDepreciationLedgerAccountId == Guid.Empty ? assetClass.AccumulatedDepreciationLedgerAccountId : request.AccumulatedDepreciationLedgerAccountId;

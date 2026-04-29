@@ -28,6 +28,9 @@ function licenseLabel(value?: number) {
 }
 
 function pageTitleForPath(pathname: string) {
+  if (pathname.startsWith('/payroll')) return 'Payroll / Salary Management';
+  if (pathname.startsWith('/working-capital')) return 'Working Capital Management';
+  if (pathname.startsWith('/reconciliation')) return 'Bank Reconciliation';
   if (pathname.startsWith('/ageing-analysis')) return 'Ageing Analysis';
   if (pathname.startsWith('/accounts')) return 'Chart of Accounts';
   if (pathname.startsWith('/journals')) return 'Journal Management';
@@ -53,6 +56,7 @@ function pageTitleForPath(pathname: string) {
   if (pathname.startsWith('/budgets/rejected')) return 'Rejected Budgets';
   if (pathname.startsWith('/budget-vs-actual')) return 'Budget vs Actual';
   if (pathname.startsWith('/budgets')) return 'Budget Management';
+
   return 'Finance Dashboard';
 }
 
@@ -82,6 +86,9 @@ function pageSubtitleForPath(pathname: string) {
   if (pathname.startsWith('/budgets/rejected')) return 'Correct, resubmit, or delete rejected budgets.';
   if (pathname.startsWith('/budget-vs-actual')) return 'Compare approved budgets against posted accounting actuals.';
   if (pathname.startsWith('/budgets')) return 'Create, approve, lock, close, upload, and control budgets.';
+  if (pathname.startsWith('/payroll')) return 'Manage employees, salary structures, payroll elements, and payroll processing.';
+  if (pathname.startsWith('/working-capital')) return 'Monitor liquidity, optimize receivables and payables, and manage cash flow.';
+  if (pathname.startsWith('/reconciliation')) return 'Match bank statements with ledger entries and resolve differences.';
   return 'Review operational activity across your accounting workspace.';
 }
 

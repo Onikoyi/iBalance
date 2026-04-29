@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using iBalance.BuildingBlocks.Infrastructure.Persistence;
 namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260428122845_AddPayrollPhase1")]
+    partial class AddPayrollPhase1
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1694,9 +1697,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
-                    b.Property<string>("MiddleName")
-                        .HasColumnType("text");
-
                     b.Property<string>("Notes")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
@@ -1818,71 +1818,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("PayrollPayGroups", "finance");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PayrollRun", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("JournalEntryId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("PayrollPeriod")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<DateTime?>("PostedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("RunDateUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("PayrollRuns", "finance");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PayrollRunLine", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("EmployeeId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("GrossPay")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<decimal>("NetPay")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<Guid>("PayrollRunId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("TotalDeductions")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PayrollRunId");
-
-                    b.ToTable("PayrollRunLines", "finance");
                 });
 
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PayrollSalaryStructure", b =>
@@ -3412,15 +3347,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PayrollRunLine", b =>
-                {
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.PayrollRun", null)
-                        .WithMany("Lines")
-                        .HasForeignKey("PayrollRunId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PayrollSalaryStructure", b =>
                 {
                     b.HasOne("iBalance.Modules.Finance.Domain.Entities.PayrollEmployee", null)
@@ -3657,11 +3583,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.LedgerAccount", b =>
                 {
                     b.Navigation("Children");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PayrollRun", b =>
-                {
-                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PurchaseInvoice", b =>

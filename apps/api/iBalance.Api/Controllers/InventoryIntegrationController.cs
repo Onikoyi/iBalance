@@ -1,3 +1,4 @@
+using iBalance.Api.Services;
 using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
 using iBalance.Modules.Finance.Domain.Entities;
@@ -50,8 +51,18 @@ public sealed class InventoryIntegrationController : ControllerBase
 
         var transactionDateUtc = request.TransactionDateUtc == default ? DateTime.UtcNow : request.TransactionDateUtc;
 
-        var postingPeriod = await GetOpenFiscalPeriodForDateAsync(dbContext, transactionDateUtc, cancellationToken);
-        if (postingPeriod is null) return Conflict(new { Message = "No open fiscal period exists for the inventory receipt date.", transactionDateUtc });
+       var postingGuard = await FiscalPeriodPostingGuard.EnsureOpenPeriodAsync(
+                dbContext,
+                transactionDateUtc,
+                "Inventory Receipt",
+                cancellationToken);
+
+            if (!postingGuard.Allowed)
+            {
+                return Conflict(postingGuard.ToProblem());
+            }
+
+            var postingPeriod = postingGuard.FiscalPeriod!;
 
         var ledgerValidation = await ValidatePostingLedgerAccountsAsync(dbContext, new[] { request.InventoryLedgerAccountId, request.CreditLedgerAccountId }, cancellationToken);
         if (ledgerValidation is not null) return ledgerValidation;
@@ -195,8 +206,18 @@ public sealed class InventoryIntegrationController : ControllerBase
 
         var transactionDateUtc = request.TransactionDateUtc == default ? DateTime.UtcNow : request.TransactionDateUtc;
 
-        var postingPeriod = await GetOpenFiscalPeriodForDateAsync(dbContext, transactionDateUtc, cancellationToken);
-        if (postingPeriod is null) return Conflict(new { Message = "No open fiscal period exists for the inventory issue date.", transactionDateUtc });
+       var postingGuard = await FiscalPeriodPostingGuard.EnsureOpenPeriodAsync(
+                dbContext,
+                transactionDateUtc,
+                "Inventory Receipt",
+                cancellationToken);
+
+            if (!postingGuard.Allowed)
+            {
+                return Conflict(postingGuard.ToProblem());
+            }
+
+            var postingPeriod = postingGuard.FiscalPeriod!;
 
         var ledgerValidation = await ValidatePostingLedgerAccountsAsync(dbContext, new[] { request.InventoryLedgerAccountId, request.CogsLedgerAccountId }, cancellationToken);
         if (ledgerValidation is not null) return ledgerValidation;

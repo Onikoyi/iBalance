@@ -72,7 +72,9 @@ function buildPrintHtml(data: AgeingAnalysisResponse, viewMode: ViewMode) {
         <td class="right">${formatAmount(item.days31To60Amount)}</td>
         <td class="right">${formatAmount(item.days61To90Amount)}</td>
         <td class="right">${formatAmount(item.days91To120Amount)}</td>
-        <td class="right">${formatAmount(item.over120Amount)}</td>
+        <td class="right">${formatAmount(item.days121To180Amount)}</td>
+        <td class="right">${formatAmount(item.days181To360Amount)}</td>
+        <td class="right">${formatAmount(item.over360Amount)}</td>
       </tr>`).join('')
     : data.detailItems.map((item) => `
       <tr>
@@ -90,12 +92,14 @@ function buildPrintHtml(data: AgeingAnalysisResponse, viewMode: ViewMode) {
         <td class="right">${formatAmount(item.days31To60Amount)}</td>
         <td class="right">${formatAmount(item.days61To90Amount)}</td>
         <td class="right">${formatAmount(item.days91To120Amount)}</td>
-        <td class="right">${formatAmount(item.over120Amount)}</td>
+        <td class="right">${formatAmount(item.days121To180Amount)}</td>
+        <td class="right">${formatAmount(item.days181To360Amount)}</td>
+        <td class="right">${formatAmount(item.over360Amount)}</td>
       </tr>`).join('');
 
   const header = viewMode === 'summary'
-    ? '<tr><th>Code</th><th>Name</th><th class="right">Invoices</th><th class="right">Invoice Amount</th><th class="right">Paid</th><th class="right">Outstanding</th><th class="right">Current</th><th class="right">1-30</th><th class="right">31-60</th><th class="right">61-90</th><th class="right">91-120</th><th class="right">120+</th></tr>'
-    : '<tr><th>Code</th><th>Name</th><th>Invoice</th><th>Date</th><th class="right">Days</th><th>Bucket</th><th class="right">Invoice Amount</th><th class="right">Paid</th><th class="right">Outstanding</th><th class="right">Current</th><th class="right">1-30</th><th class="right">31-60</th><th class="right">61-90</th><th class="right">91-120</th><th class="right">120+</th></tr>';
+    ? '<tr><th>Code</th><th>Name</th><th class="right">Invoices</th><th class="right">Invoice Amount</th><th class="right">Paid</th><th class="right">Balance Due</th><th class="right">Current</th><th class="right">1-30</th><th class="right">31-60</th><th class="right">61-90</th><th class="right">91-120</th><th class="right">121-180</th><th class="right">181-360</th><th class="right">360+</th></tr>'
+    : '<tr><th>Code</th><th>Name</th><th>Invoice</th><th>Date</th><th class="right">Days</th><th>Bucket</th><th class="right">Invoice Amount</th><th class="right">Paid</th><th class="right">Balance Due</th><th class="right">Current</th><th class="right">1-30</th><th class="right">31-60</th><th class="right">61-90</th><th class="right">91-120</th><th class="right">121-180</th><th class="right">181-360</th><th class="right">360+</th></tr>';
 
   const footerColSpan = viewMode === 'summary' ? 3 : 6;
 
@@ -135,10 +139,10 @@ function buildPrintHtml(data: AgeingAnalysisResponse, viewMode: ViewMode) {
     <div class="kv">
       <div class="metric"><span>Total Invoice Amount</span><strong>${formatAmount(data.totalInvoiceAmount)}</strong></div>
       <div class="metric"><span>Total Paid</span><strong>${formatAmount(data.totalPaidAmount)}</strong></div>
-      <div class="metric"><span>Total Outstanding</span><strong>${formatAmount(data.totalOutstandingAmount)}</strong></div>
+      <div class="metric"><span>Total Balance Due</span><strong>${formatAmount(data.totalOutstandingAmount)}</strong></div>
       <div class="metric"><span>Rows</span><strong>${viewMode === 'summary' ? data.summaryCount : data.detailCount}</strong></div>
     </div>
-    <table><thead>${header}</thead><tbody>${rows || `<tr><td colspan="15">No ageing balances found.</td></tr>`}</tbody><tfoot><tr><td colspan="${footerColSpan}">Total</td><td class="right">${formatAmount(data.totalInvoiceAmount)}</td><td class="right">${formatAmount(data.totalPaidAmount)}</td><td class="right">${formatAmount(data.totalOutstandingAmount)}</td><td class="right">${formatAmount(data.totalCurrentAmount)}</td><td class="right">${formatAmount(data.totalDays1To30Amount)}</td><td class="right">${formatAmount(data.totalDays31To60Amount)}</td><td class="right">${formatAmount(data.totalDays61To90Amount)}</td><td class="right">${formatAmount(data.totalDays91To120Amount)}</td><td class="right">${formatAmount(data.totalOver120Amount)}</td></tr></tfoot></table>
+    <table><thead>${header}</thead><tbody>${rows || `<tr><td colspan="17">No ageing balances found.</td></tr>`}</tbody><tfoot><tr><td colspan="${footerColSpan}">Total</td><td class="right">${formatAmount(data.totalInvoiceAmount)}</td><td class="right">${formatAmount(data.totalPaidAmount)}</td><td class="right">${formatAmount(data.totalOutstandingAmount)}</td><td class="right">${formatAmount(data.totalCurrentAmount)}</td><td class="right">${formatAmount(data.totalDays1To30Amount)}</td><td class="right">${formatAmount(data.totalDays31To60Amount)}</td><td class="right">${formatAmount(data.totalDays61To90Amount)}</td><td class="right">${formatAmount(data.totalDays91To120Amount)}</td><td class="right">${formatAmount(data.totalDays121To180Amount)}</td><td class="right">${formatAmount(data.totalDays181To360Amount)}</td><td class="right">${formatAmount(data.totalOver360Amount)}</td></tr></tfoot></table>
   </div>
 </body>
 </html>`;
@@ -256,13 +260,15 @@ export function AgeingAnalysisPage() {
             <div className="kv">
               <div className="kv-row"><span>Total Invoice Amount</span><span>{formatAmount(data.totalInvoiceAmount)}</span></div>
               <div className="kv-row"><span>Total Paid</span><span>{formatAmount(data.totalPaidAmount)}</span></div>
-              <div className="kv-row"><span>Total Outstanding</span><span>{formatAmount(data.totalOutstandingAmount)}</span></div>
+              <div className="kv-row"><span>Total Balance Due</span><span>{formatAmount(data.totalOutstandingAmount)}</span></div>
               <div className="kv-row"><span>Current</span><span>{formatAmount(data.totalCurrentAmount)}</span></div>
               <div className="kv-row"><span>1-30 Days</span><span>{formatAmount(data.totalDays1To30Amount)}</span></div>
               <div className="kv-row"><span>31-60 Days</span><span>{formatAmount(data.totalDays31To60Amount)}</span></div>
               <div className="kv-row"><span>61-90 Days</span><span>{formatAmount(data.totalDays61To90Amount)}</span></div>
               <div className="kv-row"><span>91-120 Days</span><span>{formatAmount(data.totalDays91To120Amount)}</span></div>
-              <div className="kv-row"><span>120+ Days</span><span>{formatAmount(data.totalOver120Amount)}</span></div>
+              <div className="kv-row"><span>121-180 Days</span><span>{formatAmount(data.totalDays121To180Amount)}</span></div>
+              <div className="kv-row"><span>181-360 Days</span><span>{formatAmount(data.totalDays181To360Amount)}</span></div>
+              <div className="kv-row"><span>360+ Days</span><span>{formatAmount(data.totalOver360Amount)}</span></div>
             </div>
           </section>
 
@@ -279,8 +285,8 @@ function SummaryTable({ items }: { items: AgeingAnalysisSummaryRowDto[] }) {
       <div className="section-heading"><h2>Summary by Party</h2><span className="muted">{items.length} row(s)</span></div>
       <div className="table-wrap">
         <table className="data-table">
-          <thead><tr><th>Code</th><th>Name</th><th>Invoices</th><th style={{ textAlign: 'right' }}>Invoice Amount</th><th style={{ textAlign: 'right' }}>Paid</th><th style={{ textAlign: 'right' }}>Outstanding</th><th style={{ textAlign: 'right' }}>Current</th><th style={{ textAlign: 'right' }}>1-30</th><th style={{ textAlign: 'right' }}>31-60</th><th style={{ textAlign: 'right' }}>61-90</th><th style={{ textAlign: 'right' }}>91-120</th><th style={{ textAlign: 'right' }}>120+</th></tr></thead>
-          <tbody>{items.length === 0 ? <tr><td colSpan={12} className="muted">No ageing balances found.</td></tr> : items.map((item) => <tr key={item.partyId}><td>{item.partyCode}</td><td>{item.partyName}</td><td>{item.invoiceCount}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.invoiceAmount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.paidAmount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.outstandingAmount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.currentAmount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.days1To30Amount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.days31To60Amount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.days61To90Amount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.days91To120Amount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.over120Amount)}</td></tr>)}</tbody>
+          <thead><tr><th>Code</th><th>Name</th><th>Invoices</th><th style={{ textAlign: 'right' }}>Invoice Amount</th><th style={{ textAlign: 'right' }}>Paid</th><th style={{ textAlign: 'right' }}>Balance Due</th><th style={{ textAlign: 'right' }}>Current</th><th style={{ textAlign: 'right' }}>1-30</th><th style={{ textAlign: 'right' }}>31-60</th><th style={{ textAlign: 'right' }}>61-90</th><th style={{ textAlign: 'right' }}>91-120</th><th style={{ textAlign: 'right' }}>121-180</th><th style={{ textAlign: 'right' }}>181-360</th><th style={{ textAlign: 'right' }}>360+</th></tr></thead>
+          <tbody>{items.length === 0 ? <tr><td colSpan={14} className="muted">No ageing balances found.</td></tr> : items.map((item) => <tr key={item.partyId}><td>{item.partyCode}</td><td>{item.partyName}</td><td>{item.invoiceCount}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.invoiceAmount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.paidAmount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.outstandingAmount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.currentAmount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.days1To30Amount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.days31To60Amount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.days61To90Amount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.days91To120Amount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.days121To180Amount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.days181To360Amount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.over360Amount)}</td></tr>)}</tbody>
         </table>
       </div>
     </section>
@@ -293,8 +299,8 @@ function DetailTable({ items }: { items: AgeingAnalysisDetailRowDto[] }) {
       <div className="section-heading"><h2>Invoice Detail</h2><span className="muted">{items.length} row(s)</span></div>
       <div className="table-wrap">
         <table className="data-table">
-          <thead><tr><th>Code</th><th>Name</th><th>Invoice</th><th>Date</th><th>Description</th><th style={{ textAlign: 'right' }}>Days</th><th>Bucket</th><th style={{ textAlign: 'right' }}>Invoice Amount</th><th style={{ textAlign: 'right' }}>Paid</th><th style={{ textAlign: 'right' }}>Outstanding</th><th style={{ textAlign: 'right' }}>Current</th><th style={{ textAlign: 'right' }}>1-30</th><th style={{ textAlign: 'right' }}>31-60</th><th style={{ textAlign: 'right' }}>61-90</th><th style={{ textAlign: 'right' }}>91-120</th><th style={{ textAlign: 'right' }}>120+</th></tr></thead>
-          <tbody>{items.length === 0 ? <tr><td colSpan={16} className="muted">No ageing balances found.</td></tr> : items.map((item) => <tr key={item.invoiceId}><td>{item.partyCode}</td><td>{item.partyName}</td><td>{item.invoiceNumber}</td><td>{formatDate(item.invoiceDateUtc)}</td><td>{item.description}</td><td style={{ textAlign: 'right' }}>{item.daysOutstanding}</td><td>{item.ageBucket}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.invoiceAmount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.paidAmount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.outstandingAmount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.currentAmount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.days1To30Amount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.days31To60Amount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.days61To90Amount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.days91To120Amount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.over120Amount)}</td></tr>)}</tbody>
+          <thead><tr><th>Code</th><th>Name</th><th>Invoice</th><th>Date</th><th>Description</th><th style={{ textAlign: 'right' }}>Days</th><th>Bucket</th><th style={{ textAlign: 'right' }}>Invoice Amount</th><th style={{ textAlign: 'right' }}>Paid</th><th style={{ textAlign: 'right' }}>Balance Due</th><th style={{ textAlign: 'right' }}>Current</th><th style={{ textAlign: 'right' }}>1-30</th><th style={{ textAlign: 'right' }}>31-60</th><th style={{ textAlign: 'right' }}>61-90</th><th style={{ textAlign: 'right' }}>91-120</th><th style={{ textAlign: 'right' }}>121-180</th><th style={{ textAlign: 'right' }}>181-360</th><th style={{ textAlign: 'right' }}>360+</th></tr></thead>
+          <tbody>{items.length === 0 ? <tr><td colSpan={18} className="muted">No ageing balances found.</td></tr> : items.map((item) => <tr key={item.invoiceId}><td>{item.partyCode}</td><td>{item.partyName}</td><td>{item.invoiceNumber}</td><td>{formatDate(item.invoiceDateUtc)}</td><td>{item.description}</td><td style={{ textAlign: 'right' }}>{item.daysOutstanding}</td><td>{item.ageBucket}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.invoiceAmount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.paidAmount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.outstandingAmount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.currentAmount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.days1To30Amount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.days31To60Amount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.days61To90Amount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.days91To120Amount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.days121To180Amount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.days181To360Amount)}</td><td style={{ textAlign: 'right' }}>{formatAmount(item.over360Amount)}</td></tr>)}</tbody>
         </table>
       </div>
     </section>

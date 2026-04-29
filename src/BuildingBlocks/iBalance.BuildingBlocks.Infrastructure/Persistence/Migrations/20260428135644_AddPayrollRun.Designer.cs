@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using iBalance.BuildingBlocks.Infrastructure.Persistence;
 namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260428135644_AddPayrollRun")]
+    partial class AddPayrollRun
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1694,9 +1697,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
-                    b.Property<string>("MiddleName")
-                        .HasColumnType("text");
-
                     b.Property<string>("Notes")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
@@ -1826,16 +1826,10 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("JournalEntryId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("PayrollPeriod")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
-
-                    b.Property<DateTime?>("PostedOnUtc")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime>("RunDateUtc")
                         .HasColumnType("timestamp with time zone");

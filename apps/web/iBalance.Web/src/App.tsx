@@ -5,6 +5,8 @@ import { DashboardPage } from './pages/DashboardPage';
 import { FiscalPeriodsPage } from './pages/FiscalPeriodsPage';
 import { JournalsPage } from './pages/JournalsPage';
 import { ReportsPage } from './pages/ReportsPage';
+import { WorkingCapitalPage } from './pages/WorkingCapitalPage';
+import { ReconciliationPage } from './pages/ReconciliationPage';
 import { AgeingAnalysisPage } from './pages/AgeingAnalysisPage';
 import { BankAccountsPage } from './pages/BankAccountsPage';
 import { InventoryPage } from './pages/InventoryPage';
@@ -35,6 +37,12 @@ import { RejectedJournalEntriesPage } from './pages/RejectedJournalEntriesPage';
 import { FixedAssetsPage } from './pages/FixedAssetsPage';
 import { FixedAssetDepreciationRunsPage } from './pages/FixedAssetDepreciationRunsPage';
 import { FixedAssetRegisterPrintPage } from './pages/FixedAssetRegisterPrintPage';
+import { PayrollDashboardPage } from './pages/PayrollDashboardPage';
+import { PayrollEmployeesPage } from './pages/PayrollEmployeesPage';
+import { PayrollSetupPage } from './pages/PayrollSetupPage';
+import { PayrollRunsPage } from './pages/PayrollRunsPage';
+import { PayrollPayslipsPage } from './pages/PayrollPayslipsPage';
+import { PayrollReportsPage } from './pages/PayrollReportsPage';
 
 import { LoginPage } from './pages/auth/LoginPage';
 import { SignUpPage } from './pages/auth/SignUpPage';
@@ -378,6 +386,17 @@ export default function App() {
       />
 
       <Route
+        path="/reconciliation"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <ReconciliationPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
         path="/reports"
         element={
           <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
@@ -387,6 +406,79 @@ export default function App() {
           </RequireAuth>
         }
       />
+
+
+      <Route
+        path="/payroll"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <PayrollDashboardPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/payroll/employees"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <PayrollEmployeesPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/payroll/setup"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <PayrollSetupPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/payroll/runs"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <PayrollRunsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/payroll/payslips"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <PayrollPayslipsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/payroll/reports"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <PayrollReportsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/working-capital"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <WorkingCapitalPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
 
       <Route
         path="/ageing-analysis"

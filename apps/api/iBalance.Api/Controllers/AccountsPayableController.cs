@@ -1,3 +1,4 @@
+using iBalance.Api.Services;
 using iBalance.BuildingBlocks.Application.Security;
 using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
@@ -1420,19 +1421,18 @@ public async Task<IActionResult> DeleteRejectedPurchaseInvoice(
             });
         }
 
-        var postingPeriod = await GetOpenFiscalPeriodForDateAsync(
+        var postingGuard = await FiscalPeriodPostingGuard.EnsureOpenPeriodAsync(
             dbContext,
             invoice.InvoiceDateUtc,
+            "Purchase Invoice Posting",
             cancellationToken);
 
-        if (postingPeriod is null)
+        if (!postingGuard.Allowed)
         {
-            return Conflict(new
-            {
-                Message = "No open fiscal period exists for the purchase invoice posting date.",
-                PostingDateUtc = invoice.InvoiceDateUtc
-            });
+            return Conflict(postingGuard.ToProblem());
         }
+
+        var postingPeriod = postingGuard.FiscalPeriod!;
 
         var requestedLedgerAccountIds = new[]
             {
@@ -2697,19 +2697,18 @@ public async Task<IActionResult> DeleteRejectedVendorPayment(
             });
         }
 
-        var postingPeriod = await GetOpenFiscalPeriodForDateAsync(
+        var postingGuard = await FiscalPeriodPostingGuard.EnsureOpenPeriodAsync(
             dbContext,
             payment.PaymentDateUtc,
+            "Vendor Payment Posting",
             cancellationToken);
 
-        if (postingPeriod is null)
+        if (!postingGuard.Allowed)
         {
-            return Conflict(new
-            {
-                Message = "No open fiscal period exists for the vendor payment posting date.",
-                PostingDateUtc = payment.PaymentDateUtc
-            });
+            return Conflict(postingGuard.ToProblem());
         }
+
+        var postingPeriod = postingGuard.FiscalPeriod!;
 
         var requestedLedgerAccountIds = new[]
         {

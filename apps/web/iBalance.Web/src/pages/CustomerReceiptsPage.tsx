@@ -51,6 +51,21 @@ function formatAmount(value: number) {
   }).format(value || 0);
 }
 
+function formatFiscalPeriodUiError(message: string) {
+  const lower = message.toLowerCase();
+  if (
+    lower.includes('fiscal') ||
+    lower.includes('period') ||
+    lower.includes('posting is blocked') ||
+    lower.includes('fiscal month is closed')
+  ) {
+    return 'Posting blocked: the selected fiscal month is closed or not open for posting.';
+  }
+
+  return message;
+}
+
+
 function receiptStatusLabel(value: number) {
   switch (value) {
     case 1:
@@ -281,7 +296,7 @@ export function CustomerReceiptsPage() {
       setSelectedReceiptId('');
     },
     onError: (error) => {
-      setMessage(getBudgetAwareReadableError(error, 'Unable to post customer receipt.'));
+      setMessage(formatFiscalPeriodUiError(getBudgetAwareReadableError(error, 'Unable to post customer receipt.')));
     },
   });
 

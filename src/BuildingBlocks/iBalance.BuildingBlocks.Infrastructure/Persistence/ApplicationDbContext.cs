@@ -73,6 +73,12 @@ public class ApplicationDbContext : DbContext
     public DbSet<FixedAssetDepreciationRun> FixedAssetDepreciationRuns => Set<FixedAssetDepreciationRun>();
     public DbSet<FixedAssetDepreciationLine> FixedAssetDepreciationLines => Set<FixedAssetDepreciationLine>();
     public DbSet<FixedAssetDisposal> FixedAssetDisposals => Set<FixedAssetDisposal>();
+    public DbSet<PayrollEmployee> PayrollEmployees => Set<PayrollEmployee>();
+    public DbSet<PayrollPayGroup> PayrollPayGroups => Set<PayrollPayGroup>();
+    public DbSet<PayrollPayElement> PayrollPayElements => Set<PayrollPayElement>();
+    public DbSet<PayrollSalaryStructure> PayrollSalaryStructures => Set<PayrollSalaryStructure>();
+    public DbSet<PayrollRun> PayrollRuns => Set<PayrollRun>();
+    public DbSet<PayrollRunLine> PayrollRunLines => Set<PayrollRunLine>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -857,7 +863,102 @@ modelBuilder.Entity<BudgetTransfer>(entity =>
 
         modelBuilder.Entity<FixedAssetDisposal>()
             .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
-    }
+    
+        modelBuilder.Entity<PayrollEmployee>(entity =>
+        {
+            entity.ToTable("PayrollEmployees", "finance");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.EmployeeNumber).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.FirstName).HasMaxLength(150).IsRequired();
+            entity.Property(x => x.LastName).HasMaxLength(150).IsRequired();
+            entity.Property(x => x.Email).HasMaxLength(256);
+            entity.Property(x => x.PhoneNumber).HasMaxLength(80);
+            entity.Property(x => x.Department).HasMaxLength(150);
+            entity.Property(x => x.JobTitle).HasMaxLength(150);
+            entity.Property(x => x.BankName).HasMaxLength(200);
+            entity.Property(x => x.BankAccountNumber).HasMaxLength(80);
+            entity.Property(x => x.PensionNumber).HasMaxLength(100);
+            entity.Property(x => x.TaxIdentificationNumber).HasMaxLength(100);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.HasIndex(x => new { x.TenantId, x.EmployeeNumber }).IsUnique();
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<PayrollPayGroup>(entity =>
+        {
+            entity.ToTable("PayrollPayGroups", "finance");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Code).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<PayrollPayElement>(entity =>
+        {
+            entity.ToTable("PayrollPayElements", "finance");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Code).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.DefaultAmount).HasPrecision(18, 2);
+            entity.Property(x => x.DefaultRate).HasPrecision(18, 6);
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
+            entity.HasOne<LedgerAccount>()
+                .WithMany()
+                .HasForeignKey(x => x.LedgerAccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<PayrollSalaryStructure>(entity =>
+        {
+            entity.ToTable("PayrollSalaryStructures", "finance");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.BasicSalary).HasPrecision(18, 2);
+            entity.Property(x => x.CurrencyCode).HasMaxLength(10).IsRequired();
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.HasIndex(x => new { x.TenantId, x.EmployeeId, x.EffectiveFromUtc });
+            entity.HasOne<PayrollEmployee>()
+                .WithMany()
+                .HasForeignKey(x => x.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<PayrollPayGroup>()
+                .WithMany()
+                .HasForeignKey(x => x.PayGroupId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<PayrollRun>(entity =>
+{
+    entity.ToTable("PayrollRuns", "finance");
+    entity.HasKey(x => x.Id);
+
+    entity.Property(x => x.PayrollPeriod).HasMaxLength(50).IsRequired();
+
+    entity.HasMany(x => x.Lines)
+        .WithOne()
+        .HasForeignKey(x => x.PayrollRunId)
+        .OnDelete(DeleteBehavior.Cascade);
+
+    entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+});
+
+modelBuilder.Entity<PayrollRunLine>(entity =>
+{
+    entity.ToTable("PayrollRunLines", "finance");
+    entity.HasKey(x => x.Id);
+
+    entity.Property(x => x.GrossPay).HasPrecision(18, 2);
+    entity.Property(x => x.TotalDeductions).HasPrecision(18, 2);
+    entity.Property(x => x.NetPay).HasPrecision(18, 2);
+
+    entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+});
+
+}
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {

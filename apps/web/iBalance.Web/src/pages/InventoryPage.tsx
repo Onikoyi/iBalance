@@ -80,6 +80,21 @@ function formatAmount(value?: number | null) {
   }).format(Number(value || 0));
 }
 
+function formatFiscalPeriodUiError(message: string) {
+  const lower = message.toLowerCase();
+  if (
+    lower.includes('fiscal') ||
+    lower.includes('period') ||
+    lower.includes('posting is blocked') ||
+    lower.includes('fiscal month is closed')
+  ) {
+    return 'Posting blocked: the selected fiscal month is closed or not open for posting.';
+  }
+
+  return message;
+}
+
+
 function formatQty(value?: number | null) {
   return new Intl.NumberFormat('en-NG', {
     minimumFractionDigits: 0,
@@ -660,7 +675,7 @@ export function InventoryPage() {
       setInfoText('Stock adjustment posted successfully.');
     },
     onError: (error) => {
-      setErrorText(getTenantReadableError(error, 'Unable to post stock adjustment.'));
+      setErrorText(formatFiscalPeriodUiError(getTenantReadableError(error, 'Unable to post stock adjustment.')));
       setInfoText('');
     },
   });

@@ -597,6 +597,56 @@ export type FiscalPeriodDto = {
   status: number;
 };
 
+export type CreateFiscalYearRequest = {
+  fiscalYearName: string;
+  fiscalYearStartDate: string;
+  createMonthsOpen: boolean;
+};
+
+export type CreateFiscalYearResponse = {
+  message?: string;
+  tenantId: string;
+  tenantKey: string;
+  fiscalYearName: string;
+  fiscalYearStartDate: string;
+  fiscalYearEndDate: string;
+  count: number;
+  items: FiscalPeriodDto[];
+};
+
+export type YearEndCloseRequest = {
+  fiscalYearStartDate: string;
+  fiscalYearEndDate: string;
+  retainedEarningsLedgerAccountId: string;
+  reference?: string | null;
+  description?: string | null;
+};
+
+export type YearEndCloseResponse = {
+  message?: string;
+  id: string;
+  reference: string;
+  description: string;
+  entryDateUtc: string;
+  status: number;
+  type: number;
+  totalDebit: number;
+  totalCredit: number;
+  movementCount: number;
+  fiscalYearStartDate: string;
+  fiscalYearEndDate: string;
+  retainedEarningsLedgerAccount: {
+    id: string;
+    code: string;
+    name: string;
+  };
+  totalIncomeClosed: number;
+  totalExpenseClosed: number;
+  netIncome: number;
+  closedAccountCount: number;
+  periodCount: number;
+};
+
 export type ReportLineDto = {
   ledgerAccountId: string;
   code: string;
@@ -2967,6 +3017,11 @@ export type CreateFiscalPeriodRequest = {
   isOpen: boolean;
 };
 
+export async function createFiscalYear(payload: CreateFiscalYearRequest) {
+  const response = await api.post<CreateFiscalYearResponse>('/api/finance/fiscal-years', payload);
+  return response.data;
+}
+
 export async function createFiscalPeriod(payload: CreateFiscalPeriodRequest) {
   const response = await api.post('/api/finance/fiscal-periods', payload);
   return response.data;
@@ -2979,6 +3034,11 @@ export async function openFiscalPeriod(fiscalPeriodId: string) {
 
 export async function closeFiscalPeriod(fiscalPeriodId: string) {
   const response = await api.post(`/api/finance/fiscal-periods/${encodeURIComponent(fiscalPeriodId)}/close`, {});
+  return response.data;
+}
+
+export async function runYearEndClose(payload: YearEndCloseRequest) {
+  const response = await api.post<YearEndCloseResponse>('/api/finance/fiscal-periods/year-end-close', payload);
   return response.data;
 }
 // ----------- FIXED ASSETS -----------
@@ -3358,7 +3418,7 @@ export async function capitalizePurchaseInvoiceToFixedAsset(
 }
 
 // ==========================================
-// AGEING ANALYSIS — AR/AP (ADDITIVE)
+// AGEING ANALYSIS — AR/AP (IFRS 9 BUCKETS)
 // ==========================================
 
 export type AgeingAnalysisSummaryRowDto = {
@@ -3374,7 +3434,9 @@ export type AgeingAnalysisSummaryRowDto = {
   days31To60Amount: number;
   days61To90Amount: number;
   days91To120Amount: number;
-  over120Amount: number;
+  days121To180Amount: number;
+  days181To360Amount: number;
+  over360Amount: number;
 };
 
 export type AgeingAnalysisDetailRowDto = {
@@ -3395,7 +3457,9 @@ export type AgeingAnalysisDetailRowDto = {
   days31To60Amount: number;
   days61To90Amount: number;
   days91To120Amount: number;
-  over120Amount: number;
+  days121To180Amount: number;
+  days181To360Amount: number;
+  over360Amount: number;
   status: number;
   postedOnUtc?: string | null;
   journalEntryId?: string | null;
@@ -3420,7 +3484,9 @@ export type AgeingAnalysisResponse = {
   totalDays31To60Amount: number;
   totalDays61To90Amount: number;
   totalDays91To120Amount: number;
-  totalOver120Amount: number;
+  totalDays121To180Amount: number;
+  totalDays181To360Amount: number;
+  totalOver360Amount: number;
   summaryItems: AgeingAnalysisSummaryRowDto[];
   detailItems: AgeingAnalysisDetailRowDto[];
 };
@@ -3458,6 +3524,7 @@ export async function getAccountsPayableAgeingAnalysis(query?: AgeingAnalysisQue
   });
   return response.data;
 }
+
 
 // ==========================================
 // BANK & CASH SETUP
@@ -4032,3 +4099,646 @@ export async function getInventoryAuditTrace(params?: {
   return data;
 }
 
+// ==========================================
+// WORKING CAPITAL
+// ==========================================
+
+export type WorkingCapitalExceptionRowDto = {
+  id: string;
+  reference: string;
+  invoiceDateUtc: string;
+  partyCode: string;
+  partyName: string;
+  outstandingAmount: number;
+  daysOutstanding: number;
+};
+
+export type WorkingCapitalInventoryRowDto = {
+  inventoryItemId: string;
+  itemCode: string;
+  itemName: string;
+  quantityOnHand: number;
+  inventoryValue: number;
+};
+
+export type WorkingCapitalDashboardResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string;
+  tenantKey: string;
+  asOfUtc: string;
+  fromUtc: string;
+  toUtc: string;
+  periodDays: number;
+  cashBalance: number;
+  accountsReceivableBalance: number;
+  accountsPayableBalance: number;
+  inventoryValue: number;
+  operatingWorkingCapital: number;
+  netWorkingCapital: number;
+  periodSalesAmount: number;
+  periodPurchaseAmount: number;
+  periodInventoryOutValue: number;
+  dsoDays: number;
+  dpoDays: number;
+  inventoryDays: number;
+  cashConversionCycleDays: number;
+  riskLevel: string;
+  overdueReceivables: WorkingCapitalExceptionRowDto[];
+  duePayables: WorkingCapitalExceptionRowDto[];
+  topInventory: WorkingCapitalInventoryRowDto[];
+};
+
+
+
+export type WorkingCapitalCashflowForecastBucketDto = {
+  bucket: string;
+  startDay: number;
+  endDay: number;
+  expectedInflows: number;
+  expectedOutflows: number;
+  netCashFlow: number;
+  projectedClosingCash: number;
+  riskLevel: string;
+};
+
+export type WorkingCapitalCashflowForecastItemDto = {
+  id: string;
+  reference: string;
+  partyCode: string;
+  partyName: string;
+  sourceType: string;
+  invoiceDateUtc: string;
+  outstandingAmount: number;
+  daysOutstanding: number;
+  forecastBucket: string;
+  forecastDay: number;
+  probabilityPercent: number;
+  expectedAmount: number;
+  recommendation: string;
+};
+
+export type WorkingCapitalCashflowAlertDto = {
+  severity: string;
+  title: string;
+  description: string;
+  recommendedAction: string;
+};
+
+export type WorkingCapitalCashflowForecastResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string;
+  tenantKey: string;
+  asOfUtc: string;
+  openingCash: number;
+  totalExpectedInflows: number;
+  totalExpectedOutflows: number;
+  netForecastCashFlow: number;
+  projectedClosingCash: number;
+  riskLevel: string;
+  buckets: WorkingCapitalCashflowForecastBucketDto[];
+  receiptForecastItems: WorkingCapitalCashflowForecastItemDto[];
+  paymentForecastItems: WorkingCapitalCashflowForecastItemDto[];
+  alerts: WorkingCapitalCashflowAlertDto[];
+};
+
+
+export type WorkingCapitalActionDto = {
+  severity: string;
+  area: string;
+  title: string;
+  description: string;
+  recommendedAction: string;
+};
+
+export type WorkingCapitalActionsResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string;
+  tenantKey: string;
+  asOfUtc: string;
+  count: number;
+  items: WorkingCapitalActionDto[];
+};
+
+export type WorkingCapitalReceivableHealthRowDto = {
+  id: string;
+  invoiceNumber: string;
+  invoiceDateUtc: string;
+  customerCode: string;
+  customerName: string;
+  balanceAmount: number;
+  netReceivableAmount: number;
+  status: number;
+  daysOutstanding: number;
+  ageBucket: string;
+  riskLevel: string;
+  recommendedAction: string;
+};
+
+export type WorkingCapitalReceivablesHealthResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string;
+  tenantKey: string;
+  asOfUtc: string;
+  count: number;
+  totalOutstandingAmount: number;
+  criticalCount: number;
+  highRiskCount: number;
+  items: WorkingCapitalReceivableHealthRowDto[];
+};
+
+export type WorkingCapitalPayableStrategyRowDto = {
+  id: string;
+  invoiceNumber: string;
+  invoiceDateUtc: string;
+  vendorCode: string;
+  vendorName: string;
+  balanceAmount: number;
+  netPayableAmount: number;
+  status: number;
+  daysOutstanding: number;
+  priority: string;
+  recommendedAction: string;
+};
+
+export type WorkingCapitalPayablesStrategyResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string;
+  tenantKey: string;
+  asOfUtc: string;
+  count: number;
+  totalOutstandingAmount: number;
+  immediateCount: number;
+  highPriorityCount: number;
+  items: WorkingCapitalPayableStrategyRowDto[];
+};
+
+
+export type WorkingCapitalDashboardQuery = {
+  asOfUtc?: string | null;
+  fromUtc?: string | null;
+  toUtc?: string | null;
+};
+
+function buildWorkingCapitalParams(query?: WorkingCapitalDashboardQuery) {
+  const params: Record<string, string> = {};
+
+  if (query?.asOfUtc) params.asOfUtc = query.asOfUtc;
+  if (query?.fromUtc) params.fromUtc = query.fromUtc;
+  if (query?.toUtc) params.toUtc = query.toUtc;
+
+  return params;
+}
+
+export async function getWorkingCapitalDashboard(query?: WorkingCapitalDashboardQuery) {
+  const response = await api.get<WorkingCapitalDashboardResponse>('/api/finance/working-capital/dashboard', {
+    params: buildWorkingCapitalParams(query),
+  });
+  return response.data;
+}
+
+
+export async function getReceivablesHealth(asOfUtc?: string | null) {
+  const response = await api.get<WorkingCapitalReceivablesHealthResponse>('/api/finance/working-capital/receivables-health', {
+    params: asOfUtc ? { asOfUtc } : {},
+  });
+  return response.data;
+}
+
+export async function getPayablesStrategy(asOfUtc?: string | null) {
+  const response = await api.get<WorkingCapitalPayablesStrategyResponse>('/api/finance/working-capital/payables-strategy', {
+    params: asOfUtc ? { asOfUtc } : {},
+  });
+  return response.data;
+}
+
+export async function getWorkingCapitalActions(asOfUtc?: string | null) {
+  const response = await api.get<WorkingCapitalActionsResponse>('/api/finance/working-capital/actions', {
+    params: asOfUtc ? { asOfUtc } : {},
+  });
+  return response.data;
+}
+
+
+export async function getWorkingCapitalCashflowForecast(asOfUtc?: string | null) {
+  const response = await api.get<WorkingCapitalCashflowForecastResponse>('/api/finance/working-capital/cashflow-forecast', {
+    params: asOfUtc ? { asOfUtc } : {},
+  });
+  return response.data;
+}
+
+export async function getWorkingCapitalOptimization(asOfUtc?: string | null) {
+  const response = await api.get('/api/finance/working-capital/optimization', {
+    params: asOfUtc ? { asOfUtc } : {},
+  });
+  return response.data;
+}
+
+
+
+
+
+
+
+// ==========================================
+// PAYROLL / SALARY MANAGEMENT — PHASE 1
+// ==========================================
+
+export type PayrollEmployeeDto = {
+  id: string;
+  tenantId: string;
+  employeeNumber: string;
+  firstName: string;
+  middleName?: string | null;
+  lastName: string;
+  fullName: string;
+  displayName: string;
+  email?: string | null;
+  phoneNumber?: string | null;
+  department?: string | null;
+  jobTitle?: string | null;
+  hireDateUtc: string;
+  bankName?: string | null;
+  bankAccountNumber?: string | null;
+  pensionNumber?: string | null;
+  taxIdentificationNumber?: string | null;
+  isActive: boolean;
+  notes?: string | null;
+  createdOnUtc: string;
+};
+
+
+export type PayrollEmployeesResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  count: number;
+  items: PayrollEmployeeDto[];
+};
+
+export type CreatePayrollEmployeeRequest = {
+  employeeNumber: string;
+  firstName: string;
+  middleName?: string | null;
+  lastName: string;
+  email?: string | null;
+  phoneNumber?: string | null;
+  department?: string | null;
+  jobTitle?: string | null;
+  hireDateUtc: string;
+  bankName?: string | null;
+  bankAccountNumber?: string | null;
+  pensionNumber?: string | null;
+  taxIdentificationNumber?: string | null;
+  isActive: boolean;
+  notes?: string | null;
+};
+
+export type UpdatePayrollEmployeeRequest = {
+  firstName: string;
+  middleName?: string | null;
+  lastName: string;
+  email?: string | null;
+  phoneNumber?: string | null;
+  department?: string | null;
+  jobTitle?: string | null;
+  hireDateUtc: string;
+  bankName?: string | null;
+  bankAccountNumber?: string | null;
+  pensionNumber?: string | null;
+  taxIdentificationNumber?: string | null;
+  isActive: boolean;
+  notes?: string | null;
+};
+
+
+
+export type ImportPayrollEmployeesRequest = {
+  items: CreatePayrollEmployeeRequest[];
+};
+
+export type PayrollPayGroupDto = {
+  id: string;
+  tenantId: string;
+  code: string;
+  name: string;
+  description?: string | null;
+  isActive: boolean;
+  createdOnUtc: string;
+};
+
+export type PayrollPayGroupsResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  count: number;
+  items: PayrollPayGroupDto[];
+};
+
+export type CreatePayrollPayGroupRequest = {
+  code: string;
+  name: string;
+  description?: string | null;
+  isActive: boolean;
+};
+
+export type UpdatePayrollPayGroupRequest = {
+  name: string;
+  description?: string | null;
+  isActive: boolean;
+};
+
+
+export type UpdatePayrollPayElementRequest = {
+  name: string;
+  elementKind: number;
+  calculationMode: number;
+  defaultAmount: number;
+  defaultRate: number;
+  ledgerAccountId: string;
+  isTaxable: boolean;
+  isActive: boolean;
+  description?: string | null;
+};
+
+export type PayrollPayElementDto = {
+  id: string;
+  tenantId: string;
+  code: string;
+  name: string;
+  elementKind: number;
+  calculationMode: number;
+  defaultAmount: number;
+  defaultRate: number;
+  ledgerAccountId: string;
+  ledgerAccountCode: string;
+  ledgerAccountName: string;
+  isTaxable: boolean;
+  isActive: boolean;
+  description?: string | null;
+  createdOnUtc: string;
+};
+
+export type PayrollPayElementsResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  count: number;
+  items: PayrollPayElementDto[];
+};
+
+export type CreatePayrollPayElementRequest = {
+  code: string;
+  name: string;
+  elementKind: number;
+  calculationMode: number;
+  defaultAmount: number;
+  defaultRate: number;
+  ledgerAccountId: string;
+  isTaxable: boolean;
+  isActive: boolean;
+  description?: string | null;
+};
+
+export type PayrollSalaryStructureDto = {
+  id: string;
+  tenantId: string;
+  employeeId: string;
+  employeeNumber: string;
+  employeeName: string;
+  payGroupId: string;
+  payGroupCode: string;
+  payGroupName: string;
+  basicSalary: number;
+  currencyCode: string;
+  effectiveFromUtc: string;
+  isActive: boolean;
+  notes?: string | null;
+  createdOnUtc: string;
+};
+
+export type PayrollSalaryStructuresResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  count: number;
+  items: PayrollSalaryStructureDto[];
+};
+
+export type CreatePayrollSalaryStructureRequest = {
+  employeeId: string;
+  payGroupId: string;
+  basicSalary: number;
+  currencyCode: string;
+  effectiveFromUtc: string;
+  isActive: boolean;
+  notes?: string | null;
+};
+
+
+export type UpdatePayrollSalaryStructureRequest = {
+  employeeId: string;
+  payGroupId: string;
+  basicSalary: number;
+  currencyCode: string;
+  effectiveFromUtc: string;
+  isActive: boolean;
+  notes?: string | null;
+};
+
+export async function getPayrollEmployees() {
+  const response = await api.get<PayrollEmployeesResponse>('/api/payroll/employees');
+  return response.data;
+}
+
+
+export async function createPayrollEmployee(payload: CreatePayrollEmployeeRequest) {
+  const response = await api.post('/api/payroll/employees', payload);
+  return response.data;
+}
+
+export async function updatePayrollEmployee(employeeId: string, payload: UpdatePayrollEmployeeRequest) {
+  const response = await api.put(`/api/payroll/employees/${employeeId}`, payload);
+  return response.data;
+}
+
+export async function deletePayrollEmployee(employeeId: string) {
+  const response = await api.delete(`/api/payroll/employees/${employeeId}`);
+  return response.data;
+}
+
+
+
+export async function importPayrollEmployees(payload: ImportPayrollEmployeesRequest) {
+  const response = await api.post('/api/payroll/employees/import', payload);
+  return response.data;
+}
+
+
+export async function getPayrollPayGroups() {
+  const response = await api.get<PayrollPayGroupsResponse>('/api/payroll/pay-groups');
+  return response.data;
+}
+
+export async function createPayrollPayGroup(payload: CreatePayrollPayGroupRequest) {
+  const response = await api.post('/api/payroll/pay-groups', payload);
+  return response.data;
+}
+
+
+export async function updatePayrollPayGroup(payGroupId: string, payload: UpdatePayrollPayGroupRequest) {
+  const response = await api.put(`/api/payroll/pay-groups/${payGroupId}`, payload);
+  return response.data;
+}
+
+export async function deletePayrollPayGroup(payGroupId: string) {
+  const response = await api.delete(`/api/payroll/pay-groups/${payGroupId}`);
+  return response.data;
+}
+
+export async function getPayrollPayElements() {
+  const response = await api.get<PayrollPayElementsResponse>('/api/payroll/pay-elements');
+  return response.data;
+}
+
+export async function createPayrollPayElement(payload: CreatePayrollPayElementRequest) {
+  const response = await api.post('/api/payroll/pay-elements', payload);
+  return response.data;
+}
+
+export async function updatePayrollPayElement(payElementId: string, payload: UpdatePayrollPayElementRequest) {
+  const response = await api.put(`/api/payroll/pay-elements/${payElementId}`, payload);
+  return response.data;
+}
+
+export async function deletePayrollPayElement(payElementId: string) {
+  const response = await api.delete(`/api/payroll/pay-elements/${payElementId}`);
+  return response.data;
+}
+
+export async function getPayrollSalaryStructures() {
+  const response = await api.get<PayrollSalaryStructuresResponse>('/api/payroll/salary-structures');
+  return response.data;
+}
+
+export async function createPayrollSalaryStructure(payload: CreatePayrollSalaryStructureRequest) {
+  const response = await api.post('/api/payroll/salary-structures', payload);
+  return response.data;
+}
+
+export async function updatePayrollSalaryStructure(salaryStructureId: string, payload: UpdatePayrollSalaryStructureRequest) {
+  const response = await api.put(`/api/payroll/salary-structures/${salaryStructureId}`, payload);
+  return response.data;
+}
+
+export async function deletePayrollSalaryStructure(salaryStructureId: string) {
+  const response = await api.delete(`/api/payroll/salary-structures/${salaryStructureId}`);
+  return response.data;
+}
+
+export async function generatePayrollRun(period: string) {
+  const response = await api.post('/api/payroll/run', null, {
+    params: { period },
+  });
+  return response.data;
+}
+
+
+export type PostPayrollRunRequest = {
+  salaryExpenseAccountId: string;
+  deductionsPayableAccountId: string;
+  netSalaryPayableAccountId: string;
+  postingDateUtc?: string | null;
+  reference?: string | null;
+  description?: string | null;
+};
+
+
+export async function postPayrollRun(runId: string, payload: PostPayrollRunRequest) {
+  const response = await api.post(`/api/payroll/run/${runId}/post`, payload);
+  return response.data;
+}
+
+
+// ==========================================
+// PAYROLL / SALARY MANAGEMENT — MAKER/CHECKER UI
+// ==========================================
+
+export type SubmitPayrollRunRequest = {
+  notes?: string | null;
+};
+
+export type RejectPayrollRunRequest = {
+  reason: string;
+};
+
+export async function submitPayrollRun(runId: string, payload?: SubmitPayrollRunRequest) {
+  const response = await api.post(`/api/payroll/run/${runId}/submit`, payload ?? {});
+  return response.data;
+}
+
+export async function approvePayrollRun(runId: string) {
+  const response = await api.post(`/api/payroll/run/${runId}/approve`);
+  return response.data;
+}
+
+export async function rejectPayrollRun(runId: string, payload: RejectPayrollRunRequest) {
+  const response = await api.post(`/api/payroll/run/${runId}/reject`, payload);
+  return response.data;
+}
+
+// ==========================================
+// PAYROLL — QUERIES (MISSING)
+// ==========================================
+
+export type PayrollRunSummaryDto = {
+  id: string;
+  payrollPeriod: string;
+  employeeCount: number;
+  totalGrossPay: number;
+  totalDeductions: number;
+  totalNetPay: number;
+  status: number;
+  journalEntryId?: string | null;
+};
+
+export type PayrollRunDetailDto = {
+  items: any[];
+};
+
+export type PayrollPayslipDto = any;
+
+export type PayrollStatutoryReportRowDto = any;
+
+// GET RUNS
+export async function getPayrollRuns() {
+  const res = await api.get<{ items: PayrollRunSummaryDto[] }>('/api/payroll/runs');
+  return res.data;
+}
+
+// GET RUN DETAIL
+export async function getPayrollRunDetail(runId: string) {
+  const res = await api.get(`/api/payroll/run/${runId}`);
+  return res.data;
+}
+
+// GET PAYSLIPS
+export async function getPayrollPayslips(runId: string) {
+  const res = await api.get(`/api/payroll/run/${runId}/payslips`);
+  return res.data;
+}
+
+// GET STATUTORY REPORT
+export async function getPayrollStatutoryReport(runId: string) {
+  const res = await api.get(`/api/payroll/run/${runId}/statutory`);
+  return res.data;
+}
+
+// EMPLOYEE HISTORY
+export async function getEmployeePayrollHistory(employeeId: string) {
+  const res = await api.get(`/api/payroll/employee/${employeeId}/history`);
+  return res.data;
+}
+
+export function canPostJournals() {
+  return true; // temporary until role system enforced
+}

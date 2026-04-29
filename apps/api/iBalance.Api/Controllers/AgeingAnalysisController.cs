@@ -120,7 +120,9 @@ public sealed class AgeingAnalysisController : ControllerBase
                     bucket.Days31To60Amount,
                     bucket.Days61To90Amount,
                     bucket.Days91To120Amount,
-                    bucket.Over120Amount,
+                    bucket.Days121To180Amount,
+                    bucket.Days181To360Amount,
+                    bucket.Over360Amount,
                     (int)x.Status,
                     x.PostedOnUtc,
                     x.JournalEntryId);
@@ -143,7 +145,9 @@ public sealed class AgeingAnalysisController : ControllerBase
                 x.Sum(y => y.Days31To60Amount),
                 x.Sum(y => y.Days61To90Amount),
                 x.Sum(y => y.Days91To120Amount),
-                x.Sum(y => y.Over120Amount)))
+                x.Sum(y => y.Days121To180Amount),
+                x.Sum(y => y.Days181To360Amount),
+                x.Sum(y => y.Over360Amount)))
             .OrderBy(x => x.PartyName)
             .ThenBy(x => x.PartyCode)
             .ToList();
@@ -268,7 +272,9 @@ public sealed class AgeingAnalysisController : ControllerBase
                     bucket.Days31To60Amount,
                     bucket.Days61To90Amount,
                     bucket.Days91To120Amount,
-                    bucket.Over120Amount,
+                    bucket.Days121To180Amount,
+                    bucket.Days181To360Amount,
+                    bucket.Over360Amount,
                     (int)x.Status,
                     x.PostedOnUtc,
                     x.JournalEntryId);
@@ -291,7 +297,9 @@ public sealed class AgeingAnalysisController : ControllerBase
                 x.Sum(y => y.Days31To60Amount),
                 x.Sum(y => y.Days61To90Amount),
                 x.Sum(y => y.Days91To120Amount),
-                x.Sum(y => y.Over120Amount)))
+                x.Sum(y => y.Days121To180Amount),
+                x.Sum(y => y.Days181To360Amount),
+                x.Sum(y => y.Over360Amount)))
             .OrderBy(x => x.PartyName)
             .ThenBy(x => x.PartyCode)
             .ToList();
@@ -318,35 +326,45 @@ public sealed class AgeingAnalysisController : ControllerBase
     {
         if (amount <= 0m)
         {
-            return new AgeingBucketAmounts("Settled", 0m, 0m, 0m, 0m, 0m, 0m);
+            return new AgeingBucketAmounts("Settled", 0m, 0m, 0m, 0m, 0m, 0m, 0m, 0m);
         }
 
         if (daysOutstanding <= 0)
         {
-            return new AgeingBucketAmounts("Current", amount, 0m, 0m, 0m, 0m, 0m);
+            return new AgeingBucketAmounts("Current", amount, 0m, 0m, 0m, 0m, 0m, 0m, 0m);
         }
 
         if (daysOutstanding <= 30)
         {
-            return new AgeingBucketAmounts("1-30", 0m, amount, 0m, 0m, 0m, 0m);
+            return new AgeingBucketAmounts("1-30", 0m, amount, 0m, 0m, 0m, 0m, 0m, 0m);
         }
 
         if (daysOutstanding <= 60)
         {
-            return new AgeingBucketAmounts("31-60", 0m, 0m, amount, 0m, 0m, 0m);
+            return new AgeingBucketAmounts("31-60", 0m, 0m, amount, 0m, 0m, 0m, 0m, 0m);
         }
 
         if (daysOutstanding <= 90)
         {
-            return new AgeingBucketAmounts("61-90", 0m, 0m, 0m, amount, 0m, 0m);
+            return new AgeingBucketAmounts("61-90", 0m, 0m, 0m, amount, 0m, 0m, 0m, 0m);
         }
 
         if (daysOutstanding <= 120)
         {
-            return new AgeingBucketAmounts("91-120", 0m, 0m, 0m, 0m, amount, 0m);
+            return new AgeingBucketAmounts("91-120", 0m, 0m, 0m, 0m, amount, 0m, 0m, 0m);
         }
 
-        return new AgeingBucketAmounts("120+", 0m, 0m, 0m, 0m, 0m, amount);
+        if (daysOutstanding <= 180)
+        {
+            return new AgeingBucketAmounts("121-180", 0m, 0m, 0m, 0m, 0m, amount, 0m, 0m);
+        }
+
+        if (daysOutstanding <= 360)
+        {
+            return new AgeingBucketAmounts("181-360", 0m, 0m, 0m, 0m, 0m, 0m, amount, 0m);
+        }
+
+        return new AgeingBucketAmounts("360+", 0m, 0m, 0m, 0m, 0m, 0m, 0m, amount);
     }
 
     private static object BuildResponse(
@@ -380,7 +398,9 @@ public sealed class AgeingAnalysisController : ControllerBase
             TotalDays31To60Amount = detailRows.Sum(x => x.Days31To60Amount),
             TotalDays61To90Amount = detailRows.Sum(x => x.Days61To90Amount),
             TotalDays91To120Amount = detailRows.Sum(x => x.Days91To120Amount),
-            TotalOver120Amount = detailRows.Sum(x => x.Over120Amount),
+            TotalDays121To180Amount = detailRows.Sum(x => x.Days121To180Amount),
+            TotalDays181To360Amount = detailRows.Sum(x => x.Days181To360Amount),
+            TotalOver360Amount = detailRows.Sum(x => x.Over360Amount),
             SummaryItems = summaryRows,
             DetailItems = detailRows
         };
@@ -393,7 +413,9 @@ public sealed class AgeingAnalysisController : ControllerBase
         decimal Days31To60Amount,
         decimal Days61To90Amount,
         decimal Days91To120Amount,
-        decimal Over120Amount);
+        decimal Days121To180Amount,
+        decimal Days181To360Amount,
+        decimal Over360Amount);
 
     private sealed record AgeingAnalysisSummaryRow(
         Guid PartyId,
@@ -408,7 +430,9 @@ public sealed class AgeingAnalysisController : ControllerBase
         decimal Days31To60Amount,
         decimal Days61To90Amount,
         decimal Days91To120Amount,
-        decimal Over120Amount);
+        decimal Days121To180Amount,
+        decimal Days181To360Amount,
+        decimal Over360Amount);
 
     private sealed record AgeingAnalysisDetailRow(
         Guid InvoiceId,
@@ -428,7 +452,9 @@ public sealed class AgeingAnalysisController : ControllerBase
         decimal Days31To60Amount,
         decimal Days61To90Amount,
         decimal Days91To120Amount,
-        decimal Over120Amount,
+        decimal Days121To180Amount,
+        decimal Days181To360Amount,
+        decimal Over360Amount,
         int Status,
         DateTime? PostedOnUtc,
         Guid? JournalEntryId);

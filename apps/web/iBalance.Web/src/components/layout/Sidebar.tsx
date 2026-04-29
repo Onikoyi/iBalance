@@ -70,11 +70,15 @@ export function Sidebar() {
     if (path.startsWith('/budgets') || path.startsWith('/budget-vs-actual')) return 'budget';
     if (path.startsWith('/fixed-assets')) return 'fixed-assets';
     if (path.startsWith('/bank-accounts')) return 'treasury';
+    if (path.startsWith('/reconciliation')) return 'reconciliation';
     if (path.startsWith('/inventory')) return 'inventory';
     if (path.startsWith('/customers') || path.startsWith('/sales-invoices') || path.startsWith('/customer-receipts')) return 'ar';
     if (path.startsWith('/vendors') || path.startsWith('/purchase-invoices') || path.startsWith('/vendor-payments')) return 'ap';
     if (path.startsWith('/reports') || path.startsWith('/ageing-analysis') || path.startsWith('/dashboard')) return 'overview';
     if (path.startsWith('/admin')) return 'admin';
+    if (path.startsWith('/working-capital')) return 'working-capital';
+    if (path.startsWith('/payroll')) return 'payroll';
+
     return 'overview';
   }, [location.pathname]);
 
@@ -154,6 +158,43 @@ export function Sidebar() {
             <SidebarSection title="Treasury & Banking" sectionKey="treasury" defaultOpen={activeSection === 'treasury'}>
               <NavLink to="/bank-accounts" className={({ isActive }) => linkClassName(isActive)}>
                 Bank Accounts
+              </NavLink>
+            </SidebarSection>
+            <SidebarSection title="Payroll" sectionKey="payroll" defaultOpen={activeSection === 'payroll'}>
+              <NavLink to="/payroll" className={({ isActive }) => linkClassName(isActive)}>
+                Payroll Dashboard
+              </NavLink>
+
+              <NavLink to="/payroll/employees" className={({ isActive }) => linkClassName(isActive)}>
+                Employees
+              </NavLink>
+
+              <NavLink to="/payroll/setup" className={({ isActive }) => linkClassName(isActive)}>
+                Payroll Setup
+              </NavLink>
+
+              <NavLink to="/payroll/runs" className={({ isActive }) => linkClassName(isActive)}>
+                Payroll Runs
+              </NavLink>
+
+              <NavLink to="/payroll/payslips" className={({ isActive }) => linkClassName(isActive)}>
+                Payslips
+              </NavLink>
+
+              <NavLink to="/payroll/reports" className={({ isActive }) => linkClassName(isActive)}>
+                Statutory Reports
+              </NavLink>
+            </SidebarSection>
+
+            <SidebarSection title="Working Capital" sectionKey="working-capital" defaultOpen={activeSection === 'working-capital'}>
+                <NavLink to="/working-capital" className={({ isActive }) => linkClassName(isActive)}>
+                  Working Capital Management Dashboard
+                </NavLink>
+              </SidebarSection>
+
+            <SidebarSection title="Reconciliation" sectionKey="reconciliation" defaultOpen={activeSection === 'reconciliation'}>
+              <NavLink to="/reconciliation" className={({ isActive }) => linkClassName(isActive)}>
+                Reconciliation
               </NavLink>
             </SidebarSection>
 

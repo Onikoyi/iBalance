@@ -50,6 +50,21 @@ function formatAmount(value?: number | null) {
   }).format(Number(value || 0));
 }
 
+function formatFiscalPeriodUiError(message: string) {
+  const lower = message.toLowerCase();
+  if (
+    lower.includes('fiscal') ||
+    lower.includes('period') ||
+    lower.includes('posting is blocked') ||
+    lower.includes('fiscal month is closed')
+  ) {
+    return 'Posting blocked: the selected fiscal month is closed or not open for posting.';
+  }
+
+  return message;
+}
+
+
 function assetStatusLabel(value: number) {
   switch (value) {
     case 1: return 'Draft';
@@ -417,7 +432,7 @@ export function FixedAssetsPage() {
       setInfoText('Fixed asset capitalized successfully.');
     },
     onError: (error) => {
-      setErrorText(getTenantReadableError(error, 'Unable to capitalize fixed asset.'));
+      setErrorText(formatFiscalPeriodUiError(getTenantReadableError(error, 'Unable to capitalize fixed asset.')));
       setInfoText('');
     },
   });
@@ -512,7 +527,7 @@ export function FixedAssetsPage() {
       setInfoText('Fixed asset disposal posted successfully.');
     },
     onError: (error) => {
-      setErrorText(getTenantReadableError(error, 'Unable to dispose fixed asset.'));
+      setErrorText(formatFiscalPeriodUiError(getTenantReadableError(error, 'Unable to dispose fixed asset.')));
       setInfoText('');
     },
   });
