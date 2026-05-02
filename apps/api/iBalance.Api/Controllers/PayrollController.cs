@@ -935,12 +935,15 @@ public async Task<IActionResult> ImportEmployees(
             request.DeductionsPayableAccountId == Guid.Empty ||
             request.NetSalaryPayableAccountId == Guid.Empty)
         {
-            return BadRequest(new { Message = "Salary expense, deductions payable, and net salary payable accounts are required." });
+            return BadRequest(new
+            {
+                Message = "Fallback salary expense, fallback deductions payable, and net salary payable accounts are required."
+            });
         }
 
         var run = await dbContext.PayrollRuns
             .Include(x => x.Lines)
-            .FirstOrDefaultAsync(x => x.Id == runId, cancellationToken);
+            .FirstOrDefaultAsync(x => x.Id == runId && x.TenantId == tenantContext.TenantId, cancellationToken);
 
         if (run is null)
         {
@@ -952,12 +955,17 @@ public async Task<IActionResult> ImportEmployees(
             return Conflict(new { Message = "Payroll run has already been posted.", RunId = runId, run.JournalEntryId });
         }
 
+        if (run.Status != 1)
+        {
+            return Conflict(new { Message = "Only approved / submitted payroll runs can be posted.", RunId = runId, run.Status });
+        }
+
         if (run.Lines.Count == 0)
         {
             return BadRequest(new { Message = "Payroll run has no lines to post." });
         }
 
-        var postingDateUtc = request.PostingDateUtc ?? DateTime.UtcNow;
+        var postingDateUtc = request.PostingDateUtc ?? ResolvePayrollRunPostingDateUtc(run.PayrollPeriod);
         var postingDate = DateOnly.FromDateTime(postingDateUtc);
 
         var fiscalPeriod = await dbContext.FiscalPeriods
@@ -969,12 +977,21 @@ public async Task<IActionResult> ImportEmployees(
 
         if (fiscalPeriod is null)
         {
-            return BadRequest(new { Message = "No fiscal period exists for the payroll posting date.", PostingDateUtc = postingDateUtc });
+            return BadRequest(new
+            {
+                Message = "No fiscal period exists for the selected payroll posting date.",
+                PostingDateUtc = postingDateUtc
+            });
         }
 
         if (fiscalPeriod.Status != FiscalPeriodStatus.Open)
         {
-            return BadRequest(new { Message = "Posting blocked: the selected fiscal month is closed or not open for posting.", PostingDateUtc = postingDateUtc, FiscalPeriod = fiscalPeriod.Name });
+            return BadRequest(new
+            {
+                Message = "Posting blocked: the fiscal period matching the selected posting date is closed or not open for posting.",
+                PostingDateUtc = postingDateUtc,
+                FiscalPeriod = fiscalPeriod.Name
+            });
         }
 
         var requestedAccountIds = new[]
@@ -983,6 +1000,32 @@ public async Task<IActionResult> ImportEmployees(
             request.DeductionsPayableAccountId,
             request.NetSalaryPayableAccountId
         }.Distinct().ToList();
+
+        var payrollItems = await dbContext.Set<PayrollRunLineItem>()
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantContext.TenantId && run.Lines.Select(line => line.Id).Contains(x.PayrollRunLineId))
+            .OrderBy(x => x.Sequence)
+            .ThenBy(x => x.Code)
+            .ToListAsync(cancellationToken);
+
+        if (payrollItems.Count == 0)
+        {
+            return BadRequest(new { Message = "Payroll run line items were not found for posting." });
+        }
+
+        var payElementIds = payrollItems
+            .Where(x => x.PayElementId.HasValue)
+            .Select(x => x.PayElementId!.Value)
+            .Distinct()
+            .ToList();
+
+        var payElements = await dbContext.PayrollPayElements
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantContext.TenantId && payElementIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, cancellationToken);
+
+        requestedAccountIds.AddRange(payElements.Values.Select(x => x.LedgerAccountId));
+        requestedAccountIds = requestedAccountIds.Distinct().ToList();
 
         var accounts = await dbContext.LedgerAccounts
             .AsNoTracking()
@@ -993,52 +1036,117 @@ public async Task<IActionResult> ImportEmployees(
         {
             if (!accounts.TryGetValue(ledgerAccountId, out var account))
             {
-                return BadRequest(new { Message = "One or more selected payroll posting accounts were not found.", LedgerAccountId = ledgerAccountId });
+                return BadRequest(new { Message = "One or more payroll posting accounts were not found.", LedgerAccountId = ledgerAccountId });
             }
 
             if (!account.IsActive || account.IsHeader || !account.IsPostingAllowed)
             {
-                return BadRequest(new { Message = "Payroll posting accounts must be active, non-header, posting-enabled ledger accounts.", account.Id, account.Code, account.Name });
+                return BadRequest(new
+                {
+                    Message = "Payroll posting accounts must be active, non-header, posting-enabled ledger accounts.",
+                    account.Id,
+                    account.Code,
+                    account.Name
+                });
             }
         }
 
-        var totalGross = run.Lines.Sum(x => x.GrossPay);
-        var totalDeductions = run.Lines.Sum(x => x.TotalDeductions);
+        var lineBuilders = new List<(Guid LedgerAccountId, string Description, decimal DebitAmount, decimal CreditAmount)>();
+
+        foreach (var item in payrollItems)
+        {
+            PayrollPayElement? mappedPayElement = null;
+
+            if (item.PayElementId.HasValue)
+            {
+                payElements.TryGetValue(item.PayElementId.Value, out mappedPayElement);
+            }
+
+            var hasMappedPayElement = mappedPayElement is not null;
+
+            if (item.ElementKind == 1)
+            {
+                var ledgerAccountId = hasMappedPayElement ? mappedPayElement!.LedgerAccountId : request.SalaryExpenseAccountId;
+                lineBuilders.Add((
+                    ledgerAccountId,
+                    hasMappedPayElement
+                        ? $"Payroll earning - {item.Code} - {run.PayrollPeriod}"
+                        : $"Payroll earning fallback - {item.Code} - {run.PayrollPeriod}",
+                    item.Amount,
+                    0m));
+                continue;
+            }
+
+            if (item.ElementKind == 2)
+            {
+                var ledgerAccountId = hasMappedPayElement ? mappedPayElement!.LedgerAccountId : request.DeductionsPayableAccountId;
+                lineBuilders.Add((
+                    ledgerAccountId,
+                    hasMappedPayElement
+                        ? $"Payroll deduction - {item.Code} - {run.PayrollPeriod}"
+                        : $"Payroll deduction fallback - {item.Code} - {run.PayrollPeriod}",
+                    0m,
+                    item.Amount));
+                continue;
+            }
+
+            if (item.ElementKind == 3)
+            {
+                var expenseLedgerAccountId = hasMappedPayElement ? mappedPayElement!.LedgerAccountId : request.SalaryExpenseAccountId;
+
+                lineBuilders.Add((
+                    expenseLedgerAccountId,
+                    hasMappedPayElement
+                        ? $"Employer payroll cost - {item.Code} - {run.PayrollPeriod}"
+                        : $"Employer payroll cost fallback - {item.Code} - {run.PayrollPeriod}",
+                    item.Amount,
+                    0m));
+
+                lineBuilders.Add((
+                    request.DeductionsPayableAccountId,
+                    $"Employer payroll obligation payable - {item.Code} - {run.PayrollPeriod}",
+                    0m,
+                    item.Amount));
+            }
+        }
+
         var totalNetPay = run.Lines.Sum(x => x.NetPay);
-
-        if (totalGross <= 0m)
-        {
-            return BadRequest(new { Message = "Payroll gross amount must be greater than zero before posting." });
-        }
-
-        var journalLines = new List<JournalEntryLine>
-        {
-            new(
-                Guid.NewGuid(),
-                request.SalaryExpenseAccountId,
-                $"Payroll salary expense - {run.PayrollPeriod}",
-                totalGross,
-                0m)
-        };
-
-        if (totalDeductions > 0m)
-        {
-            journalLines.Add(new JournalEntryLine(
-                Guid.NewGuid(),
-                request.DeductionsPayableAccountId,
-                $"Payroll statutory/employee deductions payable - {run.PayrollPeriod}",
-                0m,
-                totalDeductions));
-        }
-
         if (totalNetPay > 0m)
         {
-            journalLines.Add(new JournalEntryLine(
-                Guid.NewGuid(),
+            lineBuilders.Add((
                 request.NetSalaryPayableAccountId,
                 $"Net salary payable - {run.PayrollPeriod}",
                 0m,
                 totalNetPay));
+        }
+
+        var groupedLines = lineBuilders
+            .GroupBy(x => new { x.LedgerAccountId, x.Description })
+            .Select(group => new JournalEntryLine(
+                Guid.NewGuid(),
+                group.Key.LedgerAccountId,
+                group.Key.Description,
+                group.Sum(x => x.DebitAmount),
+                group.Sum(x => x.CreditAmount)))
+            .Where(x => x.DebitAmount != 0m || x.CreditAmount != 0m)
+            .ToList();
+
+        var totalDebit = groupedLines.Sum(x => x.DebitAmount);
+        var totalCredit = groupedLines.Sum(x => x.CreditAmount);
+
+        if (groupedLines.Count == 0)
+        {
+            return BadRequest(new { Message = "No payroll journal lines were generated for posting." });
+        }
+
+        if (totalDebit != totalCredit)
+        {
+            return BadRequest(new
+            {
+                Message = "Payroll posting is out of balance. Review pay-element ledger mappings and payroll line items.",
+                TotalDebit = totalDebit,
+                TotalCredit = totalCredit
+            });
         }
 
         var reference = string.IsNullOrWhiteSpace(request.Reference)
@@ -1062,7 +1170,7 @@ public async Task<IActionResult> ImportEmployees(
             string.IsNullOrWhiteSpace(request.Description) ? $"Payroll posting - {run.PayrollPeriod}" : request.Description.Trim(),
             JournalEntryStatus.Approved,
             JournalEntryType.Normal,
-            journalLines);
+            groupedLines);
 
         var postedAtUtc = DateTime.UtcNow;
         journalEntry.MarkPosted(postedAtUtc);
@@ -1091,6 +1199,8 @@ public async Task<IActionResult> ImportEmployees(
         return Ok(new
         {
             Message = "Payroll posted successfully.",
+            PostingDateUtc = postingDateUtc,
+            FiscalPeriod = fiscalPeriod.Name,
             PayrollRun = new
             {
                 run.Id,
@@ -1099,8 +1209,6 @@ public async Task<IActionResult> ImportEmployees(
                 run.JournalEntryId,
                 run.PostedOnUtc,
                 EmployeeCount = run.Lines.Count,
-                TotalGross = totalGross,
-                TotalDeductions = totalDeductions,
                 TotalNetPay = totalNetPay
             },
             JournalEntry = new
@@ -1117,6 +1225,413 @@ public async Task<IActionResult> ImportEmployees(
         });
     }
 
+
+
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+    [HttpPost("run/{runId:guid}/submit")]
+    public async Task<IActionResult> SubmitPayrollRun(
+        [FromRoute] Guid runId,
+        [FromBody] SubmitPayrollRunRequest? request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new { Message = "Tenant context is required.", RequiredHeader = "X-Tenant-Key" });
+        }
+
+        var run = await dbContext.PayrollRuns
+            .Include(x => x.Lines)
+            .FirstOrDefaultAsync(x => x.Id == runId && x.TenantId == tenantContext.TenantId, cancellationToken);
+
+        if (run is null)
+        {
+            return NotFound(new { Message = "Payroll run was not found.", RunId = runId });
+        }
+
+        if (run.Status != 0)
+        {
+            return Conflict(new { Message = "Only draft payroll runs can be submitted.", RunId = runId, run.Status });
+        }
+
+        if (run.Lines.Count == 0)
+        {
+            return BadRequest(new { Message = "Payroll run has no lines to submit.", RunId = runId });
+        }
+
+        run.MarkProcessed();
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Payroll run submitted successfully.",
+            run.Id,
+            run.PayrollPeriod,
+            run.Status,
+            Notes = string.IsNullOrWhiteSpace(request?.Notes) ? null : request!.Notes!.Trim()
+        });
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceJournalsPost)]
+    [HttpPost("run/{runId:guid}/approve")]
+    public async Task<IActionResult> ApprovePayrollRun(
+        [FromRoute] Guid runId,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new { Message = "Tenant context is required.", RequiredHeader = "X-Tenant-Key" });
+        }
+
+        var run = await dbContext.PayrollRuns
+            .FirstOrDefaultAsync(x => x.Id == runId && x.TenantId == tenantContext.TenantId, cancellationToken);
+
+        if (run is null)
+        {
+            return NotFound(new { Message = "Payroll run was not found.", RunId = runId });
+        }
+
+        if (run.Status == 2 || run.JournalEntryId.HasValue)
+        {
+            return Conflict(new { Message = "Posted payroll runs cannot be approved again.", RunId = runId, run.Status });
+        }
+
+        if (run.Status != 1)
+        {
+            return Conflict(new { Message = "Only submitted payroll runs can be approved.", RunId = runId, run.Status });
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Payroll run approved successfully.",
+            run.Id,
+            run.PayrollPeriod,
+            run.Status
+        });
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceJournalsPost)]
+    [HttpPost("run/{runId:guid}/reject")]
+    public async Task<IActionResult> RejectPayrollRun(
+        [FromRoute] Guid runId,
+        [FromBody] RejectPayrollRunRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new { Message = "Tenant context is required.", RequiredHeader = "X-Tenant-Key" });
+        }
+
+        if (request is null || string.IsNullOrWhiteSpace(request.Reason))
+        {
+            return BadRequest(new { Message = "Reject reason is required." });
+        }
+
+        var run = await dbContext.PayrollRuns
+            .FirstOrDefaultAsync(x => x.Id == runId && x.TenantId == tenantContext.TenantId, cancellationToken);
+
+        if (run is null)
+        {
+            return NotFound(new { Message = "Payroll run was not found.", RunId = runId });
+        }
+
+        if (run.Status == 2 || run.JournalEntryId.HasValue || run.PostedOnUtc.HasValue)
+        {
+            return Conflict(new { Message = "Posted payroll runs cannot be rejected.", RunId = runId, run.Status });
+        }
+
+        if (run.Status != 1)
+        {
+            return Conflict(new { Message = "Only submitted payroll runs can be rejected.", RunId = runId, run.Status });
+        }
+
+        dbContext.Entry(run).Property(nameof(PayrollRun.Status)).CurrentValue = 4;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Payroll run rejected successfully.",
+            run.Id,
+            run.PayrollPeriod,
+            Status = 4,
+            Reason = request.Reason.Trim()
+        });
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+    [HttpPost("run/{runId:guid}/reopen")]
+    public async Task<IActionResult> ReopenRejectedPayrollRun(
+        [FromRoute] Guid runId,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new { Message = "Tenant context is required.", RequiredHeader = "X-Tenant-Key" });
+        }
+
+        var run = await dbContext.PayrollRuns
+            .Include(x => x.Lines)
+            .FirstOrDefaultAsync(x => x.Id == runId && x.TenantId == tenantContext.TenantId, cancellationToken);
+
+        if (run is null)
+        {
+            return NotFound(new { Message = "Payroll run was not found.", RunId = runId });
+        }
+
+        if (run.Status != 4)
+        {
+            return Conflict(new { Message = "Only rejected payroll runs can be reopened to draft.", RunId = runId, run.Status });
+        }
+
+        dbContext.Entry(run).Property(nameof(PayrollRun.Status)).CurrentValue = 0;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Rejected payroll run returned to draft successfully.",
+            run.Id,
+            run.PayrollPeriod,
+            Status = 0
+        });
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+    [HttpPost("run/{runId:guid}/resubmit")]
+    public async Task<IActionResult> ResubmitRejectedPayrollRun(
+        [FromRoute] Guid runId,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new { Message = "Tenant context is required.", RequiredHeader = "X-Tenant-Key" });
+        }
+
+        var run = await dbContext.PayrollRuns
+            .Include(x => x.Lines)
+            .FirstOrDefaultAsync(x => x.Id == runId && x.TenantId == tenantContext.TenantId, cancellationToken);
+
+        if (run is null)
+        {
+            return NotFound(new { Message = "Payroll run was not found.", RunId = runId });
+        }
+
+        if (run.Status != 4)
+        {
+            return Conflict(new { Message = "Only rejected payroll runs can be resubmitted.", RunId = runId, run.Status });
+        }
+
+        if (run.Lines.Count == 0)
+        {
+            return BadRequest(new { Message = "Rejected payroll run has no lines to resubmit.", RunId = runId });
+        }
+
+        dbContext.Entry(run).Property(nameof(PayrollRun.Status)).CurrentValue = 1;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Rejected payroll run resubmitted successfully.",
+            run.Id,
+            run.PayrollPeriod,
+            Status = 1
+        });
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+    [HttpDelete("runs/{runId:guid}")]
+    public async Task<IActionResult> DeletePayrollRun(
+        [FromRoute] Guid runId,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new { Message = "Tenant context is required.", RequiredHeader = "X-Tenant-Key" });
+        }
+
+        var run = await dbContext.PayrollRuns
+            .Include(x => x.Lines)
+            .FirstOrDefaultAsync(x => x.Id == runId && x.TenantId == tenantContext.TenantId, cancellationToken);
+
+        if (run is null)
+        {
+            return NotFound(new { Message = "Payroll run was not found.", RunId = runId });
+        }
+
+        if (run.Status != 0 && run.Status != 4)
+        {
+            return Conflict(new
+            {
+                Message = "Only draft or rejected payroll runs can be deleted.",
+                RunId = runId,
+                run.PayrollPeriod,
+                run.Status
+            });
+        }
+
+        if (run.JournalEntryId.HasValue || run.PostedOnUtc.HasValue)
+        {
+            return Conflict(new
+            {
+                Message = "Posted payroll runs cannot be deleted.",
+                RunId = runId,
+                run.PayrollPeriod,
+                run.JournalEntryId,
+                run.PostedOnUtc
+            });
+        }
+
+        var lineIds = run.Lines.Select(x => x.Id).ToList();
+
+        if (lineIds.Count > 0)
+        {
+            var lineItems = await dbContext.Set<PayrollRunLineItem>()
+                .Where(x => x.TenantId == tenantContext.TenantId && lineIds.Contains(x.PayrollRunLineId))
+                .ToListAsync(cancellationToken);
+
+            if (lineItems.Count > 0)
+            {
+                dbContext.Set<PayrollRunLineItem>().RemoveRange(lineItems);
+            }
+
+            dbContext.PayrollRunLines.RemoveRange(run.Lines);
+        }
+
+        dbContext.PayrollRuns.Remove(run);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Payroll run deleted successfully.",
+            run.Id,
+            run.PayrollPeriod
+        });
+    }
+
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceView)]
+    [HttpGet("policy")]
+    public async Task<IActionResult> GetPayrollPolicy(
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new { Message = "Tenant context is required.", RequiredHeader = "X-Tenant-Key" });
+        }
+
+        var policy = await dbContext.Set<PayrollPolicySetting>()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.TenantId == tenantContext.TenantId, cancellationToken);
+
+        if (policy is null)
+        {
+            return Ok(new
+            {
+                Id = Guid.Empty,
+                TenantId = tenantContext.TenantId,
+                EnforceMinimumTakeHome = false,
+                MinimumTakeHomeRuleType = "fixed_amount",
+                MinimumTakeHomeAmount = 0m,
+                MinimumTakeHomePercent = 0m,
+                CurrencyCode = "NGN",
+                CreatedOnUtc = DateTime.UtcNow,
+                UpdatedOnUtc = DateTime.UtcNow
+            });
+        }
+
+        return Ok(policy);
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+    [HttpPut("policy")]
+    public async Task<IActionResult> UpsertPayrollPolicy(
+        [FromBody] UpdatePayrollPolicySettingRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new { Message = "Tenant context is required.", RequiredHeader = "X-Tenant-Key" });
+        }
+
+        if (request.MinimumTakeHomeAmount < 0)
+        {
+            return BadRequest(new { Message = "Minimum take-home amount cannot be negative." });
+        }
+
+        if (request.MinimumTakeHomePercent < 0 || request.MinimumTakeHomePercent > 100)
+        {
+            return BadRequest(new { Message = "Minimum take-home percentage must be between 0 and 100." });
+        }
+
+        var normalizedRuleType = NormalizeMinimumTakeHomeRuleType(request.MinimumTakeHomeRuleType);
+
+        var policy = await dbContext.Set<PayrollPolicySetting>()
+            .FirstOrDefaultAsync(x => x.TenantId == tenantContext.TenantId, cancellationToken);
+
+        if (policy is null)
+        {
+            policy = new PayrollPolicySetting(
+                Guid.NewGuid(),
+                tenantContext.TenantId,
+                request.EnforceMinimumTakeHome,
+                normalizedRuleType,
+                request.MinimumTakeHomeAmount,
+                request.MinimumTakeHomePercent,
+                request.CurrencyCode);
+
+            dbContext.Set<PayrollPolicySetting>().Add(policy);
+        }
+        else
+        {
+            policy.Update(request.EnforceMinimumTakeHome, normalizedRuleType, request.MinimumTakeHomeAmount, request.MinimumTakeHomePercent, request.CurrencyCode);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Payroll policy saved successfully.",
+            policy.Id,
+            policy.EnforceMinimumTakeHome,
+            policy.MinimumTakeHomeRuleType,
+            policy.MinimumTakeHomeAmount,
+            policy.MinimumTakeHomePercent,
+            policy.CurrencyCode
+        });
+    }
 
     [Authorize(Policy = AuthorizationPolicies.FinanceView)]
     [HttpGet("runs")]
@@ -1177,26 +1692,37 @@ public async Task<IActionResult> ImportEmployees(
         }
 
         var employeeIds = run.Lines.Select(x => x.EmployeeId).Distinct().ToList();
+        var runLineIds = run.Lines.Select(x => x.Id).Distinct().ToList();
 
         var employees = await dbContext.PayrollEmployees
             .AsNoTracking()
             .Where(x => employeeIds.Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, cancellationToken);
 
+        var lineItems = await dbContext.Set<PayrollRunLineItem>()
+            .AsNoTracking()
+            .Where(x => runLineIds.Contains(x.PayrollRunLineId))
+            .OrderBy(x => x.Sequence)
+            .ToListAsync(cancellationToken);
+
+        var lineItemLookup = lineItems
+            .GroupBy(x => x.PayrollRunLineId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
         var items = run.Lines
             .OrderBy(x => employees.TryGetValue(x.EmployeeId, out var employee) ? employee.EmployeeNumber : string.Empty)
             .Select(line =>
             {
                 employees.TryGetValue(line.EmployeeId, out var employee);
+                var itemRows = lineItemLookup.TryGetValue(line.Id, out var rows) ? rows : new List<PayrollRunLineItem>();
 
                 return new
                 {
-                    line.Id,
-                    line.TenantId,
+                    PayrollRunLineId = line.Id,
                     line.PayrollRunId,
                     line.EmployeeId,
                     EmployeeNumber = employee?.EmployeeNumber ?? string.Empty,
-                    EmployeeName = employee is null ? string.Empty : $"{employee.FirstName} {employee.LastName}".Trim(),
+                    EmployeeName = employee is null ? string.Empty : string.Join(" ", new[] { employee.FirstName, employee.MiddleName, employee.LastName }.Where(v => !string.IsNullOrWhiteSpace(v))),
                     employee?.Department,
                     employee?.JobTitle,
                     employee?.BankName,
@@ -1205,7 +1731,20 @@ public async Task<IActionResult> ImportEmployees(
                     employee?.TaxIdentificationNumber,
                     line.GrossPay,
                     line.TotalDeductions,
-                    line.NetPay
+                    line.NetPay,
+                    Items = itemRows.Select(item => new
+                    {
+                        item.Id,
+                        item.PayrollRunLineId,
+                        item.PayElementId,
+                        item.Code,
+                        item.Description,
+                        item.ElementKind,
+                        item.CalculationMode,
+                        item.Amount,
+                        item.Sequence,
+                        item.IsTaxable
+                    }).ToList()
                 };
             })
             .ToList();
@@ -1255,6 +1794,7 @@ public async Task<IActionResult> ImportEmployees(
         }
 
         var employeeIds = run.Lines.Select(x => x.EmployeeId).Distinct().ToList();
+        var runLineIds = run.Lines.Select(x => x.Id).Distinct().ToList();
 
         var employees = await dbContext.PayrollEmployees
             .AsNoTracking()
@@ -1267,15 +1807,21 @@ public async Task<IActionResult> ImportEmployees(
             .OrderByDescending(x => x.EffectiveFromUtc)
             .ToListAsync(cancellationToken);
 
+        var lineItems = await dbContext.Set<PayrollRunLineItem>()
+            .AsNoTracking()
+            .Where(x => runLineIds.Contains(x.PayrollRunLineId))
+            .OrderBy(x => x.Sequence)
+            .ToListAsync(cancellationToken);
+
+        var lineItemLookup = lineItems.GroupBy(x => x.PayrollRunLineId).ToDictionary(g => g.Key, g => g.ToList());
+
         var items = run.Lines
             .OrderBy(x => employees.TryGetValue(x.EmployeeId, out var employee) ? employee.EmployeeNumber : string.Empty)
             .Select(line =>
             {
                 employees.TryGetValue(line.EmployeeId, out var employee);
                 var structure = activeStructures.FirstOrDefault(x => x.EmployeeId == line.EmployeeId);
-
-                var deductionLabel = line.TotalDeductions > 0m ? "Statutory/Employee Deductions" : "No deductions";
-                var grossLabel = "Basic Salary / Gross Earnings";
+                var childItems = lineItemLookup.TryGetValue(line.Id, out var rows) ? rows : new List<PayrollRunLineItem>();
 
                 return new
                 {
@@ -1289,7 +1835,7 @@ public async Task<IActionResult> ImportEmployees(
                     run.PostedOnUtc,
                     line.EmployeeId,
                     EmployeeNumber = employee?.EmployeeNumber ?? string.Empty,
-                    EmployeeName = employee is null ? string.Empty : $"{employee.FirstName} {employee.LastName}".Trim(),
+                    EmployeeName = employee is null ? string.Empty : string.Join(" ", new[] { employee.FirstName, employee.MiddleName, employee.LastName }.Where(v => !string.IsNullOrWhiteSpace(v))),
                     employee?.Department,
                     employee?.JobTitle,
                     employee?.Email,
@@ -1299,26 +1845,8 @@ public async Task<IActionResult> ImportEmployees(
                     employee?.PensionNumber,
                     employee?.TaxIdentificationNumber,
                     CurrencyCode = structure?.CurrencyCode ?? "NGN",
-                    Earnings = new[]
-                    {
-                        new
-                        {
-                            Code = "BASIC",
-                            Description = grossLabel,
-                            Amount = line.GrossPay
-                        }
-                    },
-                    Deductions = line.TotalDeductions > 0m
-                        ? new[]
-                        {
-                            new
-                            {
-                                Code = "DED",
-                                Description = deductionLabel,
-                                Amount = line.TotalDeductions
-                            }
-                        }
-                        : Array.Empty<object>(),
+                    Earnings = childItems.Where(x => x.ElementKind == 1).Select(x => new { x.Code, x.Description, x.Amount, x.Sequence }).ToList(),
+                    Deductions = childItems.Where(x => x.ElementKind == 2).Select(x => new { x.Code, x.Description, x.Amount, x.Sequence }).ToList(),
                     line.GrossPay,
                     line.TotalDeductions,
                     line.NetPay
@@ -1344,6 +1872,183 @@ public async Task<IActionResult> ImportEmployees(
             Items = items
         });
     }
+
+
+    // ==========================================
+// PAYROLL / PHASE 1 — PAY GROUP COMPOSITION
+// ==========================================
+
+[Authorize(Policy = AuthorizationPolicies.FinanceView)]
+[HttpGet("pay-group-elements/{payGroupId:guid}")]
+public async Task<IActionResult> GetPayGroupElements(
+    [FromRoute] Guid payGroupId,
+    [FromServices] ApplicationDbContext dbContext,
+    [FromServices] ITenantContextAccessor tenantContextAccessor,
+    CancellationToken cancellationToken)
+{
+    var tenantContext = tenantContextAccessor.Current;
+
+    var items = await dbContext.Set<PayrollPayGroupElement>()
+        .AsNoTracking()
+        .Where(x => x.PayGroupId == payGroupId)
+        .Join(
+            dbContext.PayrollPayGroups.AsNoTracking(),
+            item => item.PayGroupId,
+            group => group.Id,
+            (item, group) => new { item, group })
+        .Join(
+            dbContext.PayrollPayElements.AsNoTracking(),
+            joined => joined.item.PayElementId,
+            element => element.Id,
+            (joined, element) => new
+            {
+                joined.item.Id,
+                joined.item.TenantId,
+                joined.item.PayGroupId,
+                PayGroupCode = joined.group.Code,
+                PayGroupName = joined.group.Name,
+                joined.item.PayElementId,
+                PayElementCode = element.Code,
+                PayElementName = element.Name,
+                element.ElementKind,
+                element.CalculationMode,
+                DefaultAmount = element.DefaultAmount,
+                DefaultRate = element.DefaultRate,
+                joined.item.Sequence,
+                joined.item.AmountOverride,
+                joined.item.RateOverride,
+                joined.item.IsMandatory,
+                joined.item.IsActive,
+                joined.item.EffectiveFromUtc,
+                joined.item.EffectiveToUtc,
+                joined.item.Notes,
+                joined.item.CreatedOnUtc
+            })
+        .OrderBy(x => x.Sequence)
+        .ThenBy(x => x.PayElementCode)
+        .ToListAsync(cancellationToken);
+
+    return Ok(new
+    {
+        TenantContextAvailable = tenantContext.IsAvailable,
+        TenantId = tenantContext.IsAvailable ? tenantContext.TenantId : (Guid?)null,
+        TenantKey = tenantContext.IsAvailable ? tenantContext.TenantKey : null,
+        Count = items.Count,
+        Items = items
+    });
+}
+
+[Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+[HttpPost("pay-group-elements")]
+public async Task<IActionResult> CreatePayGroupElement(
+    [FromBody] CreatePayrollPayGroupElementRequest request,
+    [FromServices] ApplicationDbContext dbContext,
+    [FromServices] ITenantContextAccessor tenantContextAccessor,
+    CancellationToken cancellationToken)
+{
+    var tenantContext = tenantContextAccessor.Current;
+
+    if (!tenantContext.IsAvailable)
+    {
+        return BadRequest(new { Message = "Tenant context is required.", RequiredHeader = "X-Tenant-Key" });
+    }
+
+    var validation = ValidatePayGroupElementRequest(request);
+    if (validation is not null)
+    {
+        return BadRequest(new { Message = validation });
+    }
+
+    var payGroup = await dbContext.PayrollPayGroups.AsNoTracking().FirstOrDefaultAsync(x => x.Id == request.PayGroupId && x.TenantId == tenantContext.TenantId, cancellationToken);
+    if (payGroup is null) return BadRequest(new { Message = "Selected pay group was not found." });
+
+    var payElement = await dbContext.PayrollPayElements.AsNoTracking().FirstOrDefaultAsync(x => x.Id == request.PayElementId && x.TenantId == tenantContext.TenantId, cancellationToken);
+    if (payElement is null) return BadRequest(new { Message = "Selected pay element was not found." });
+
+    var duplicate = await dbContext.Set<PayrollPayGroupElement>().AsNoTracking().AnyAsync(
+        x => x.TenantId == tenantContext.TenantId && x.PayGroupId == request.PayGroupId && x.PayElementId == request.PayElementId,
+        cancellationToken);
+
+    if (duplicate)
+    {
+        return Conflict(new { Message = "The selected pay element is already attached to this pay group.", request.PayGroupId, request.PayElementId });
+    }
+
+    var item = new PayrollPayGroupElement(
+        Guid.NewGuid(),
+        tenantContext.TenantId,
+        request.PayGroupId,
+        request.PayElementId,
+        request.Sequence,
+        request.AmountOverride,
+        request.RateOverride,
+        request.IsMandatory,
+        request.IsActive,
+        request.EffectiveFromUtc,
+        request.EffectiveToUtc,
+        request.Notes);
+
+    dbContext.Set<PayrollPayGroupElement>().Add(item);
+    await dbContext.SaveChangesAsync(cancellationToken);
+
+    return Ok(new { Message = "Pay group composition item created successfully.", item.Id, item.PayGroupId, item.PayElementId, item.Sequence });
+}
+
+[Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+[HttpPut("pay-group-elements/{payGroupElementId:guid}")]
+public async Task<IActionResult> UpdatePayGroupElement(
+    [FromRoute] Guid payGroupElementId,
+    [FromBody] UpdatePayrollPayGroupElementRequest request,
+    [FromServices] ApplicationDbContext dbContext,
+    [FromServices] ITenantContextAccessor tenantContextAccessor,
+    CancellationToken cancellationToken)
+{
+    var tenantContext = tenantContextAccessor.Current;
+
+    if (!tenantContext.IsAvailable)
+    {
+        return BadRequest(new { Message = "Tenant context is required.", RequiredHeader = "X-Tenant-Key" });
+    }
+
+    var validation = ValidatePayGroupElementUpdateRequest(request);
+    if (validation is not null)
+    {
+        return BadRequest(new { Message = validation });
+    }
+
+    var item = await dbContext.Set<PayrollPayGroupElement>().FirstOrDefaultAsync(x => x.Id == payGroupElementId && x.TenantId == tenantContext.TenantId, cancellationToken);
+    if (item is null) return NotFound(new { Message = "Pay group composition item was not found.", PayGroupElementId = payGroupElementId });
+
+    item.Update(request.Sequence, request.AmountOverride, request.RateOverride, request.IsMandatory, request.IsActive, request.EffectiveFromUtc, request.EffectiveToUtc, request.Notes);
+    await dbContext.SaveChangesAsync(cancellationToken);
+
+    return Ok(new { Message = "Pay group composition item updated successfully.", item.Id, item.Sequence, item.IsActive });
+}
+
+[Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+[HttpDelete("pay-group-elements/{payGroupElementId:guid}")]
+public async Task<IActionResult> DeletePayGroupElement(
+    [FromRoute] Guid payGroupElementId,
+    [FromServices] ApplicationDbContext dbContext,
+    [FromServices] ITenantContextAccessor tenantContextAccessor,
+    CancellationToken cancellationToken)
+{
+    var tenantContext = tenantContextAccessor.Current;
+
+    if (!tenantContext.IsAvailable)
+    {
+        return BadRequest(new { Message = "Tenant context is required.", RequiredHeader = "X-Tenant-Key" });
+    }
+
+    var item = await dbContext.Set<PayrollPayGroupElement>().FirstOrDefaultAsync(x => x.Id == payGroupElementId && x.TenantId == tenantContext.TenantId, cancellationToken);
+    if (item is null) return NotFound(new { Message = "Pay group composition item was not found.", PayGroupElementId = payGroupElementId });
+
+    dbContext.Set<PayrollPayGroupElement>().Remove(item);
+    await dbContext.SaveChangesAsync(cancellationToken);
+
+    return Ok(new { Message = "Pay group composition item deleted successfully.", item.Id });
+}
+
 
     [Authorize(Policy = AuthorizationPolicies.FinanceView)]
     [HttpGet("runs/{runId:guid}/statutory-report")]
@@ -1382,7 +2087,7 @@ public async Task<IActionResult> ImportEmployees(
                 {
                     line.EmployeeId,
                     EmployeeNumber = employee?.EmployeeNumber ?? string.Empty,
-                    EmployeeName = employee is null ? string.Empty : $"{employee.FirstName} {employee.LastName}".Trim(),
+                    EmployeeName = employee is null ? string.Empty : string.Join(" ", new[] { employee.FirstName, employee.MiddleName, employee.LastName }.Where(v => !string.IsNullOrWhiteSpace(v))),
                     employee?.Department,
                     employee?.PensionNumber,
                     employee?.TaxIdentificationNumber,
@@ -1466,7 +2171,7 @@ public async Task<IActionResult> ImportEmployees(
             {
                 employee.Id,
                 employee.EmployeeNumber,
-                EmployeeName = $"{employee.FirstName} {employee.LastName}".Trim(),
+                EmployeeName = string.Join(" ", new[] { employee.FirstName, employee.MiddleName, employee.LastName }.Where(v => !string.IsNullOrWhiteSpace(v))),
                 employee.Department,
                 employee.JobTitle,
                 employee.BankName,
@@ -1482,6 +2187,292 @@ public async Task<IActionResult> ImportEmployees(
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.FinanceView)]
+    [HttpGet("salary-structure-overrides/{salaryStructureId:guid}")]
+    public async Task<IActionResult> GetSalaryStructureOverrides(
+        [FromRoute] Guid salaryStructureId,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        var items = await dbContext.Set<PayrollSalaryStructureOverride>()
+            .AsNoTracking()
+            .Where(x => x.PayrollSalaryStructureId == salaryStructureId)
+            .Join(
+                dbContext.PayrollSalaryStructures.AsNoTracking(),
+                item => item.PayrollSalaryStructureId,
+                structure => structure.Id,
+                (item, structure) => new { item, structure })
+            .Join(
+                dbContext.PayrollPayElements.AsNoTracking(),
+                joined => joined.item.PayElementId,
+                element => element.Id,
+                (joined, element) => new
+                {
+                    joined.item.Id,
+                    joined.item.TenantId,
+                    joined.item.PayrollSalaryStructureId,
+                    joined.structure.EmployeeId,
+                    joined.structure.PayGroupId,
+                    joined.item.PayElementId,
+                    PayElementCode = element.Code,
+                    PayElementName = element.Name,
+                    element.ElementKind,
+                    element.CalculationMode,
+                    element.DefaultAmount,
+                    element.DefaultRate,
+                    joined.item.AmountOverride,
+                    joined.item.RateOverride,
+                    joined.item.IsExcluded,
+                    joined.item.IsActive,
+                    joined.item.EffectiveFromUtc,
+                    joined.item.EffectiveToUtc,
+                    joined.item.Notes,
+                    joined.item.CreatedOnUtc
+                })
+            .OrderBy(x => x.PayElementCode)
+            .ToListAsync(cancellationToken);
+
+        return Ok(new
+        {
+            TenantContextAvailable = tenantContext.IsAvailable,
+            TenantId = tenantContext.IsAvailable ? tenantContext.TenantId : (Guid?)null,
+            TenantKey = tenantContext.IsAvailable ? tenantContext.TenantKey : null,
+            Count = items.Count,
+            Items = items
+        });
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+    [HttpPost("salary-structure-overrides")]
+    public async Task<IActionResult> CreateSalaryStructureOverride(
+        [FromBody] CreatePayrollSalaryStructureOverrideRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new { Message = "Tenant context is required.", RequiredHeader = "X-Tenant-Key" });
+        }
+
+        var validation = ValidateSalaryStructureOverrideRequest(request);
+        if (validation is not null)
+        {
+            return BadRequest(new { Message = validation });
+        }
+
+        var structure = await dbContext.PayrollSalaryStructures
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == request.PayrollSalaryStructureId && x.TenantId == tenantContext.TenantId, cancellationToken);
+
+        if (structure is null)
+        {
+            return BadRequest(new { Message = "Selected salary structure was not found." });
+        }
+
+        var payElement = await dbContext.PayrollPayElements
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == request.PayElementId && x.TenantId == tenantContext.TenantId, cancellationToken);
+
+        if (payElement is null)
+        {
+            return BadRequest(new { Message = "Selected pay element was not found." });
+        }
+
+        var duplicate = await dbContext.Set<PayrollSalaryStructureOverride>()
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.TenantId == tenantContext.TenantId &&
+                     x.PayrollSalaryStructureId == request.PayrollSalaryStructureId &&
+                     x.PayElementId == request.PayElementId,
+                cancellationToken);
+
+        if (duplicate)
+        {
+            return Conflict(new
+            {
+                Message = "An override for the selected pay element already exists on this salary structure.",
+                request.PayrollSalaryStructureId,
+                request.PayElementId
+            });
+        }
+
+        var item = new PayrollSalaryStructureOverride(
+            Guid.NewGuid(),
+            tenantContext.TenantId,
+            request.PayrollSalaryStructureId,
+            request.PayElementId,
+            request.AmountOverride,
+            request.RateOverride,
+            request.IsExcluded,
+            request.IsActive,
+            request.EffectiveFromUtc,
+            request.EffectiveToUtc,
+            request.Notes);
+
+        dbContext.Set<PayrollSalaryStructureOverride>().Add(item);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Salary structure override created successfully.",
+            item.Id,
+            item.PayrollSalaryStructureId,
+            item.PayElementId
+        });
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+    [HttpPut("salary-structure-overrides/{salaryStructureOverrideId:guid}")]
+    public async Task<IActionResult> UpdateSalaryStructureOverride(
+        [FromRoute] Guid salaryStructureOverrideId,
+        [FromBody] UpdatePayrollSalaryStructureOverrideRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new { Message = "Tenant context is required.", RequiredHeader = "X-Tenant-Key" });
+        }
+
+        var validation = ValidateSalaryStructureOverrideUpdateRequest(request);
+        if (validation is not null)
+        {
+            return BadRequest(new { Message = validation });
+        }
+
+        var item = await dbContext.Set<PayrollSalaryStructureOverride>()
+            .FirstOrDefaultAsync(x => x.Id == salaryStructureOverrideId && x.TenantId == tenantContext.TenantId, cancellationToken);
+
+        if (item is null)
+        {
+            return NotFound(new { Message = "Salary structure override was not found.", SalaryStructureOverrideId = salaryStructureOverrideId });
+        }
+
+        item.Update(
+            request.AmountOverride,
+            request.RateOverride,
+            request.IsExcluded,
+            request.IsActive,
+            request.EffectiveFromUtc,
+            request.EffectiveToUtc,
+            request.Notes);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Salary structure override updated successfully.",
+            item.Id,
+            item.IsExcluded,
+            item.IsActive
+        });
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+    [HttpDelete("salary-structure-overrides/{salaryStructureOverrideId:guid}")]
+    public async Task<IActionResult> DeleteSalaryStructureOverride(
+        [FromRoute] Guid salaryStructureOverrideId,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new { Message = "Tenant context is required.", RequiredHeader = "X-Tenant-Key" });
+        }
+
+        var item = await dbContext.Set<PayrollSalaryStructureOverride>()
+            .FirstOrDefaultAsync(x => x.Id == salaryStructureOverrideId && x.TenantId == tenantContext.TenantId, cancellationToken);
+
+        if (item is null)
+        {
+            return NotFound(new { Message = "Salary structure override was not found.", SalaryStructureOverrideId = salaryStructureOverrideId });
+        }
+
+        dbContext.Set<PayrollSalaryStructureOverride>().Remove(item);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Salary structure override deleted successfully.",
+            item.Id
+        });
+    }
+
+public sealed record CreatePayrollSalaryStructureOverrideRequest(
+    Guid PayrollSalaryStructureId,
+    Guid PayElementId,
+    decimal? AmountOverride,
+    decimal? RateOverride,
+    bool IsExcluded,
+    bool IsActive,
+    DateTime? EffectiveFromUtc,
+    DateTime? EffectiveToUtc,
+    string? Notes);
+
+public sealed record UpdatePayrollSalaryStructureOverrideRequest(
+    decimal? AmountOverride,
+    decimal? RateOverride,
+    bool IsExcluded,
+    bool IsActive,
+    DateTime? EffectiveFromUtc,
+    DateTime? EffectiveToUtc,
+    string? Notes);
+
+private static string? ValidateSalaryStructureOverrideRequest(CreatePayrollSalaryStructureOverrideRequest request)
+{
+    if (request.PayrollSalaryStructureId == Guid.Empty) return "Salary structure is required.";
+    if (request.PayElementId == Guid.Empty) return "Pay element is required.";
+    if (request.EffectiveFromUtc.HasValue && request.EffectiveToUtc.HasValue && request.EffectiveToUtc < request.EffectiveFromUtc)
+    {
+        return "Effective to date cannot be earlier than effective from date.";
+    }
+    return null;
+}
+
+private static string? ValidateSalaryStructureOverrideUpdateRequest(UpdatePayrollSalaryStructureOverrideRequest request)
+{
+    if (request.EffectiveFromUtc.HasValue && request.EffectiveToUtc.HasValue && request.EffectiveToUtc < request.EffectiveFromUtc)
+    {
+        return "Effective to date cannot be earlier than effective from date.";
+    }
+    return null;
+}
+
+
+public sealed record SubmitPayrollRunRequest(string? Notes);
+public sealed record RejectPayrollRunRequest(string Reason);
+
+public sealed record UpdatePayrollPolicySettingRequest(bool EnforceMinimumTakeHome, string MinimumTakeHomeRuleType, decimal MinimumTakeHomeAmount, decimal MinimumTakeHomePercent, string CurrencyCode);
+
+
+private static DateTime ResolvePayrollRunPostingDateUtc(string payrollPeriod)
+{
+    if (DateTime.TryParse($"{payrollPeriod}-01", out var parsed))
+    {
+        var monthEnd = new DateTime(parsed.Year, parsed.Month, DateTime.DaysInMonth(parsed.Year, parsed.Month), 0, 0, 0, DateTimeKind.Utc);
+        return monthEnd;
+    }
+
+    return DateTime.UtcNow;
+}
+
+private static string NormalizeMinimumTakeHomeRuleType(string? value)
+{
+    var normalized = (value ?? "fixed_amount").Trim().ToLowerInvariant();
+    return normalized == "gross_percentage" ? "gross_percentage" : "fixed_amount";
+}
 
 private static string? ValidateEmployeeRequest(CreatePayrollEmployeeRequest request)
 {
@@ -1501,54 +2492,290 @@ private static string? ValidateEmployeeUpdateRequest(UpdatePayrollEmployeeReques
 }
 
 
-    [HttpPost("run")]
-public async Task<IActionResult> GeneratePayrollRun(
-    [FromQuery] string period,
-    [FromServices] ApplicationDbContext dbContext,
-    [FromServices] ITenantContextAccessor tenantContextAccessor,
-    CancellationToken cancellationToken)
+
+private static string? ValidatePayGroupElementRequest(CreatePayrollPayGroupElementRequest request)
 {
-    var tenant = tenantContextAccessor.Current;
-
-    if (!tenant.IsAvailable)
-        return BadRequest("Tenant required");
-
-    var employees = await dbContext.PayrollEmployees
-        .Where(x => x.IsActive)
-        .ToListAsync(cancellationToken);
-
-    var salaries = await dbContext.PayrollSalaryStructures
-        .Where(x => x.IsActive)
-        .ToListAsync(cancellationToken);
-
-    var run = new PayrollRun(Guid.NewGuid(), tenant.TenantId, period);
-
-    foreach (var emp in employees)
-    {
-        var salary = salaries.FirstOrDefault(x => x.EmployeeId == emp.Id);
-
-        if (salary == null) continue;
-
-        var gross = salary.BasicSalary;
-        var deductions = gross * 0.10m; // TEMP rule (10%)
-
-        var line = new PayrollRunLine(Guid.NewGuid(), tenant.TenantId, run.Id, emp.Id);
-        line.SetValues(gross, deductions);
-
-        run.AddLine(line);
-    }
-
-    dbContext.PayrollRuns.Add(run);
-    await dbContext.SaveChangesAsync(cancellationToken);
-
-    return Ok(new
-    {
-        Message = "Payroll run generated",
-        run.Id,
-        run.PayrollPeriod,
-        EmployeeCount = run.Lines.Count
-    });
+    if (request.PayGroupId == Guid.Empty) return "Pay group is required.";
+    if (request.PayElementId == Guid.Empty) return "Pay element is required.";
+    if (request.Sequence < 1) return "Sequence must be at least 1.";
+    if (request.EffectiveFromUtc.HasValue && request.EffectiveToUtc.HasValue && request.EffectiveToUtc < request.EffectiveFromUtc)
+        return "Effective to date cannot be earlier than effective from date.";
+    return null;
 }
+
+private static string? ValidatePayGroupElementUpdateRequest(UpdatePayrollPayGroupElementRequest request)
+{
+    if (request.Sequence < 1) return "Sequence must be at least 1.";
+    if (request.EffectiveFromUtc.HasValue && request.EffectiveToUtc.HasValue && request.EffectiveToUtc < request.EffectiveFromUtc)
+        return "Effective to date cannot be earlier than effective from date.";
+    return null;
+}
+
+
+
+    [HttpPost("run")]
+    public async Task<IActionResult> GeneratePayrollRun(
+        [FromQuery] string period,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new { Message = "Tenant context is required.", RequiredHeader = "X-Tenant-Key" });
+        }
+
+        if (string.IsNullOrWhiteSpace(period))
+        {
+            return BadRequest(new { Message = "Payroll period is required." });
+        }
+
+        if (!DateTime.TryParse($"{period.Trim()}-01", out var parsedPeriodStart))
+        {
+            return BadRequest(new { Message = "Payroll period must be in YYYY-MM format.", PayrollPeriod = period.Trim() });
+        }
+
+        var periodStartUtc = DateTime.SpecifyKind(new DateTime(parsedPeriodStart.Year, parsedPeriodStart.Month, 1), DateTimeKind.Utc);
+        var periodEndUtc = DateTime.SpecifyKind(periodStartUtc.AddMonths(1).AddDays(-1), DateTimeKind.Utc);
+        var normalizedPeriod = periodStartUtc.ToString("yyyy-MM");
+
+        var existingRun = await dbContext.PayrollRuns
+            .AsNoTracking()
+            .AnyAsync(x => x.TenantId == tenantContext.TenantId && x.PayrollPeriod == normalizedPeriod, cancellationToken);
+
+        if (existingRun)
+        {
+            return Conflict(new { Message = "A payroll run already exists for the selected period.", PayrollPeriod = normalizedPeriod });
+        }
+
+        var employees = await dbContext.PayrollEmployees
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantContext.TenantId && x.IsActive)
+            .OrderBy(x => x.EmployeeNumber)
+            .ToListAsync(cancellationToken);
+
+        if (employees.Count == 0)
+        {
+            return BadRequest(new { Message = "No active payroll employees were found." });
+        }
+
+        var payGroups = await dbContext.PayrollPayGroups
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantContext.TenantId && x.IsActive)
+            .ToDictionaryAsync(x => x.Id, cancellationToken);
+
+        var salaryStructures = await dbContext.PayrollSalaryStructures
+            .AsNoTracking()
+            .Where(x =>
+                x.TenantId == tenantContext.TenantId &&
+                x.IsActive &&
+                x.EffectiveFromUtc <= periodEndUtc)
+            .OrderByDescending(x => x.EffectiveFromUtc)
+            .ToListAsync(cancellationToken);
+
+        var payGroupElements = await dbContext.Set<PayrollPayGroupElement>()
+            .AsNoTracking()
+            .Where(x =>
+                x.TenantId == tenantContext.TenantId &&
+                x.IsActive &&
+                (!x.EffectiveFromUtc.HasValue || x.EffectiveFromUtc.Value <= periodEndUtc) &&
+                (!x.EffectiveToUtc.HasValue || x.EffectiveToUtc.Value >= periodStartUtc))
+            .OrderBy(x => x.Sequence)
+            .ToListAsync(cancellationToken);
+
+        var payElements = await dbContext.PayrollPayElements
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantContext.TenantId && x.IsActive)
+            .ToDictionaryAsync(x => x.Id, cancellationToken);
+
+        var salaryOverrides = await dbContext.Set<PayrollSalaryStructureOverride>()
+            .AsNoTracking()
+            .Where(x =>
+                x.TenantId == tenantContext.TenantId &&
+                x.IsActive &&
+                (!x.EffectiveFromUtc.HasValue || x.EffectiveFromUtc.Value <= periodEndUtc) &&
+                (!x.EffectiveToUtc.HasValue || x.EffectiveToUtc.Value >= periodStartUtc))
+            .ToListAsync(cancellationToken);
+
+        var payrollPolicy = await dbContext.Set<PayrollPolicySetting>()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.TenantId == tenantContext.TenantId, cancellationToken);
+
+        var run = new PayrollRun(Guid.NewGuid(), tenantContext.TenantId, normalizedPeriod);
+        dbContext.PayrollRuns.Add(run);
+
+        var generatedItemCount = 0;
+        var skippedEmployees = new List<object>();
+
+        foreach (var employee in employees)
+        {
+            var structure = salaryStructures.FirstOrDefault(x => x.EmployeeId == employee.Id);
+
+            if (structure is null)
+            {
+                skippedEmployees.Add(new
+                {
+                    employee.Id,
+                    employee.EmployeeNumber,
+                    EmployeeName = string.Join(" ", new[] { employee.FirstName, employee.MiddleName, employee.LastName }.Where(v => !string.IsNullOrWhiteSpace(v))),
+                    Reason = "No active salary structure effective for the selected payroll period."
+                });
+                continue;
+            }
+
+            if (!payGroups.TryGetValue(structure.PayGroupId, out _))
+            {
+                skippedEmployees.Add(new
+                {
+                    employee.Id,
+                    employee.EmployeeNumber,
+                    EmployeeName = string.Join(" ", new[] { employee.FirstName, employee.MiddleName, employee.LastName }.Where(v => !string.IsNullOrWhiteSpace(v))),
+                    Reason = "Assigned pay group was not found or is inactive."
+                });
+                continue;
+            }
+
+            var line = new PayrollRunLine(Guid.NewGuid(), tenantContext.TenantId, run.Id, employee.Id);
+            var lineItems = new List<PayrollRunLineItem>();
+
+            var compositions = payGroupElements
+                .Where(x => x.PayGroupId == structure.PayGroupId)
+                .OrderBy(x => x.Sequence)
+                .ToList();
+
+            var structureOverrides = salaryOverrides
+                .Where(x => x.PayrollSalaryStructureId == structure.Id)
+                .ToDictionary(x => x.PayElementId, x => x);
+
+            var hasBasicInComposition = false;
+
+            foreach (var composition in compositions)
+            {
+                if (!payElements.TryGetValue(composition.PayElementId, out var payElement))
+                {
+                    continue;
+                }
+
+                if (string.Equals(payElement.Code, "BASIC", StringComparison.OrdinalIgnoreCase))
+                {
+                    hasBasicInComposition = true;
+                }
+
+                structureOverrides.TryGetValue(payElement.Id, out var overrideItem);
+
+                if (overrideItem?.IsExcluded == true)
+                {
+                    continue;
+                }
+
+                var rateToUse = overrideItem?.RateOverride
+                    ?? composition.RateOverride
+                    ?? payElement.DefaultRate;
+
+                var amountToUse = overrideItem?.AmountOverride
+                    ?? composition.AmountOverride
+                    ?? payElement.DefaultAmount;
+
+                var usePercentageCalculation =
+                    payElement.CalculationMode == 2 ||
+                    (rateToUse > 0m && overrideItem?.AmountOverride is null && composition.AmountOverride is null);
+
+                var calculatedAmount = usePercentageCalculation
+                    ? Math.Round(structure.BasicSalary * (rateToUse / 100m), 2)
+                    : amountToUse;
+
+                if (string.Equals(payElement.Code, "BASIC", StringComparison.OrdinalIgnoreCase))
+                {
+                    calculatedAmount = structure.BasicSalary;
+                }
+
+                if (calculatedAmount == 0m && !composition.IsMandatory)
+                {
+                    continue;
+                }
+
+                lineItems.Add(new PayrollRunLineItem(
+                    Guid.NewGuid(),
+                    tenantContext.TenantId,
+                    line.Id,
+                    payElement.Id,
+                    payElement.Code,
+                    payElement.Name,
+                    payElement.ElementKind,
+                    usePercentageCalculation ? 2 : payElement.CalculationMode,
+                    calculatedAmount,
+                    composition.Sequence,
+                    payElement.IsTaxable));
+            }
+
+            if (!hasBasicInComposition)
+            {
+                lineItems.Insert(0, new PayrollRunLineItem(
+                    Guid.NewGuid(),
+                    tenantContext.TenantId,
+                    line.Id,
+                    null,
+                    "BASIC",
+                    "Basic Salary",
+                    1,
+                    1,
+                    structure.BasicSalary,
+                    1,
+                    true));
+            }
+
+            var gross = lineItems.Where(x => x.ElementKind == 1).Sum(x => x.Amount);
+            var deductions = lineItems.Where(x => x.ElementKind == 2).Sum(x => x.Amount);
+
+            if (gross < deductions)
+            {
+                skippedEmployees.Add(new
+                {
+                    employee.Id,
+                    employee.EmployeeNumber,
+                    EmployeeName = string.Join(" ", new[] { employee.FirstName, employee.MiddleName, employee.LastName }.Where(v => !string.IsNullOrWhiteSpace(v))),
+                    Reason = "Calculated deductions exceed gross pay."
+                });
+                continue;
+            }
+
+            line.SetValues(gross, deductions);
+            run.AddLine(line);
+
+            dbContext.Set<PayrollRunLineItem>().AddRange(lineItems);
+            generatedItemCount += lineItems.Count;
+        }
+
+        if (run.Lines.Count == 0)
+        {
+            return BadRequest(new
+            {
+                Message = "No payroll lines were generated. Review salary structures, pay groups, and effective dates.",
+                PayrollPeriod = normalizedPeriod,
+                SkippedEmployees = skippedEmployees
+            });
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Payroll run generated successfully.",
+            run.Id,
+            run.PayrollPeriod,
+            PayrollPeriodStartUtc = periodStartUtc,
+            PayrollPeriodEndUtc = periodEndUtc,
+            EmployeeCount = run.Lines.Count,
+            SkippedEmployeeCount = skippedEmployees.Count,
+            SkippedEmployees = skippedEmployees,
+            LineItemCount = generatedItemCount,
+            TotalGrossPay = run.Lines.Sum(x => x.GrossPay),
+            TotalDeductions = run.Lines.Sum(x => x.TotalDeductions),
+            TotalNetPay = run.Lines.Sum(x => x.NetPay)
+        });
+    }
 }
 
 
@@ -1654,4 +2881,26 @@ public sealed record UpdatePayrollSalaryStructureRequest(
     string CurrencyCode,
     DateTime EffectiveFromUtc,
     bool IsActive,
+    string? Notes);
+
+public sealed record CreatePayrollPayGroupElementRequest(
+    Guid PayGroupId,
+    Guid PayElementId,
+    int Sequence,
+    decimal? AmountOverride,
+    decimal? RateOverride,
+    bool IsMandatory,
+    bool IsActive,
+    DateTime? EffectiveFromUtc,
+    DateTime? EffectiveToUtc,
+    string? Notes);
+
+public sealed record UpdatePayrollPayGroupElementRequest(
+    int Sequence,
+    decimal? AmountOverride,
+    decimal? RateOverride,
+    bool IsMandatory,
+    bool IsActive,
+    DateTime? EffectiveFromUtc,
+    DateTime? EffectiveToUtc,
     string? Notes);

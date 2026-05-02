@@ -40,6 +40,10 @@ function pageTitleForPath(pathname: string) {
   if (pathname.startsWith('/sales-invoices')) return 'Sales Invoice Management';
   if (pathname.startsWith('/customer-receipts/rejected')) return 'Rejected Customer Receipts';
   if (pathname.startsWith('/customer-receipts')) return 'Customer Receipt Management';
+  if (pathname.startsWith('/purchase-requisitions/rejected')) return 'Rejected Purchase Requisitions';
+  if (pathname.startsWith('/purchase-requisitions')) return 'Purchase Requisition Management';
+  if (pathname.startsWith('/purchase-orders/rejected')) return 'Rejected Purchase Orders';
+  if (pathname.startsWith('/purchase-orders')) return 'Purchase Order Management';
   if (pathname.startsWith('/vendors')) return 'Vendor Management';
   if (pathname.startsWith('/purchase-invoices/rejected')) return 'Rejected Purchase Invoices';
   if (pathname.startsWith('/purchase-invoices')) return 'Purchase Invoice Management';
@@ -70,6 +74,10 @@ function pageSubtitleForPath(pathname: string) {
   if (pathname.startsWith('/sales-invoices')) return 'Raise and review sales invoices for receivables operations.';
   if (pathname.startsWith('/customer-receipts/rejected')) return 'Correct, resubmit, or delete rejected customer receipts.';
   if (pathname.startsWith('/customer-receipts')) return 'Capture customer collections and apply receipts against receivables.';
+  if (pathname.startsWith('/purchase-requisitions/rejected')) return 'Correct, resubmit, or delete rejected purchase requisitions.';
+  if (pathname.startsWith('/purchase-requisitions')) return 'Raise, review, approve, and control purchase requests before vendor commitment.';
+  if (pathname.startsWith('/purchase-orders/rejected')) return 'Correct, resubmit, or delete rejected purchase orders.';
+  if (pathname.startsWith('/purchase-orders')) return 'Create, approve, issue, and monitor vendor purchase orders.';
   if (pathname.startsWith('/vendors')) return 'Register and maintain accounts payable vendors.';
   if (pathname.startsWith('/purchase-invoices/rejected')) return 'Correct, resubmit, or delete rejected purchase invoices.';
   if (pathname.startsWith('/purchase-invoices')) return 'Capture and manage supplier invoices for payables operations.';

@@ -1834,6 +1834,81 @@ export type ConsolidatedBudgetVsActualResponse = {
 
 export type UpdateJournalEntryRequest = CreateJournalEntryRequest;
 
+
+export type PayrollSalaryStructureOverrideDto = {
+  id: string;
+  tenantId: string;
+  payrollSalaryStructureId: string;
+  employeeId: string;
+  payGroupId: string;
+  payElementId: string;
+  payElementCode: string;
+  payElementName: string;
+  elementKind: number;
+  calculationMode: number;
+  defaultAmount: number;
+  defaultRate: number;
+  amountOverride?: number | null;
+  rateOverride?: number | null;
+  isExcluded: boolean;
+  isActive: boolean;
+  effectiveFromUtc?: string | null;
+  effectiveToUtc?: string | null;
+  notes?: string | null;
+  createdOnUtc: string;
+};
+
+export type PayrollSalaryStructureOverridesResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  count: number;
+  items: PayrollSalaryStructureOverrideDto[];
+};
+
+export type CreatePayrollSalaryStructureOverrideRequest = {
+  payrollSalaryStructureId: string;
+  payElementId: string;
+  amountOverride?: number | null;
+  rateOverride?: number | null;
+  isExcluded: boolean;
+  isActive: boolean;
+  effectiveFromUtc?: string | null;
+  effectiveToUtc?: string | null;
+  notes?: string | null;
+};
+
+export type UpdatePayrollSalaryStructureOverrideRequest = {
+  amountOverride?: number | null;
+  rateOverride?: number | null;
+  isExcluded: boolean;
+  isActive: boolean;
+  effectiveFromUtc?: string | null;
+  effectiveToUtc?: string | null;
+  notes?: string | null;
+};
+
+export async function getPayrollSalaryStructureOverrides(salaryStructureId: string) {
+  const response = await api.get<PayrollSalaryStructureOverridesResponse>(`/api/payroll/salary-structure-overrides/${salaryStructureId}`);
+  return response.data;
+}
+
+export async function createPayrollSalaryStructureOverride(payload: CreatePayrollSalaryStructureOverrideRequest) {
+  const response = await api.post('/api/payroll/salary-structure-overrides', payload);
+  return response.data;
+}
+
+export async function updatePayrollSalaryStructureOverride(salaryStructureOverrideId: string, payload: UpdatePayrollSalaryStructureOverrideRequest) {
+  const response = await api.put(`/api/payroll/salary-structure-overrides/${salaryStructureOverrideId}`, payload);
+  return response.data;
+}
+
+export async function deletePayrollSalaryStructureOverride(salaryStructureOverrideId: string) {
+  const response = await api.delete(`/api/payroll/salary-structure-overrides/${salaryStructureOverrideId}`);
+  return response.data;
+}
+
+
 export async function updateJournalEntry(
   journalEntryId: string,
   payload: UpdateJournalEntryRequest
@@ -4545,6 +4620,438 @@ export type UpdatePayrollSalaryStructureRequest = {
   notes?: string | null;
 };
 
+// ==========================================
+// PAYROLL / PHASE 1 — PAY GROUP COMPOSITION
+// ==========================================
+
+export type PayrollPayGroupElementDto = {
+  id: string;
+  tenantId: string;
+  payGroupId: string;
+  payGroupCode: string;
+  payGroupName: string;
+  payElementId: string;
+  payElementCode: string;
+  payElementName: string;
+  elementKind: number;
+  calculationMode: number;
+  defaultAmount: number;
+  defaultRate: number;
+  sequence: number;
+  amountOverride?: number | null;
+  rateOverride?: number | null;
+  isMandatory: boolean;
+  isActive: boolean;
+  effectiveFromUtc?: string | null;
+  effectiveToUtc?: string | null;
+  notes?: string | null;
+  createdOnUtc: string;
+};
+
+export type PayrollPayGroupElementsResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  count: number;
+  items: PayrollPayGroupElementDto[];
+};
+
+export type CreatePayrollPayGroupElementRequest = {
+  payGroupId: string;
+  payElementId: string;
+  sequence: number;
+  amountOverride?: number | null;
+  rateOverride?: number | null;
+  isMandatory: boolean;
+  isActive: boolean;
+  effectiveFromUtc?: string | null;
+  effectiveToUtc?: string | null;
+  notes?: string | null;
+};
+
+export type UpdatePayrollPayGroupElementRequest = {
+  sequence: number;
+  amountOverride?: number | null;
+  rateOverride?: number | null;
+  isMandatory: boolean;
+  isActive: boolean;
+  effectiveFromUtc?: string | null;
+  effectiveToUtc?: string | null;
+  notes?: string | null;
+};
+
+export type PayrollRunLineItemDto = {
+  id: string;
+  payrollRunLineId: string;
+  payElementId?: string | null;
+  code: string;
+  description: string;
+  elementKind: number;
+  calculationMode: number;
+  amount: number;
+  sequence: number;
+  isTaxable: boolean;
+};
+
+export type PayrollRunLineDetailDto = {
+  payrollRunLineId: string;
+  payrollRunId: string;
+  employeeId: string;
+  employeeNumber: string;
+  employeeName: string;
+  department?: string | null;
+  jobTitle?: string | null;
+  bankName?: string | null;
+  bankAccountNumber?: string | null;
+  pensionNumber?: string | null;
+  taxIdentificationNumber?: string | null;
+  grossPay: number;
+  totalDeductions: number;
+  netPay: number;
+  items: PayrollRunLineItemDto[];
+};
+
+export type PayrollRunDetailDto = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  payrollRun: {
+    id: string;
+    tenantId: string;
+    payrollPeriod: string;
+    runDateUtc: string;
+    status: number;
+    journalEntryId?: string | null;
+    postedOnUtc?: string | null;
+    employeeCount: number;
+    totalGrossPay: number;
+    totalDeductions: number;
+    totalNetPay: number;
+  };
+  count: number;
+  items: PayrollRunLineDetailDto[];
+};
+
+export type PayrollPayslipItemDto = {
+  code: string;
+  description: string;
+  amount: number;
+  sequence: number;
+};
+
+export type PayrollPayslipDto = {
+  payslipNumber: string;
+  payrollRunId: string;
+  payrollRunLineId: string;
+  payrollPeriod: string;
+  runDateUtc: string;
+  status: number;
+  journalEntryId?: string | null;
+  postedOnUtc?: string | null;
+  employeeId: string;
+  employeeNumber: string;
+  employeeName: string;
+  department?: string | null;
+  jobTitle?: string | null;
+  email?: string | null;
+  phoneNumber?: string | null;
+  bankName?: string | null;
+  bankAccountNumber?: string | null;
+  pensionNumber?: string | null;
+  taxIdentificationNumber?: string | null;
+  currencyCode: string;
+  earnings: PayrollPayslipItemDto[];
+  deductions: PayrollPayslipItemDto[];
+  grossPay: number;
+  totalDeductions: number;
+  netPay: number;
+};
+
+export type PayrollStatutoryReportRowDto = {
+  employeeId: string;
+  employeeNumber: string;
+  employeeName: string;
+  department?: string | null;
+  pensionNumber?: string | null;
+  taxIdentificationNumber?: string | null;
+  grossPay: number;
+  statutoryDeductionAmount: number;
+  netPay: number;
+};
+
+
+export type PayrollPolicySettingDto = {
+  id: string;
+  tenantId: string;
+  enforceMinimumTakeHome: boolean;
+  minimumTakeHomeRuleType: 'fixed_amount' | 'gross_percentage';
+  minimumTakeHomeAmount: number;
+  minimumTakeHomePercent: number;
+  currencyCode: string;
+  createdOnUtc: string;
+  updatedOnUtc: string;
+};
+
+export type UpdatePayrollPolicySettingRequest = {
+  enforceMinimumTakeHome: boolean;
+  minimumTakeHomeRuleType: 'fixed_amount' | 'gross_percentage';
+  minimumTakeHomeAmount: number;
+  minimumTakeHomePercent: number;
+  currencyCode: string;
+};
+
+
+export type PurchaseRequisitionLineDto = {
+  id: string;
+  inventoryItemId?: string | null;
+  description: string;
+  quantity: number;
+  estimatedUnitPrice: number;
+  notes?: string | null;
+};
+
+export type PurchaseRequisitionDto = {
+  id: string;
+  tenantId: string;
+  requisitionNumber: string;
+  requestDateUtc: string;
+  requestedByName: string;
+  department?: string | null;
+  neededByUtc?: string | null;
+  purpose: string;
+  status: number;
+  notes?: string | null;
+  createdOnUtc?: string | null;
+  lineCount?: number;
+  estimatedTotalAmount?: number;
+  lines?: PurchaseRequisitionLineDto[];
+};
+
+export type PurchaseRequisitionListResponse = ListEnvelope<PurchaseRequisitionDto>;
+
+export type PurchaseOrderLineDto = {
+  id: string;
+  purchaseRequisitionLineId?: string | null;
+  inventoryItemId?: string | null;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  notes?: string | null;
+};
+
+export type PurchaseOrderDto = {
+  id: string;
+  tenantId: string;
+  purchaseOrderNumber: string;
+  purchaseRequisitionId?: string | null;
+  purchaseRequisitionNumber?: string | null;
+  vendorId: string;
+  vendorName?: string | null;
+  orderDateUtc: string;
+  expectedDeliveryUtc?: string | null;
+  currencyCode: string;
+  status: number;
+  notes?: string | null;
+  createdOnUtc?: string | null;
+  lineCount?: number;
+  totalAmount?: number;
+  lines?: PurchaseOrderLineDto[];
+};
+
+export type PurchaseOrderListResponse = ListEnvelope<PurchaseOrderDto>;
+
+export type CreatePurchaseRequisitionLineRequest = {
+  inventoryItemId?: string | null;
+  description: string;
+  quantity: number;
+  estimatedUnitPrice: number;
+  notes?: string | null;
+};
+
+export type CreatePurchaseRequisitionRequest = {
+  requestDateUtc: string;
+  requestedByName: string;
+  department?: string | null;
+  neededByUtc?: string | null;
+  purpose: string;
+  notes?: string | null;
+  lines: CreatePurchaseRequisitionLineRequest[];
+};
+
+export type UpdatePurchaseRequisitionRequest = CreatePurchaseRequisitionRequest;
+
+export type CreatePurchaseOrderFromRequisitionRequest = {
+  vendorId: string;
+  orderDateUtc: string;
+  expectedDeliveryUtc?: string | null;
+  currencyCode: string;
+  notes?: string | null;
+};
+
+export type PurchaseOrderLineRequest = {
+  purchaseRequisitionLineId?: string | null;
+  inventoryItemId?: string | null;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  notes?: string | null;
+};
+
+export type UpdatePurchaseOrderRequest = {
+  vendorId: string;
+  orderDateUtc: string;
+  expectedDeliveryUtc?: string | null;
+  currencyCode: string;
+  notes?: string | null;
+  lines: PurchaseOrderLineRequest[];
+};
+
+export async function getPurchaseRequisitions() {
+  const { data } = await api.get<PurchaseRequisitionListResponse>('/api/finance/procurement/requisitions');
+  return data;
+}
+
+export async function getRejectedPurchaseRequisitions() {
+  const { data } = await api.get<PurchaseRequisitionListResponse>('/api/finance/procurement/requisitions/rejected');
+  return data;
+}
+
+export async function createPurchaseRequisition(request: CreatePurchaseRequisitionRequest) {
+  const { data } = await api.post('/api/finance/procurement/requisitions', request);
+  return data;
+}
+
+export async function updatePurchaseRequisition(requisitionId: string, request: UpdatePurchaseRequisitionRequest) {
+  const { data } = await api.put(`/api/finance/procurement/requisitions/${requisitionId}`, request);
+  return data;
+}
+
+export async function submitPurchaseRequisition(requisitionId: string) {
+  const { data } = await api.post(`/api/finance/procurement/requisitions/${requisitionId}/submit`);
+  return data;
+}
+
+export async function approvePurchaseRequisition(requisitionId: string) {
+  const { data } = await api.post(`/api/finance/procurement/requisitions/${requisitionId}/approve`);
+  return data;
+}
+
+export async function rejectPurchaseRequisition(requisitionId: string, reason: string) {
+  const { data } = await api.post(`/api/finance/procurement/requisitions/${requisitionId}/reject`, { reason });
+  return data;
+}
+
+export async function deletePurchaseRequisition(requisitionId: string) {
+  const { data } = await api.delete(`/api/finance/procurement/requisitions/${requisitionId}`);
+  return data;
+}
+
+export async function getPurchaseOrders() {
+  const { data } = await api.get<PurchaseOrderListResponse>('/api/finance/procurement/purchase-orders');
+  return data;
+}
+
+export async function getRejectedPurchaseOrders() {
+  const { data } = await api.get<PurchaseOrderListResponse>('/api/finance/procurement/purchase-orders/rejected');
+  return data;
+}
+
+export async function createPurchaseOrderFromRequisition(requisitionId: string, request: CreatePurchaseOrderFromRequisitionRequest) {
+  const { data } = await api.post(`/api/finance/procurement/purchase-orders/from-requisition/${requisitionId}`, request);
+  return data;
+}
+
+export async function updatePurchaseOrder(purchaseOrderId: string, request: UpdatePurchaseOrderRequest) {
+  const { data } = await api.put(`/api/finance/procurement/purchase-orders/${purchaseOrderId}`, request);
+  return data;
+}
+
+export async function submitPurchaseOrder(purchaseOrderId: string) {
+  const { data } = await api.post(`/api/finance/procurement/purchase-orders/${purchaseOrderId}/submit`);
+  return data;
+}
+
+export async function approvePurchaseOrder(purchaseOrderId: string) {
+  const { data } = await api.post(`/api/finance/procurement/purchase-orders/${purchaseOrderId}/approve`);
+  return data;
+}
+
+export async function rejectPurchaseOrder(purchaseOrderId: string, reason: string) {
+  const { data } = await api.post(`/api/finance/procurement/purchase-orders/${purchaseOrderId}/reject`, { reason });
+  return data;
+}
+
+export async function deletePurchaseOrder(purchaseOrderId: string) {
+  const { data } = await api.delete(`/api/finance/procurement/purchase-orders/${purchaseOrderId}`);
+  return data;
+}
+
+
+export async function reopenRejectedPayrollRun(runId: string) {
+  const response = await api.post(`/api/payroll/run/${runId}/reopen`);
+  return response.data;
+}
+
+export async function resubmitRejectedPayrollRun(runId: string) {
+  const response = await api.post(`/api/payroll/run/${runId}/resubmit`);
+  return response.data;
+}
+
+
+export async function getPayrollPolicySetting() {
+  const response = await api.get<PayrollPolicySettingDto>('/api/payroll/policy');
+  return response.data;
+}
+
+export async function upsertPayrollPolicySetting(payload: UpdatePayrollPolicySettingRequest) {
+  const response = await api.put('/api/payroll/policy', payload);
+  return response.data;
+}
+
+
+
+export async function getPayrollRunDetail(runId: string) {
+  const response = await api.get<PayrollRunDetailDto>(`/api/payroll/runs/${runId}`);
+  return response.data;
+}
+
+export async function getPayrollPayslips(runId: string) {
+  const response = await api.get<{ tenantContextAvailable: boolean; tenantId: string | null; tenantKey: string | null; payrollRun: any; count: number; items: PayrollPayslipDto[] }>(`/api/payroll/runs/${runId}/payslips`);
+  return response.data;
+}
+
+export async function getPayrollStatutoryReport(runId: string) {
+  const response = await api.get<{ tenantContextAvailable: boolean; tenantId: string | null; tenantKey: string | null; payrollRun: any; count: number; totalGrossPay: number; totalStatutoryDeductions: number; totalNetPay: number; items: PayrollStatutoryReportRowDto[] }>(`/api/payroll/runs/${runId}/statutory-report`);
+  return response.data;
+}
+
+export async function getEmployeePayrollHistory(employeeId: string) {
+  const response = await api.get(`/api/payroll/employees/${employeeId}/history`);
+  return response.data;
+}
+
+
+export async function getPayrollPayGroupElements(payGroupId: string) {
+  const response = await api.get<PayrollPayGroupElementsResponse>(`/api/payroll/pay-group-elements/${payGroupId}`);
+  return response.data;
+}
+
+export async function createPayrollPayGroupElement(payload: CreatePayrollPayGroupElementRequest) {
+  const response = await api.post('/api/payroll/pay-group-elements', payload);
+  return response.data;
+}
+
+export async function updatePayrollPayGroupElement(payGroupElementId: string, payload: UpdatePayrollPayGroupElementRequest) {
+  const response = await api.put(`/api/payroll/pay-group-elements/${payGroupElementId}`, payload);
+  return response.data;
+}
+
+export async function deletePayrollPayGroupElement(payGroupElementId: string) {
+  const response = await api.delete(`/api/payroll/pay-group-elements/${payGroupElementId}`);
+  return response.data;
+}
+
+
 export async function getPayrollEmployees() {
   const response = await api.get<PayrollEmployeesResponse>('/api/payroll/employees');
   return response.data;
@@ -4701,13 +5208,6 @@ export type PayrollRunSummaryDto = {
   journalEntryId?: string | null;
 };
 
-export type PayrollRunDetailDto = {
-  items: any[];
-};
-
-export type PayrollPayslipDto = any;
-
-export type PayrollStatutoryReportRowDto = any;
 
 // GET RUNS
 export async function getPayrollRuns() {
@@ -4715,30 +5215,73 @@ export async function getPayrollRuns() {
   return res.data;
 }
 
-// GET RUN DETAIL
-export async function getPayrollRunDetail(runId: string) {
-  const res = await api.get(`/api/payroll/run/${runId}`);
-  return res.data;
-}
-
-// GET PAYSLIPS
-export async function getPayrollPayslips(runId: string) {
-  const res = await api.get(`/api/payroll/run/${runId}/payslips`);
-  return res.data;
-}
-
-// GET STATUTORY REPORT
-export async function getPayrollStatutoryReport(runId: string) {
-  const res = await api.get(`/api/payroll/run/${runId}/statutory`);
-  return res.data;
-}
-
-// EMPLOYEE HISTORY
-export async function getEmployeePayrollHistory(employeeId: string) {
-  const res = await api.get(`/api/payroll/employee/${employeeId}/history`);
-  return res.data;
-}
-
 export function canPostJournals() {
   return true; // temporary until role system enforced
+}
+
+export async function deletePayrollRun(runId: string) {
+  const response = await api.delete(`/api/payroll/runs/${runId}`);
+  return response.data;
+}
+
+
+export type PurchaseOrderReceiptLineDto = {
+  id: string;
+  purchaseOrderLineId: string;
+  inventoryItemId?: string | null;
+  description: string;
+  quantity: number;
+  unitCost: number;
+  receiptKind: number;
+  notes?: string | null;
+};
+
+export type PurchaseOrderReceiptDto = {
+  id: string;
+  tenantId: string;
+  receiptNumber: string;
+  purchaseOrderId: string;
+  warehouseId?: string | null;
+  warehouseName?: string | null;
+  purchaseOrderNumber?: string | null;
+  receiptDateUtc: string;
+  status: number;
+  notes?: string | null;
+  inventoryTransactionId?: string | null;
+  journalEntryId?: string | null;
+  createdOnUtc: string;
+  lineCount: number;
+  totalAmount: number;
+  lines: PurchaseOrderReceiptLineDto[];
+};
+
+export type PurchaseOrderReceiptsResponse = ListEnvelope<PurchaseOrderReceiptDto>;
+
+export type CreatePurchaseOrderReceiptLineRequest = {
+  purchaseOrderLineId: string;
+  inventoryItemId?: string | null;
+  description?: string | null;
+  quantity: number;
+  unitCost: number;
+  notes?: string | null;
+};
+
+export type CreatePurchaseOrderReceiptRequest = {
+  purchaseOrderId: string;
+  warehouseId?: string | null;
+  inventoryLedgerAccountId?: string | null;
+  receiptClearingLedgerAccountId?: string | null;
+  receiptDateUtc: string;
+  notes?: string | null;
+  lines: CreatePurchaseOrderReceiptLineRequest[];
+};
+
+export async function getPurchaseOrderReceipts() {
+  const { data } = await api.get<PurchaseOrderReceiptsResponse>('/api/finance/procurement/purchase-order-receipts');
+  return data;
+}
+
+export async function createPurchaseOrderReceipt(request: CreatePurchaseOrderReceiptRequest) {
+  const { data } = await api.post('/api/finance/procurement/purchase-order-receipts', request);
+  return data;
 }

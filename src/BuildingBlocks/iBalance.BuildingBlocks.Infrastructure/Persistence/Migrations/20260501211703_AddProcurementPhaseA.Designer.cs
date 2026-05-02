@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using iBalance.BuildingBlocks.Infrastructure.Persistence;
 namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260501211703_AddProcurementPhaseA")]
+    partial class AddProcurementPhaseA
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2449,92 +2452,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.ToTable("PurchaseOrderLines", "finance");
                 });
 
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PurchaseOrderReceipt", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("InventoryTransactionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("JournalEntryId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("LastModifiedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Notes")
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("PurchaseOrderId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("ReceiptDateUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ReceiptNumber")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("WarehouseId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("PurchaseOrderReceipts", "public");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PurchaseOrderReceiptLine", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid?>("InventoryItemId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Notes")
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("PurchaseOrderLineId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("PurchaseOrderReceiptId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Quantity")
-                        .HasColumnType("numeric");
-
-                    b.Property<int>("ReceiptKind")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("UnitCost")
-                        .HasColumnType("numeric");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PurchaseOrderReceiptId");
-
-                    b.ToTable("PurchaseOrderReceiptLines", "public");
-                });
-
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PurchaseRequisition", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4061,15 +3978,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PurchaseOrderReceiptLine", b =>
-                {
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.PurchaseOrderReceipt", null)
-                        .WithMany("Lines")
-                        .HasForeignKey("PurchaseOrderReceiptId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PurchaseRequisitionLine", b =>
                 {
                     b.HasOne("iBalance.Modules.Finance.Domain.Entities.InventoryItem", null)
@@ -4269,11 +4177,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PurchaseOrder", b =>
-                {
-                    b.Navigation("Lines");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PurchaseOrderReceipt", b =>
                 {
                     b.Navigation("Lines");
                 });

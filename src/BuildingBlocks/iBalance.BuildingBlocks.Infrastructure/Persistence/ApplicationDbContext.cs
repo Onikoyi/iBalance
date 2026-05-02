@@ -79,6 +79,17 @@ public class ApplicationDbContext : DbContext
     public DbSet<PayrollSalaryStructure> PayrollSalaryStructures => Set<PayrollSalaryStructure>();
     public DbSet<PayrollRun> PayrollRuns => Set<PayrollRun>();
     public DbSet<PayrollRunLine> PayrollRunLines => Set<PayrollRunLine>();
+    public DbSet<PayrollPayGroupElement> PayrollPayGroupElements => Set<PayrollPayGroupElement>();
+    public DbSet<PayrollRunLineItem> PayrollRunLineItems => Set<PayrollRunLineItem>();
+    public DbSet<PayrollSalaryStructureOverride> PayrollSalaryStructureOverrides => Set<PayrollSalaryStructureOverride>();
+    public DbSet<PayrollPolicySetting> PayrollPolicySettings => Set<PayrollPolicySetting>();
+    public DbSet<PurchaseRequisition> PurchaseRequisitions => Set<PurchaseRequisition>();
+    public DbSet<PurchaseRequisitionLine> PurchaseRequisitionLines => Set<PurchaseRequisitionLine>();
+    public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
+    public DbSet<PurchaseOrderLine> PurchaseOrderLines => Set<PurchaseOrderLine>();
+    public DbSet<PurchaseOrderReceipt> PurchaseOrderReceipts => Set<PurchaseOrderReceipt>();
+    public DbSet<PurchaseOrderReceiptLine> PurchaseOrderReceiptLines => Set<PurchaseOrderReceiptLine>();
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -870,6 +881,7 @@ modelBuilder.Entity<BudgetTransfer>(entity =>
             entity.HasKey(x => x.Id);
             entity.Property(x => x.EmployeeNumber).HasMaxLength(80).IsRequired();
             entity.Property(x => x.FirstName).HasMaxLength(150).IsRequired();
+            entity.Property(x => x.MiddleName).HasMaxLength(150);
             entity.Property(x => x.LastName).HasMaxLength(150).IsRequired();
             entity.Property(x => x.Email).HasMaxLength(256);
             entity.Property(x => x.PhoneNumber).HasMaxLength(80);
@@ -911,6 +923,47 @@ modelBuilder.Entity<BudgetTransfer>(entity =>
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
         });
+
+        modelBuilder.Entity<PayrollPayGroupElement>(entity =>
+        {
+            entity.ToTable("PayrollPayGroupElements", "finance");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Sequence).IsRequired();
+            entity.Property(x => x.AmountOverride).HasPrecision(18, 2);
+            entity.Property(x => x.RateOverride).HasPrecision(18, 6);
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.TenantId, x.PayGroupId, x.PayElementId }).IsUnique();
+            entity.HasIndex(x => new { x.TenantId, x.PayGroupId, x.Sequence });
+            entity.HasOne<PayrollPayGroup>()
+                .WithMany()
+                .HasForeignKey(x => x.PayGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<PayrollPayElement>()
+                .WithMany()
+                .HasForeignKey(x => x.PayElementId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<PayrollSalaryStructureOverride>(entity =>
+            {
+                entity.ToTable("PayrollSalaryStructureOverrides", "finance");
+                entity.HasKey(x => x.Id);
+                entity.Property(x => x.AmountOverride).HasPrecision(18, 2);
+                entity.Property(x => x.RateOverride).HasPrecision(18, 6);
+                entity.Property(x => x.Notes).HasMaxLength(1000);
+                entity.HasIndex(x => new { x.TenantId, x.PayrollSalaryStructureId, x.PayElementId }).IsUnique();
+                entity.HasOne<PayrollSalaryStructure>()
+                    .WithMany()
+                    .HasForeignKey(x => x.PayrollSalaryStructureId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne<PayrollPayElement>()
+                    .WithMany()
+                    .HasForeignKey(x => x.PayElementId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+            });
+
 
         modelBuilder.Entity<PayrollSalaryStructure>(entity =>
         {
@@ -957,6 +1010,116 @@ modelBuilder.Entity<PayrollRunLine>(entity =>
 
     entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
 });
+
+
+modelBuilder.Entity<PayrollPolicySetting>(entity =>
+{
+    entity.ToTable("PayrollPolicySettings", "finance");
+    entity.HasKey(x => x.Id);
+    entity.Property(x => x.MinimumTakeHomeRuleType).HasMaxLength(40).IsRequired();
+    entity.Property(x => x.MinimumTakeHomeAmount).HasPrecision(18, 2);
+    entity.Property(x => x.MinimumTakeHomePercent).HasPrecision(18, 4);
+    entity.Property(x => x.CurrencyCode).HasMaxLength(10).IsRequired();
+    entity.HasIndex(x => x.TenantId).IsUnique();
+    entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+});
+
+
+modelBuilder.Entity<PayrollRunLineItem>(entity =>
+{
+    entity.ToTable("PayrollRunLineItems", "finance");
+    entity.HasKey(x => x.Id);
+    entity.Property(x => x.Code).HasMaxLength(80).IsRequired();
+    entity.Property(x => x.Description).HasMaxLength(250).IsRequired();
+    entity.Property(x => x.Amount).HasPrecision(18, 2);
+    entity.Property(x => x.Sequence).IsRequired();
+    entity.HasIndex(x => new { x.TenantId, x.PayrollRunLineId, x.Sequence });
+    entity.HasOne<PayrollRunLine>()
+        .WithMany()
+        .HasForeignKey(x => x.PayrollRunLineId)
+        .OnDelete(DeleteBehavior.Cascade);
+    entity.HasOne<PayrollPayElement>()
+        .WithMany()
+        .HasForeignKey(x => x.PayElementId)
+        .OnDelete(DeleteBehavior.Restrict);
+    entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+});
+
+
+modelBuilder.Entity<PurchaseRequisition>(entity =>
+{
+    entity.ToTable("PurchaseRequisitions", "finance");
+    entity.HasKey(x => x.Id);
+    entity.Property(x => x.RequisitionNumber).HasMaxLength(50).IsRequired();
+    entity.Property(x => x.RequestedByName).HasMaxLength(200).IsRequired();
+    entity.Property(x => x.Department).HasMaxLength(200);
+    entity.Property(x => x.Purpose).HasMaxLength(500).IsRequired();
+    entity.Property(x => x.Notes).HasMaxLength(1000);
+    entity.HasMany<PurchaseRequisitionLine>(nameof(PurchaseRequisition.Lines))
+        .WithOne()
+        .HasForeignKey(x => x.PurchaseRequisitionId)
+        .OnDelete(DeleteBehavior.Cascade);
+    entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+});
+
+modelBuilder.Entity<PurchaseRequisitionLine>(entity =>
+{
+    entity.ToTable("PurchaseRequisitionLines", "finance");
+    entity.HasKey(x => x.Id);
+    entity.Property(x => x.Description).HasMaxLength(500).IsRequired();
+    entity.Property(x => x.Quantity).HasPrecision(18, 4);
+    entity.Property(x => x.EstimatedUnitPrice).HasPrecision(18, 2);
+    entity.Property(x => x.Notes).HasMaxLength(1000);
+    entity.HasOne<InventoryItem>()
+        .WithMany()
+        .HasForeignKey(x => x.InventoryItemId)
+        .OnDelete(DeleteBehavior.Restrict);
+    entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+});
+
+modelBuilder.Entity<PurchaseOrder>(entity =>
+{
+    entity.ToTable("PurchaseOrders", "finance");
+    entity.HasKey(x => x.Id);
+    entity.Property(x => x.PurchaseOrderNumber).HasMaxLength(50).IsRequired();
+    entity.Property(x => x.CurrencyCode).HasMaxLength(10).IsRequired();
+    entity.Property(x => x.Notes).HasMaxLength(1000);
+    entity.HasMany<PurchaseOrderLine>(nameof(PurchaseOrder.Lines))
+        .WithOne()
+        .HasForeignKey(x => x.PurchaseOrderId)
+        .OnDelete(DeleteBehavior.Cascade);
+    entity.HasOne<Vendor>()
+        .WithMany()
+        .HasForeignKey(x => x.VendorId)
+        .OnDelete(DeleteBehavior.Restrict);
+    entity.HasOne<PurchaseRequisition>()
+        .WithMany()
+        .HasForeignKey(x => x.PurchaseRequisitionId)
+        .OnDelete(DeleteBehavior.Restrict);
+    entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+});
+
+modelBuilder.Entity<PurchaseOrderLine>(entity =>
+{
+    entity.ToTable("PurchaseOrderLines", "finance");
+    entity.HasKey(x => x.Id);
+    entity.Property(x => x.Description).HasMaxLength(500).IsRequired();
+    entity.Property(x => x.Quantity).HasPrecision(18, 4);
+    entity.Property(x => x.UnitPrice).HasPrecision(18, 2);
+    entity.Property(x => x.ReceivedQuantity).HasPrecision(18, 4);
+    entity.Property(x => x.InvoicedQuantity).HasPrecision(18, 4);
+    entity.Property(x => x.Notes).HasMaxLength(1000);
+    entity.HasOne<PurchaseRequisitionLine>()
+        .WithMany()
+        .HasForeignKey(x => x.PurchaseRequisitionLineId)
+        .OnDelete(DeleteBehavior.Restrict);
+    entity.HasOne<InventoryItem>()
+        .WithMany()
+        .HasForeignKey(x => x.InventoryItemId)
+        .OnDelete(DeleteBehavior.Restrict);
+    entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+});
+
 
 }
 
@@ -1027,7 +1190,3 @@ modelBuilder.Entity<PayrollRunLine>(entity =>
         }
     }
 }
-
-
-
-

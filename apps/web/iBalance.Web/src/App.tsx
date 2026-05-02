@@ -23,6 +23,11 @@ import { VendorPaymentsPage } from './pages/VendorPaymentsPage';
 import { RejectedVendorPaymentsPage } from './pages/RejectedVendorPaymentsPage';
 import { VendorPaymentVoucherPrintPage } from './pages/VendorPaymentVoucherPrintPage';
 import { VendorStatementPage } from './pages/VendorStatementPage';
+import { RejectedPurchaseOrdersPage } from './pages/RejectedPurchaseOrdersPage';
+import { PurchaseOrdersPage } from './pages/PurchaseOrdersPage';
+import { PurchaseOrderReceiptsPage } from './pages/PurchaseOrderReceiptsPage';
+import { RejectedPurchaseRequisitionsPage } from './pages/RejectedPurchaseRequisitionsPage';
+import { PurchaseRequisitionsPage } from './pages/PurchaseRequisitionsPage';
 import { BudgetsPage } from './pages/BudgetsPage';
 import { RejectedBudgetsPage } from './pages/RejectedBudgetsPage';
 import { BudgetVsActualPage } from './pages/BudgetVsActualPage';
@@ -43,6 +48,7 @@ import { PayrollSetupPage } from './pages/PayrollSetupPage';
 import { PayrollRunsPage } from './pages/PayrollRunsPage';
 import { PayrollPayslipsPage } from './pages/PayrollPayslipsPage';
 import { PayrollReportsPage } from './pages/PayrollReportsPage';
+import { RejectPayrollRunsPage } from './pages/RejectPayrollRunsPage';
 
 import { LoginPage } from './pages/auth/LoginPage';
 import { SignUpPage } from './pages/auth/SignUpPage';
@@ -220,6 +226,57 @@ export default function App() {
           <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
             <AppShell>
               <VendorStatementPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/purchase-requisitions"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <PurchaseRequisitionsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/purchase-requisitions/rejected"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <RejectedPurchaseRequisitionsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/purchase-orders"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <PurchaseOrdersPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/purchase-order-receipts"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <PurchaseOrderReceiptsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/purchase-orders/rejected"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <RejectedPurchaseOrdersPage />
             </AppShell>
           </RequireAuth>
         }
@@ -464,6 +521,16 @@ export default function App() {
           <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
             <AppShell>
               <PayrollReportsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/payroll/runs/rejected"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin', 'TenantAdmin', 'Accountant', 'Approver', 'Viewer']}>
+            <AppShell>
+              <RejectPayrollRunsPage />
             </AppShell>
           </RequireAuth>
         }

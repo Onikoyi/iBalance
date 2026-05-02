@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using iBalance.BuildingBlocks.Infrastructure.Persistence;
 namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260430070407_AddPayrollPayGroupComposition")]
+    partial class AddPayrollPayGroupComposition
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1880,50 +1883,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.ToTable("PayrollPayGroupElements", "finance");
                 });
 
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PayrollPolicySetting", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CurrencyCode")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<bool>("EnforceMinimumTakeHome")
-                        .HasColumnType("boolean");
-
-                    b.Property<decimal>("MinimumTakeHomeAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<decimal>("MinimumTakeHomePercent")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<string>("MinimumTakeHomeRuleType")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("UpdatedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId")
-                        .IsUnique();
-
-                    b.ToTable("PayrollPolicySettings", "finance");
-                });
-
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PayrollRun", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1989,61 +1948,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.ToTable("PayrollRunLines", "finance");
                 });
 
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PayrollRunLineItem", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Amount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<int>("CalculationMode")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
-
-                    b.Property<DateTime>("CreatedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(250)
-                        .HasColumnType("character varying(250)");
-
-                    b.Property<int>("ElementKind")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("IsTaxable")
-                        .HasColumnType("boolean");
-
-                    b.Property<Guid?>("PayElementId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("PayrollRunLineId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Sequence")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PayElementId");
-
-                    b.HasIndex("PayrollRunLineId");
-
-                    b.HasIndex("TenantId", "PayrollRunLineId", "Sequence");
-
-                    b.ToTable("PayrollRunLineItems", "finance");
-                });
-
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PayrollSalaryStructure", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2090,60 +1994,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "EmployeeId", "EffectiveFromUtc");
 
                     b.ToTable("PayrollSalaryStructures", "finance");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PayrollSalaryStructureOverride", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal?>("AmountOverride")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<DateTime>("CreatedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("EffectiveFromUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("EffectiveToUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsExcluded")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<Guid>("PayElementId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("PayrollSalaryStructureId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal?>("RateOverride")
-                        .HasPrecision(18, 6)
-                        .HasColumnType("numeric(18,6)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PayElementId");
-
-                    b.HasIndex("PayrollSalaryStructureId");
-
-                    b.HasIndex("TenantId", "PayrollSalaryStructureId", "PayElementId")
-                        .IsUnique();
-
-                    b.ToTable("PayrollSalaryStructureOverrides", "finance");
                 });
 
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PurchaseInvoice", b =>
@@ -2340,292 +2190,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.HasIndex("TaxLedgerAccountId");
 
                     b.ToTable("PurchaseInvoiceTaxLines", "public");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PurchaseOrder", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CurrencyCode")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<DateTime?>("ExpectedDeliveryUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("LastModifiedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<DateTime>("OrderDateUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("PurchaseOrderNumber")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<Guid?>("PurchaseRequisitionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("VendorId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PurchaseRequisitionId");
-
-                    b.HasIndex("VendorId");
-
-                    b.ToTable("PurchaseOrders", "finance");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PurchaseOrderLine", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<Guid?>("InventoryItemId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("InvoicedQuantity")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<Guid>("PurchaseOrderId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("PurchaseRequisitionLineId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Quantity")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<decimal>("ReceivedQuantity")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("UnitPrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("InventoryItemId");
-
-                    b.HasIndex("PurchaseOrderId");
-
-                    b.HasIndex("PurchaseRequisitionLineId");
-
-                    b.ToTable("PurchaseOrderLines", "finance");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PurchaseOrderReceipt", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("InventoryTransactionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("JournalEntryId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("LastModifiedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Notes")
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("PurchaseOrderId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("ReceiptDateUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ReceiptNumber")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("WarehouseId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("PurchaseOrderReceipts", "public");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PurchaseOrderReceiptLine", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid?>("InventoryItemId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Notes")
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("PurchaseOrderLineId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("PurchaseOrderReceiptId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Quantity")
-                        .HasColumnType("numeric");
-
-                    b.Property<int>("ReceiptKind")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("UnitCost")
-                        .HasColumnType("numeric");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PurchaseOrderReceiptId");
-
-                    b.ToTable("PurchaseOrderReceiptLines", "public");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PurchaseRequisition", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Department")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<DateTime>("LastModifiedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("NeededByUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<string>("Purpose")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<DateTime>("RequestDateUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("RequestedByName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("RequisitionNumber")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("PurchaseRequisitions", "finance");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PurchaseRequisitionLine", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<decimal>("EstimatedUnitPrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<Guid?>("InventoryItemId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<Guid>("PurchaseRequisitionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Quantity")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("InventoryItemId");
-
-                    b.HasIndex("PurchaseRequisitionId");
-
-                    b.ToTable("PurchaseRequisitionLines", "finance");
                 });
 
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.SalesInvoice", b =>
@@ -3935,20 +3499,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PayrollRunLineItem", b =>
-                {
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.PayrollPayElement", null)
-                        .WithMany()
-                        .HasForeignKey("PayElementId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.PayrollRunLine", null)
-                        .WithMany()
-                        .HasForeignKey("PayrollRunLineId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PayrollSalaryStructure", b =>
                 {
                     b.HasOne("iBalance.Modules.Finance.Domain.Entities.PayrollEmployee", null)
@@ -3961,21 +3511,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("PayGroupId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PayrollSalaryStructureOverride", b =>
-                {
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.PayrollPayElement", null)
-                        .WithMany()
-                        .HasForeignKey("PayElementId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.PayrollSalaryStructure", null)
-                        .WithMany()
-                        .HasForeignKey("PayrollSalaryStructureId")
-                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
@@ -4026,62 +3561,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.Navigation("TaxCode");
 
                     b.Navigation("TaxLedgerAccount");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PurchaseOrder", b =>
-                {
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.PurchaseRequisition", null)
-                        .WithMany()
-                        .HasForeignKey("PurchaseRequisitionId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.Vendor", null)
-                        .WithMany()
-                        .HasForeignKey("VendorId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PurchaseOrderLine", b =>
-                {
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.InventoryItem", null)
-                        .WithMany()
-                        .HasForeignKey("InventoryItemId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.PurchaseOrder", null)
-                        .WithMany("Lines")
-                        .HasForeignKey("PurchaseOrderId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.PurchaseRequisitionLine", null)
-                        .WithMany()
-                        .HasForeignKey("PurchaseRequisitionLineId")
-                        .OnDelete(DeleteBehavior.Restrict);
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PurchaseOrderReceiptLine", b =>
-                {
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.PurchaseOrderReceipt", null)
-                        .WithMany("Lines")
-                        .HasForeignKey("PurchaseOrderReceiptId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PurchaseRequisitionLine", b =>
-                {
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.InventoryItem", null)
-                        .WithMany()
-                        .HasForeignKey("InventoryItemId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("iBalance.Modules.Finance.Domain.Entities.PurchaseRequisition", null)
-                        .WithMany("Lines")
-                        .HasForeignKey("PurchaseRequisitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.SalesInvoice", b =>
@@ -4264,21 +3743,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PurchaseInvoice", b =>
-                {
-                    b.Navigation("Lines");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PurchaseOrder", b =>
-                {
-                    b.Navigation("Lines");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PurchaseOrderReceipt", b =>
-                {
-                    b.Navigation("Lines");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.PurchaseRequisition", b =>
                 {
                     b.Navigation("Lines");
                 });

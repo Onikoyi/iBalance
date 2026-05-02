@@ -73,7 +73,7 @@ export function Sidebar() {
     if (path.startsWith('/reconciliation')) return 'reconciliation';
     if (path.startsWith('/inventory')) return 'inventory';
     if (path.startsWith('/customers') || path.startsWith('/sales-invoices') || path.startsWith('/customer-receipts')) return 'ar';
-    if (path.startsWith('/vendors') || path.startsWith('/purchase-invoices') || path.startsWith('/vendor-payments')) return 'ap';
+    if (path.startsWith('/vendors') || path.startsWith('/purchase-requisitions') || path.startsWith('/purchase-orders') || path.startsWith('/purchase-invoices') || path.startsWith('/vendor-payments')) return 'ap';
     if (path.startsWith('/reports') || path.startsWith('/ageing-analysis') || path.startsWith('/dashboard')) return 'overview';
     if (path.startsWith('/admin')) return 'admin';
     if (path.startsWith('/working-capital')) return 'working-capital';
@@ -177,6 +177,10 @@ export function Sidebar() {
                 Payroll Runs
               </NavLink>
 
+              <NavLink to="/payroll/runs/rejected" className={({ isActive }) => linkClassName(isActive)}>
+                Rejected Payroll Runs
+              </NavLink>
+
               <NavLink to="/payroll/payslips" className={({ isActive }) => linkClassName(isActive)}>
                 Payslips
               </NavLink>
@@ -226,9 +230,29 @@ export function Sidebar() {
               </NavLink>
             </SidebarSection>
 
-            <SidebarSection title="Accounts Payable" sectionKey="ap" defaultOpen={activeSection === 'ap'}>
+            <SidebarSection title="Accounts Payable / Procurement" sectionKey="ap" defaultOpen={activeSection === 'ap'}>
               <NavLink to="/vendors" className={({ isActive }) => linkClassName(isActive)}>
                 Vendors
+              </NavLink>
+
+              <NavLink to="/purchase-requisitions" className={({ isActive }) => linkClassName(isActive)}>
+                Purchase Requisitions
+              </NavLink>
+
+              <NavLink to="/purchase-requisitions/rejected" className={({ isActive }) => linkClassName(isActive)}>
+                Rejected Requisitions
+              </NavLink>
+
+              <NavLink to="/purchase-orders" className={({ isActive }) => linkClassName(isActive)}>
+                Purchase Orders
+              </NavLink>
+
+              <NavLink to="/purchase-order-receipts" className={({ isActive }) => linkClassName(isActive)}>
+                Purchase Order Receipts
+              </NavLink>
+
+              <NavLink to="/purchase-orders/rejected" className={({ isActive }) => linkClassName(isActive)}>
+                Rejected Purchase Orders
               </NavLink>
 
               <NavLink to="/purchase-invoices" className={({ isActive }) => linkClassName(isActive)}>

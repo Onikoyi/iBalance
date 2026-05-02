@@ -14,6 +14,12 @@ import {
   createPayrollSalaryStructure,
   updatePayrollSalaryStructure,
   deletePayrollSalaryStructure,
+  createPayrollSalaryStructureOverride,
+  updatePayrollSalaryStructureOverride,
+  deletePayrollSalaryStructureOverride,
+  createPayrollPayGroupElement,
+  updatePayrollPayGroupElement,
+  deletePayrollPayGroupElement,
   generatePayrollRun,
   postPayrollRun,
   submitPayrollRun,
@@ -24,10 +30,14 @@ import {
   getPayrollEmployees,
   getPayrollPayElements,
   getPayrollPayGroups,
+  getPayrollPayGroupElements,
   getPayrollPayslips,
   getPayrollRunDetail,
   getPayrollRuns,
   getPayrollSalaryStructures,
+  getPayrollSalaryStructureOverrides,
+  getPayrollPolicySetting,
+  upsertPayrollPolicySetting,
   getPayrollStatutoryReport,
   getTenantReadableError,
   importPayrollEmployees,
@@ -37,12 +47,23 @@ import {
   type PayrollPayElementDto,
   type UpdatePayrollPayElementRequest,
   type PayrollPayGroupDto,
+  type PayrollPayGroupElementDto,
+  type CreatePayrollPayGroupElementRequest,
+  type UpdatePayrollPayGroupElementRequest,
   type PayrollPayslipDto,
   type PayrollRunSummaryDto,
   type PayrollSalaryStructureDto,
   type UpdatePayrollSalaryStructureRequest,
+  type PayrollSalaryStructureOverrideDto,
+  type CreatePayrollSalaryStructureOverrideRequest,
+  type UpdatePayrollSalaryStructureOverrideRequest,
+  type PayrollPolicySettingDto,
+  type UpdatePayrollPolicySettingRequest,
   type PayrollStatutoryReportRowDto,
   type UpdatePayrollPayGroupRequest,
+  type PayrollRunLineItemDto,
+  type PayrollRunLineDetailDto,
+  type PayrollRunDetailDto,
 } from '../lib/api';
 import { canManageFinanceSetup, canViewFinance } from '../lib/auth';
 
@@ -65,6 +86,7 @@ export function formatAmount(value?: number | null) {
 }
 
 export function payrollStatusLabel(status?: number | null) {
+  if (status === 4) return 'Rejected';
   if (status === 2) return 'Posted';
   if (status === 1) return 'Submitted / Approved';
   return 'Draft';
@@ -73,24 +95,6 @@ export function payrollStatusLabel(status?: number | null) {
 export function printCurrentPage() {
   window.print();
 }
-
-export type PayrollRunLineDetailDto = {
-  id: string;
-  tenantId?: string;
-  payrollRunId: string;
-  employeeId: string;
-  employeeNumber: string;
-  employeeName: string;
-  department?: string | null;
-  jobTitle?: string | null;
-  bankName?: string | null;
-  bankAccountNumber?: string | null;
-  pensionNumber?: string | null;
-  taxIdentificationNumber?: string | null;
-  grossPay: number;
-  totalDeductions: number;
-  netPay: number;
-};
 
 export function canPostJournals() {
   return canManageFinanceSetup();
@@ -228,6 +232,12 @@ export {
   createPayrollSalaryStructure,
   updatePayrollSalaryStructure,
   deletePayrollSalaryStructure,
+  createPayrollSalaryStructureOverride,
+  updatePayrollSalaryStructureOverride,
+  deletePayrollSalaryStructureOverride,
+  createPayrollPayGroupElement,
+  updatePayrollPayGroupElement,
+  deletePayrollPayGroupElement,
   generatePayrollRun,
   postPayrollRun,
   submitPayrollRun,
@@ -238,10 +248,14 @@ export {
   getPayrollEmployees,
   getPayrollPayElements,
   getPayrollPayGroups,
+  getPayrollPayGroupElements,
   getPayrollPayslips,
   getPayrollRunDetail,
   getPayrollRuns,
   getPayrollSalaryStructures,
+  getPayrollSalaryStructureOverrides,
+  getPayrollPolicySetting,
+  upsertPayrollPolicySetting,
   getPayrollStatutoryReport,
   getTenantReadableError,
   importPayrollEmployees,
@@ -257,10 +271,21 @@ export type {
   PayrollPayElementDto,
   UpdatePayrollPayElementRequest,
   PayrollPayGroupDto,
+  PayrollPayGroupElementDto,
+  CreatePayrollPayGroupElementRequest,
+  UpdatePayrollPayGroupElementRequest,
   PayrollPayslipDto,
   PayrollRunSummaryDto,
   PayrollSalaryStructureDto,
   UpdatePayrollSalaryStructureRequest,
+  PayrollSalaryStructureOverrideDto,
+  CreatePayrollSalaryStructureOverrideRequest,
+  UpdatePayrollSalaryStructureOverrideRequest,
+  PayrollPolicySettingDto,
+  UpdatePayrollPolicySettingRequest,
   PayrollStatutoryReportRowDto,
   UpdatePayrollPayGroupRequest,
+  PayrollRunLineItemDto,
+  PayrollRunLineDetailDto,
+  PayrollRunDetailDto,
 };

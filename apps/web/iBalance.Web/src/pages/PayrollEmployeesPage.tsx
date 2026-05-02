@@ -256,10 +256,6 @@ export function PayrollEmployeesPage() {
     await deleteMut.mutateAsync(employee.id);
   }
 
-  if (!canView) return <div className="panel error-panel">You do not have access to Payroll Employees.</div>;
-  if (employeesQ.isLoading) return <div className="panel">Loading employees...</div>;
-  if (employeesQ.isError) return <div className="panel error-panel">Unable to load employees.</div>;
-
   const employees = (employeesQ.data?.items ?? []) as PayrollEmployeeDto[];
 
   const departmentOptions = useMemo(() => {
@@ -309,6 +305,10 @@ export function PayrollEmployeesPage() {
       return matchesSearch && matchesStatus && matchesDepartment;
     });
   }, [employees, searchText, statusFilter, departmentFilter]);
+
+  if (!canView) return <div className="panel error-panel">You do not have access to Payroll Employees.</div>;
+  if (employeesQ.isLoading) return <div className="panel">Loading employees...</div>;
+  if (employeesQ.isError) return <div className="panel error-panel">Unable to load employees.</div>;
 
   return (
     <div className="page-grid">
