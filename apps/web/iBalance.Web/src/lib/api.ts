@@ -976,6 +976,7 @@ export type SalesInvoiceDto = {
   rejectedBy?: string | null;
   rejectedOnUtc?: string | null;
   rejectionReason?: string | null;
+  receiptMatches?: PurchaseInvoiceReceiptMatchDto[];
   };
 
 export type SalesInvoicesResponse = {
@@ -1319,6 +1320,30 @@ export type PurchaseInvoiceLineDto = {
   unitPrice: number;
 };
 
+export type PurchaseInvoiceReceiptMatchDto = {
+  purchaseOrderReceiptId: string;
+  receiptNumber?: string | null;
+  matchedBaseAmount: number;
+};
+
+export type PurchaseOrderReceiptMatchingDto = {
+  id: string;
+  receiptNumber: string;
+  purchaseOrderId: string;
+  purchaseOrderNumber?: string | null;
+  vendorId: string;
+  vendorCode: string;
+  vendorName: string;
+  receiptDateUtc: string;
+  status: number;
+  notes?: string | null;
+  totalAmount: number;
+  matchedAmount: number;
+  availableAmount: number;
+};
+
+export type PurchaseOrderReceiptMatchingResponse = ListEnvelope<PurchaseOrderReceiptMatchingDto>;
+
 export type PurchaseInvoiceDto = {
   id: string;
   vendorId: string;
@@ -1345,6 +1370,7 @@ export type PurchaseInvoiceDto = {
   rejectedBy?: string | null;
   rejectedOnUtc?: string | null;
   rejectionReason?: string | null;
+  receiptMatches?: PurchaseInvoiceReceiptMatchDto[];
   };
 
 export type PurchaseInvoicesResponse = {
@@ -1362,6 +1388,7 @@ export type CreatePurchaseInvoiceRequest = {
   description: string;
   lines: PurchaseInvoiceLineDto[];
   taxCodeIds?: string[] | null;
+  purchaseOrderReceiptIds?: string[] | null;
 };
 
 export type PostPurchaseInvoiceRequest = {
@@ -1428,6 +1455,7 @@ export type RejectedPurchaseInvoiceDto = {
   lastModifiedByDisplayName?: string | null;
   lines: RejectedPurchaseInvoiceLineDto[];
   taxLines: RejectedPurchaseInvoiceTaxLineDto[];
+  receiptMatches?: PurchaseInvoiceReceiptMatchDto[];
 };
 
 export type UpdatePurchaseInvoiceRequest = {
@@ -1437,6 +1465,7 @@ export type UpdatePurchaseInvoiceRequest = {
   description: string;
   lines: PurchaseInvoiceLineDto[];
   taxCodeIds?: string[];
+  purchaseOrderReceiptIds?: string[];
 };
 
 
@@ -2088,6 +2117,15 @@ export async function createPurchaseInvoice(payload: CreatePurchaseInvoiceReques
   return response.data;
 }
 
+
+export async function getPurchaseOrderReceiptsForInvoiceMatching(vendorId?: string | null) {
+  const response = await api.get<PurchaseOrderReceiptMatchingResponse>('/api/finance/ap/purchase-order-receipts/matching', {
+    params: {
+      ...(vendorId ? { vendorId } : {}),
+    },
+  });
+  return response.data;
+}
 
 export async function submitPurchaseInvoiceForApproval(purchaseInvoiceId: string) {
   const response = await api.post(`/api/finance/ap/purchase-invoices/${purchaseInvoiceId}/submit`);
@@ -5285,3 +5323,138 @@ export async function createPurchaseOrderReceipt(request: CreatePurchaseOrderRec
   const { data } = await api.post('/api/finance/procurement/purchase-order-receipts', request);
   return data;
 }
+
+export type SecurityRoleDto = {
+  id: string;
+  code: string;
+  name: string;
+  description?: string | null;
+  isSystemDefined: boolean;
+  isActive: boolean;
+  permissionCount?: number;
+};
+
+export type SecurityPermissionDto = {
+  id: string;
+  code: string;
+  module: string;
+  action: string;
+  name: string;
+  description?: string | null;
+  isSystemDefined: boolean;
+  isActive: boolean;
+};
+
+export type ScopeMasterDto = {
+  id: string;
+  code: string;
+  name: string;
+  description?: string | null;
+  isActive: boolean;
+};
+
+export type UserAccessAssignmentDto = {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  displayName: string;
+  role: string;
+  isActive: boolean;
+  roles: { id: string; code: string; name: string; isPrimary: boolean }[];
+  scopes: { id: string; scopeType: string; scopeEntityId: string; scopeCode?: string | null; scopeName?: string | null }[];
+};
+
+export type DepartmentWorkflowPolicyDto = {
+  id: string;
+  moduleCode: string;
+  organizationDepartmentId: string;
+  departmentCode: string;
+  departmentName: string;
+  makerCheckerRequired: boolean;
+  enforceSegregationOfDuties: boolean;
+  minimumApproverCount: number;
+  notes?: string | null;
+  isActive: boolean;
+};
+
+export async function seedDefaultAccessControl() {
+  const { data } = await api.post('/api/admin/access-control/seed-defaults');
+  return data;
+}
+
+export async function getSecurityRoles() {
+  const { data } = await api.get<ListEnvelope<SecurityRoleDto>>('/api/admin/access-control/roles');
+  return data;
+}
+
+export async function createSecurityRole(payload: { code: string; name: string; description?: string | null; isActive: boolean }) {
+  const { data } = await api.post('/api/admin/access-control/roles', payload);
+  return data;
+}
+
+export async function getSecurityPermissions() {
+  const { data } = await api.get<ListEnvelope<SecurityPermissionDto>>('/api/admin/access-control/permissions');
+  return data;
+}
+
+export async function createSecurityPermission(payload: { code: string; module: string; action: string; name: string; description?: string | null; isActive: boolean }) {
+  const { data } = await api.post('/api/admin/access-control/permissions', payload);
+  return data;
+}
+
+export async function setSecurityRolePermissions(roleId: string, permissionIds: string[]) {
+  const { data } = await api.put(`/api/admin/access-control/roles/${roleId}/permissions`, { permissionIds });
+  return data;
+}
+
+export async function getAccessDepartments() {
+  const { data } = await api.get<ListEnvelope<ScopeMasterDto>>('/api/admin/access-control/departments');
+  return data;
+}
+
+export async function createAccessDepartment(payload: { code: string; name: string; description?: string | null; isActive: boolean }) {
+  const { data } = await api.post('/api/admin/access-control/departments', payload);
+  return data;
+}
+
+export async function getAccessBranches() {
+  const { data } = await api.get<ListEnvelope<ScopeMasterDto>>('/api/admin/access-control/branches');
+  return data;
+}
+
+export async function createAccessBranch(payload: { code: string; name: string; description?: string | null; isActive: boolean }) {
+  const { data } = await api.post('/api/admin/access-control/branches', payload);
+  return data;
+}
+
+export async function getAccessCostCenters() {
+  const { data } = await api.get<ListEnvelope<ScopeMasterDto>>('/api/admin/access-control/cost-centers');
+  return data;
+}
+
+export async function createAccessCostCenter(payload: { code: string; name: string; description?: string | null; isActive: boolean }) {
+  const { data } = await api.post('/api/admin/access-control/cost-centers', payload);
+  return data;
+}
+
+export async function getUserAccessAssignments() {
+  const { data } = await api.get<ListEnvelope<UserAccessAssignmentDto>>('/api/admin/access-control/users/access-assignments');
+  return data;
+}
+
+export async function setUserAccessAssignments(userId: string, payload: { roleIds?: string[]; scopes?: { scopeType: string; scopeEntityId: string; scopeCode?: string | null; scopeName?: string | null }[] }) {
+  const { data } = await api.put(`/api/admin/access-control/users/${userId}/access-assignments`, payload);
+  return data;
+}
+
+export async function getDepartmentWorkflowPolicies() {
+  const { data } = await api.get<ListEnvelope<DepartmentWorkflowPolicyDto>>('/api/admin/access-control/workflow-policies');
+  return data;
+}
+
+export async function createDepartmentWorkflowPolicy(payload: { moduleCode: string; organizationDepartmentId: string; makerCheckerRequired: boolean; enforceSegregationOfDuties: boolean; minimumApproverCount: number; notes?: string | null; isActive: boolean }) {
+  const { data } = await api.post('/api/admin/access-control/workflow-policies', payload);
+  return data;
+}
+

@@ -8,8 +8,11 @@ import {
   canManagePlatformCommercials,
   canManageTenantUsers,
   canViewFinance,
+  canViewPayroll,
   canViewPlatformTenantConsole,
+  canManageEnterpriseAccessControl,
 } from '../../lib/auth';
+
 
 function linkClassName(isActive: boolean) {
   return isActive ? 'sidebar-link active' : 'sidebar-link';
@@ -57,12 +60,15 @@ function SidebarSection({ title, sectionKey, defaultOpen, children }: SidebarSec
 export function Sidebar() {
   const location = useLocation();
   const canView = canViewFinance();
+  const canViewPayrollModule = canViewPayroll();
   const canManageSetup = canManageFinanceSetup();
   const canCreate = canCreateJournals();
   const canAdmin = canAccessAdmin();
   const canManageUsers = canManageTenantUsers();
   const canManageCommercials = canManagePlatformCommercials();
   const canViewTenantConsole = canViewPlatformTenantConsole();
+  const canManageAccessControl = canManageEnterpriseAccessControl();
+
 
   const activeSection = useMemo(() => {
     const path = location.pathname;
@@ -160,6 +166,8 @@ export function Sidebar() {
                 Bank Accounts
               </NavLink>
             </SidebarSection>
+
+            {canViewPayrollModule ? (
             <SidebarSection title="Payroll" sectionKey="payroll" defaultOpen={activeSection === 'payroll'}>
               <NavLink to="/payroll" className={({ isActive }) => linkClassName(isActive)}>
                 Payroll Dashboard
@@ -189,6 +197,8 @@ export function Sidebar() {
                 Statutory Reports
               </NavLink>
             </SidebarSection>
+          ) : null}
+          
 
             <SidebarSection title="Working Capital" sectionKey="working-capital" defaultOpen={activeSection === 'working-capital'}>
                 <NavLink to="/working-capital" className={({ isActive }) => linkClassName(isActive)}>
@@ -287,6 +297,13 @@ export function Sidebar() {
             <NavLink to="/admin" className={({ isActive }) => linkClassName(isActive)}>
               Administration
             </NavLink>
+
+            {canManageAccessControl ? (
+              <NavLink to="/admin/access-control" className={({ isActive }) => linkClassName(isActive)}>
+                Access Control
+              </NavLink>
+            ) : null}
+
 
             {canManageUsers ? (
               <NavLink to="/admin/users" className={({ isActive }) => linkClassName(isActive)}>

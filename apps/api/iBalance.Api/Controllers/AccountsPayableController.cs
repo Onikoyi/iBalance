@@ -301,6 +301,132 @@ public sealed class AccountsPayableController : ControllerBase
         });
     }
 
+    
+    [HttpGet("purchase-order-receipts/matching")]
+    public async Task<IActionResult> GetPurchaseOrderReceiptsForInvoiceMatching(
+        [FromQuery] Guid? vendorId,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        var receiptsQuery = dbContext.Set<PurchaseOrderReceipt>()
+            .AsNoTracking()
+            .Include(x => x.Lines)
+            .OrderByDescending(x => x.ReceiptDateUtc)
+            .ThenByDescending(x => x.CreatedOnUtc)
+            .AsQueryable();
+
+        var purchaseOrders = dbContext.Set<PurchaseOrder>().AsNoTracking();
+        var vendors = dbContext.Vendors.AsNoTracking();
+
+        var receiptRows = await receiptsQuery
+            .Select(x => new
+            {
+                x.Id,
+                x.ReceiptNumber,
+                x.PurchaseOrderId,
+                x.ReceiptDateUtc,
+                x.Status,
+                x.Notes,
+                x.CreatedOnUtc,
+                TotalAmount = x.Lines.Sum(line => line.Quantity * line.UnitCost)
+            })
+            .ToListAsync(cancellationToken);
+
+        var purchaseOrderIds = receiptRows.Select(x => x.PurchaseOrderId).Distinct().ToList();
+
+        var poLookup = await purchaseOrders
+            .Where(x => purchaseOrderIds.Contains(x.Id))
+            .Select(x => new
+            {
+                x.Id,
+                x.PurchaseOrderNumber,
+                x.VendorId
+            })
+            .ToDictionaryAsync(x => x.Id, cancellationToken);
+
+        var vendorIds = poLookup.Values.Select(x => x.VendorId).Distinct().ToList();
+        var vendorLookup = await vendors
+            .Where(x => vendorIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, cancellationToken);
+
+        var activeMatchRows = await dbContext.Set<PurchaseInvoiceReceiptMatch>()
+            .AsNoTracking()
+            .Join(
+                dbContext.PurchaseInvoices.AsNoTracking(),
+                match => match.PurchaseInvoiceId,
+                invoice => invoice.Id,
+                (match, invoice) => new
+                {
+                    match.PurchaseOrderReceiptId,
+                    match.MatchedBaseAmount,
+                    invoice.Status
+                })
+            .Where(x => x.Status != PurchaseInvoiceStatus.Rejected && x.Status != PurchaseInvoiceStatus.Cancelled)
+            .ToListAsync(cancellationToken);
+
+        var matchedLookup = activeMatchRows
+            .GroupBy(x => x.PurchaseOrderReceiptId)
+            .ToDictionary(x => x.Key, x => x.Sum(v => v.MatchedBaseAmount));
+
+        var items = receiptRows
+            .Where(row =>
+            {
+                if (!poLookup.TryGetValue(row.PurchaseOrderId, out var po)) return false;
+                if (vendorId.HasValue && po.VendorId != vendorId.Value) return false;
+                return true;
+            })
+            .Select(row =>
+            {
+                var po = poLookup[row.PurchaseOrderId];
+                vendorLookup.TryGetValue(po.VendorId, out var vendor);
+                matchedLookup.TryGetValue(row.Id, out var matchedAmount);
+                var availableAmount = row.TotalAmount - matchedAmount;
+
+                return new
+                {
+                    row.Id,
+                    row.ReceiptNumber,
+                    row.PurchaseOrderId,
+                    po.PurchaseOrderNumber,
+                    VendorId = po.VendorId,
+                    VendorCode = vendor?.VendorCode ?? string.Empty,
+                    VendorName = vendor?.VendorName ?? string.Empty,
+                    row.ReceiptDateUtc,
+                    row.Status,
+                    row.Notes,
+                    row.CreatedOnUtc,
+                    row.TotalAmount,
+                    MatchedAmount = matchedAmount,
+                    AvailableAmount = availableAmount
+                };
+            })
+            .OrderByDescending(x => x.ReceiptDateUtc)
+            .ThenByDescending(x => x.CreatedOnUtc)
+            .ToList();
+
+        return Ok(new
+        {
+            TenantContextAvailable = true,
+            TenantId = tenantContext.TenantId,
+            TenantKey = tenantContext.TenantKey,
+            Count = items.Count,
+            Items = items
+        });
+    }
+
+
     [HttpGet("purchase-invoices")]
     public async Task<IActionResult> GetPurchaseInvoices(
         [FromServices] ApplicationDbContext dbContext,
@@ -350,7 +476,16 @@ public sealed class AccountsPayableController : ControllerBase
                 x.RejectedBy,
                 x.RejectedOnUtc,
                 x.RejectionReason,
-                LineCount = x.Lines.Count
+                LineCount = x.Lines.Count,
+                ReceiptMatches = dbContext.Set<PurchaseInvoiceReceiptMatch>()
+                    .Where(match => match.PurchaseInvoiceId == x.Id)
+                    .Select(match => new
+                    {
+                        match.PurchaseOrderReceiptId,
+                        match.MatchedBaseAmount,
+                        ReceiptNumber = dbContext.Set<PurchaseOrderReceipt>().Where(receipt => receipt.Id == match.PurchaseOrderReceiptId).Select(receipt => receipt.ReceiptNumber).FirstOrDefault()
+                    })
+                    .ToList()
             })
             .ToListAsync(cancellationToken);
 
@@ -468,6 +603,16 @@ public async Task<IActionResult> GetRejectedPurchaseInvoices(
                     line.LineTotal
                 })
                 .ToList(),
+            ReceiptMatches = dbContext.Set<PurchaseInvoiceReceiptMatch>()
+                .AsNoTracking()
+                .Where(match => match.PurchaseInvoiceId == x.Id)
+                .Select(match => new
+                {
+                    match.PurchaseOrderReceiptId,
+                    match.MatchedBaseAmount,
+                    ReceiptNumber = dbContext.Set<PurchaseOrderReceipt>().Where(receipt => receipt.Id == match.PurchaseOrderReceiptId).Select(receipt => receipt.ReceiptNumber).FirstOrDefault()
+                })
+                .ToList(),
             TaxLines = (invoiceTaxLines ?? [])
                 .Select(taxLine => new
                 {
@@ -570,6 +715,25 @@ public async Task<IActionResult> UpdateRejectedPurchaseInvoice(
     if (request.Lines is null || request.Lines.Count == 0)
     {
         return BadRequest(new { Message = "At least one purchase invoice line is required." });
+    }
+
+    var receiptMatchValidation = await BuildReceiptAllocationsAsync(
+        dbContext,
+        tenantContext.TenantId,
+        request.VendorId,
+        purchaseInvoiceId,
+        request.PurchaseOrderReceiptIds,
+        request.Lines.Select(line => new CreatePurchaseInvoiceLineRequest(line.Description, line.Quantity, line.UnitPrice)).ToList(),
+        cancellationToken);
+
+    if (receiptMatchValidation.ErrorMessage is not null)
+    {
+        return Conflict(new
+        {
+            Message = receiptMatchValidation.ErrorMessage,
+            InvoiceBaseAmount = receiptMatchValidation.InvoiceBaseAmount,
+            AvailableMatchedAmount = receiptMatchValidation.TotalAvailableAmount
+        });
     }
 
     foreach (var line in request.Lines)
@@ -914,6 +1078,27 @@ public async Task<IActionResult> DeleteRejectedPurchaseInvoice(
 
         var submittedByUserId = EnsureAuthenticatedUserId(currentUserService);
 
+        var currentMatches = await dbContext.Set<PurchaseInvoiceReceiptMatch>()
+            .AsNoTracking()
+            .Where(x => x.PurchaseInvoiceId == purchaseInvoiceId)
+            .ToListAsync(cancellationToken);
+
+        if (currentMatches.Count > 0)
+        {
+            var matchedAmount = currentMatches.Sum(x => x.MatchedBaseAmount);
+            var invoiceBaseAmount = invoice.Lines.Sum(x => x.Quantity * x.UnitPrice);
+
+            if (matchedAmount < invoiceBaseAmount)
+            {
+                return Conflict(new
+                {
+                    Message = "Matched receipt value is below the invoice base amount. Review invoice-to-receipt matching before submitting.",
+                    InvoiceBaseAmount = invoiceBaseAmount,
+                    MatchedReceiptAmount = matchedAmount
+                });
+            }
+        }
+
         try
         {
             invoice.RecalculateTotals();
@@ -1096,6 +1281,148 @@ public async Task<IActionResult> DeleteRejectedPurchaseInvoice(
     }
 
 
+
+    private sealed record ReceiptMatchValidationResult(
+        decimal InvoiceBaseAmount,
+        decimal TotalAvailableAmount,
+        List<(Guid ReceiptId, decimal AmountToAllocate)> Allocations,
+        string? ErrorMessage);
+
+    private async Task<ReceiptMatchValidationResult> BuildReceiptAllocationsAsync(
+        ApplicationDbContext dbContext,
+        Guid tenantId,
+        Guid vendorId,
+        Guid? excludingInvoiceId,
+        IEnumerable<Guid>? requestedReceiptIds,
+        IEnumerable<CreatePurchaseInvoiceLineRequest> createLines,
+        CancellationToken cancellationToken)
+    {
+        var receiptIds = (requestedReceiptIds ?? [])
+            .Where(x => x != Guid.Empty)
+            .Distinct()
+            .ToList();
+
+        var invoiceBaseAmount = createLines.Sum(x => x.Quantity * x.UnitPrice);
+
+        if (receiptIds.Count == 0)
+        {
+            return new ReceiptMatchValidationResult(invoiceBaseAmount, 0m, new List<(Guid, decimal)>(), null);
+        }
+
+        var receipts = await dbContext.Set<PurchaseOrderReceipt>()
+            .AsNoTracking()
+            .Include(x => x.Lines)
+            .Where(x => x.TenantId == tenantId && receiptIds.Contains(x.Id))
+            .ToListAsync(cancellationToken);
+
+        if (receipts.Count != receiptIds.Count)
+        {
+            return new ReceiptMatchValidationResult(invoiceBaseAmount, 0m, new List<(Guid, decimal)>(), "One or more selected purchase order receipts were not found.");
+        }
+
+        var poIds = receipts.Select(x => x.PurchaseOrderId).Distinct().ToList();
+
+        var poLookup = await dbContext.Set<PurchaseOrder>()
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && poIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, cancellationToken);
+
+        foreach (var receipt in receipts)
+        {
+            if (!poLookup.TryGetValue(receipt.PurchaseOrderId, out var purchaseOrder))
+            {
+                return new ReceiptMatchValidationResult(invoiceBaseAmount, 0m, new List<(Guid, decimal)>(), "One or more selected receipts are not linked to a valid purchase order.");
+            }
+
+            if (purchaseOrder.VendorId != vendorId)
+            {
+                return new ReceiptMatchValidationResult(invoiceBaseAmount, 0m, new List<(Guid, decimal)>(), "All selected receipts must belong to the selected vendor.");
+            }
+        }
+
+        var currentMatches = await dbContext.Set<PurchaseInvoiceReceiptMatch>()
+            .AsNoTracking()
+            .Join(
+                dbContext.PurchaseInvoices.AsNoTracking(),
+                match => match.PurchaseInvoiceId,
+                invoice => invoice.Id,
+                (match, invoice) => new
+                {
+                    match.PurchaseOrderReceiptId,
+                    match.MatchedBaseAmount,
+                    match.PurchaseInvoiceId,
+                    invoice.Status
+                })
+            .Where(x => receiptIds.Contains(x.PurchaseOrderReceiptId) && x.Status != PurchaseInvoiceStatus.Rejected && x.Status != PurchaseInvoiceStatus.Cancelled)
+            .ToListAsync(cancellationToken);
+
+        var allocations = new List<(Guid ReceiptId, decimal AmountToAllocate)>();
+        var amountRemaining = invoiceBaseAmount;
+
+        foreach (var receipt in receipts.OrderBy(x => x.ReceiptDateUtc).ThenBy(x => x.ReceiptNumber))
+        {
+            var totalReceiptAmount = receipt.Lines.Sum(line => line.Quantity * line.UnitCost);
+            var matchedAmount = currentMatches
+                .Where(x => x.PurchaseOrderReceiptId == receipt.Id && (!excludingInvoiceId.HasValue || x.PurchaseInvoiceId != excludingInvoiceId.Value))
+                .Sum(x => x.MatchedBaseAmount);
+
+            var available = totalReceiptAmount - matchedAmount;
+            if (available <= 0m)
+            {
+                continue;
+            }
+
+            var allocation = Math.Min(available, amountRemaining);
+            if (allocation > 0m)
+            {
+                allocations.Add((receipt.Id, allocation));
+                amountRemaining -= allocation;
+            }
+
+            if (amountRemaining <= 0m)
+            {
+                break;
+            }
+        }
+
+        var totalAvailable = allocations.Sum(x => x.AmountToAllocate);
+
+        if (invoiceBaseAmount > 0m && totalAvailable < invoiceBaseAmount)
+        {
+            return new ReceiptMatchValidationResult(invoiceBaseAmount, totalAvailable, allocations, "Selected receipts do not have enough uninvoiced value to cover this purchase invoice.");
+        }
+
+        return new ReceiptMatchValidationResult(invoiceBaseAmount, totalAvailable, allocations, null);
+    }
+
+    private async Task ReplacePurchaseInvoiceReceiptMatchesAsync(
+        ApplicationDbContext dbContext,
+        Guid tenantId,
+        Guid purchaseInvoiceId,
+        List<(Guid ReceiptId, decimal AmountToAllocate)> allocations,
+        CancellationToken cancellationToken)
+    {
+        var existingMatches = await dbContext.Set<PurchaseInvoiceReceiptMatch>()
+            .Where(x => x.TenantId == tenantId && x.PurchaseInvoiceId == purchaseInvoiceId)
+            .ToListAsync(cancellationToken);
+
+        if (existingMatches.Count > 0)
+        {
+            dbContext.RemoveRange(existingMatches);
+        }
+
+        foreach (var allocation in allocations.Where(x => x.AmountToAllocate > 0m))
+        {
+            dbContext.Set<PurchaseInvoiceReceiptMatch>().Add(new PurchaseInvoiceReceiptMatch(
+                Guid.NewGuid(),
+                tenantId,
+                purchaseInvoiceId,
+                allocation.ReceiptId,
+                allocation.AmountToAllocate));
+        }
+    }
+
+
     [HttpPost("purchase-invoices")]
     [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
     public async Task<IActionResult> CreatePurchaseInvoice(
@@ -1157,6 +1484,25 @@ public async Task<IActionResult> DeleteRejectedPurchaseInvoice(
         if (exists)
         {
             return Conflict(new { Message = "A purchase invoice with the same number already exists." });
+        }
+
+        var receiptMatchValidation = await BuildReceiptAllocationsAsync(
+            dbContext,
+            tenantContext.TenantId,
+            request.VendorId,
+            null,
+            request.PurchaseOrderReceiptIds,
+            request.Lines,
+            cancellationToken);
+
+        if (receiptMatchValidation.ErrorMessage is not null)
+        {
+            return Conflict(new
+            {
+                Message = receiptMatchValidation.ErrorMessage,
+                InvoiceBaseAmount = receiptMatchValidation.InvoiceBaseAmount,
+                AvailableMatchedAmount = receiptMatchValidation.TotalAvailableAmount
+            });
         }
 
         var invoice = new PurchaseInvoice(
@@ -2973,7 +3319,8 @@ public async Task<IActionResult> DeleteRejectedVendorPayment(
     string InvoiceNumber,
     string Description,
     List<CreatePurchaseInvoiceLineRequest> Lines,
-    List<Guid>? TaxCodeIds);
+    List<Guid>? TaxCodeIds,
+    List<Guid>? PurchaseOrderReceiptIds);
 
     public sealed record PostPurchaseInvoiceRequest(
         Guid PayableLedgerAccountId,
@@ -3016,5 +3363,6 @@ public async Task<IActionResult> DeleteRejectedVendorPayment(
     string InvoiceNumber,
     string Description,
     List<PurchaseInvoiceLineDto> Lines,
-    List<Guid>? TaxCodeIds);
+    List<Guid>? TaxCodeIds,
+    List<Guid>? PurchaseOrderReceiptIds);
 }

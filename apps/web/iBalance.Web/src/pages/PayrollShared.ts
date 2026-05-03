@@ -65,7 +65,14 @@ import {
   type PayrollRunLineDetailDto,
   type PayrollRunDetailDto,
 } from '../lib/api';
-import { canManageFinanceSetup, canViewFinance } from '../lib/auth';
+import {
+  canApprovePayrollRuns,
+  canManagePayroll,
+  canPostPayrollRuns,
+  canRejectPayrollRuns,
+  canSubmitPayrollRuns,
+  canViewPayroll,
+} from '../lib/auth';
 
 export function toDateInputValue(value?: string | null) {
   if (!value) return '';
@@ -96,8 +103,47 @@ export function printCurrentPage() {
   window.print();
 }
 
+/**
+ * Backward-compatible exports expected by existing payroll pages.
+ * Internally they now resolve to payroll-specific permissions.
+ */
+export function canViewFinance() {
+  return canViewPayroll();
+}
+
+export function canManageFinanceSetup() {
+  return canManagePayroll();
+}
+
 export function canPostJournals() {
-  return canManageFinanceSetup();
+  return canPostPayrollRuns();
+}
+
+/**
+ * New payroll-specific helpers for future payroll-page cleanup.
+ */
+export function canManagePayrollSetup() {
+  return canManagePayroll();
+}
+
+export function canCreatePayrollRuns() {
+  return canManagePayroll();
+}
+
+export function canSubmitPayrollRunAction() {
+  return canSubmitPayrollRuns();
+}
+
+export function canApprovePayrollRunAction() {
+  return canApprovePayrollRuns();
+}
+
+export function canRejectPayrollRunAction() {
+  return canRejectPayrollRuns();
+}
+
+export function canPostPayrollRunAction() {
+  return canPostPayrollRuns();
 }
 
 export const employeeTemplateHeader = [
@@ -259,8 +305,7 @@ export {
   getPayrollStatutoryReport,
   getTenantReadableError,
   importPayrollEmployees,
-  canManageFinanceSetup,
-  canViewFinance,
+  canViewPayroll,
 };
 
 export type {

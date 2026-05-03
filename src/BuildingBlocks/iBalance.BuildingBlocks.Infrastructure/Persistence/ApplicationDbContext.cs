@@ -63,6 +63,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Vendor> Vendors => Set<Vendor>();
     public DbSet<PurchaseInvoice> PurchaseInvoices => Set<PurchaseInvoice>();
     public DbSet<PurchaseInvoiceLine> PurchaseInvoiceLines => Set<PurchaseInvoiceLine>();
+    public DbSet<PurchaseInvoiceReceiptMatch> PurchaseInvoiceReceiptMatches => Set<PurchaseInvoiceReceiptMatch>();
     public DbSet<VendorPayment> VendorPayments => Set<VendorPayment>();
     public DbSet<Budget> Budgets => Set<Budget>();
     public DbSet<BudgetLine> BudgetLines => Set<BudgetLine>();
@@ -89,6 +90,16 @@ public class ApplicationDbContext : DbContext
     public DbSet<PurchaseOrderLine> PurchaseOrderLines => Set<PurchaseOrderLine>();
     public DbSet<PurchaseOrderReceipt> PurchaseOrderReceipts => Set<PurchaseOrderReceipt>();
     public DbSet<PurchaseOrderReceiptLine> PurchaseOrderReceiptLines => Set<PurchaseOrderReceiptLine>();
+    public DbSet<SecurityRole> SecurityRoles => Set<SecurityRole>();
+    public DbSet<SecurityPermission> SecurityPermissions => Set<SecurityPermission>();
+    public DbSet<SecurityRolePermission> SecurityRolePermissions => Set<SecurityRolePermission>();
+    public DbSet<OrganizationDepartment> OrganizationDepartments => Set<OrganizationDepartment>();
+    public DbSet<OrganizationBranch> OrganizationBranches => Set<OrganizationBranch>();
+    public DbSet<OrganizationCostCenter> OrganizationCostCenters => Set<OrganizationCostCenter>();
+    public DbSet<UserSecurityRoleAssignment> UserSecurityRoleAssignments => Set<UserSecurityRoleAssignment>();
+    public DbSet<UserScopeAssignment> UserScopeAssignments => Set<UserScopeAssignment>();
+    public DbSet<DepartmentWorkflowPolicy> DepartmentWorkflowPolicies => Set<DepartmentWorkflowPolicy>();
+
 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -163,6 +174,109 @@ public class ApplicationDbContext : DbContext
             builder.Property(x => x.AmountPaid).HasPrecision(18, 2);
             builder.HasIndex(x => x.TenantId).IsUnique();
         });
+
+
+        modelBuilder.Entity<SecurityRole>(entity =>
+        {
+            entity.ToTable("SecurityRoles", "platform");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Code).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<SecurityPermission>(entity =>
+        {
+            entity.ToTable("SecurityPermissions", "platform");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Code).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.Module).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Action).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<SecurityRolePermission>(entity =>
+        {
+            entity.ToTable("SecurityRolePermissions", "platform");
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.TenantId, x.SecurityRoleId, x.SecurityPermissionId }).IsUnique();
+            entity.HasOne<SecurityRole>().WithMany().HasForeignKey(x => x.SecurityRoleId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<SecurityPermission>().WithMany().HasForeignKey(x => x.SecurityPermissionId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<OrganizationDepartment>(entity =>
+        {
+            entity.ToTable("OrganizationDepartments", "platform");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Code).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<OrganizationBranch>(entity =>
+        {
+            entity.ToTable("OrganizationBranches", "platform");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Code).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<OrganizationCostCenter>(entity =>
+        {
+            entity.ToTable("OrganizationCostCenters", "platform");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Code).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<UserSecurityRoleAssignment>(entity =>
+        {
+            entity.ToTable("UserSecurityRoleAssignments", "platform");
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.TenantId, x.UserAccountId, x.SecurityRoleId }).IsUnique();
+            entity.HasOne<UserAccount>().WithMany().HasForeignKey(x => x.UserAccountId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<SecurityRole>().WithMany().HasForeignKey(x => x.SecurityRoleId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<UserScopeAssignment>(entity =>
+        {
+            entity.ToTable("UserScopeAssignments", "platform");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ScopeType).HasMaxLength(50).IsRequired();
+            entity.Property(x => x.ScopeCode).HasMaxLength(80);
+            entity.Property(x => x.ScopeName).HasMaxLength(200);
+            entity.HasIndex(x => new { x.TenantId, x.UserAccountId, x.ScopeType, x.ScopeEntityId }).IsUnique();
+            entity.HasOne<UserAccount>().WithMany().HasForeignKey(x => x.UserAccountId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<DepartmentWorkflowPolicy>(entity =>
+        {
+            entity.ToTable("DepartmentWorkflowPolicies", "platform");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ModuleCode).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.TenantId, x.ModuleCode, x.OrganizationDepartmentId }).IsUnique();
+            entity.HasOne<OrganizationDepartment>().WithMany().HasForeignKey(x => x.OrganizationDepartmentId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+
         modelBuilder.Entity<BankAccount>(entity =>
         {
             entity.ToTable("BankAccounts", "finance");
@@ -455,6 +569,24 @@ public class ApplicationDbContext : DbContext
                 .IsUnique();
 
             entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
+        });
+
+
+        modelBuilder.Entity<PurchaseInvoiceReceiptMatch>(entity =>
+        {
+            entity.ToTable("PurchaseInvoiceReceiptMatches", "finance");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.MatchedBaseAmount).HasPrecision(18, 2);
+            entity.HasIndex(x => new { x.TenantId, x.PurchaseInvoiceId, x.PurchaseOrderReceiptId }).IsUnique();
+            entity.HasOne<PurchaseInvoice>()
+                .WithMany()
+                .HasForeignKey(x => x.PurchaseInvoiceId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<PurchaseOrderReceipt>()
+                .WithMany()
+                .HasForeignKey(x => x.PurchaseOrderReceiptId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
         });
 
         modelBuilder.Entity<PurchaseInvoice>(entity =>

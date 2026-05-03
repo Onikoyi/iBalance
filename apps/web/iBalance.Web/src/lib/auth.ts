@@ -21,6 +21,14 @@ export type AuthSession = {
   tenantKey: string;
   issuedAtUtc: string;
   expiresAtUtc: string;
+  roles?: string[];
+  permissions?: string[];
+  scopes?: {
+    scopeType: string;
+    scopeEntityId: string;
+    scopeCode?: string | null;
+    scopeName?: string | null;
+  }[];
 };
 
 type AuthSuccessResponse = {
@@ -38,6 +46,14 @@ type AuthSuccessResponse = {
     role: UserRole;
     tenantId: string;
     tenantKey: string;
+    roles?: string[];
+    permissions?: string[];
+    scopes?: {
+      scopeType: string;
+      scopeEntityId: string;
+      scopeCode?: string | null;
+      scopeName?: string | null;
+    }[];
   };
 };
 
@@ -88,6 +104,9 @@ function setSessionFromResponse(data: AuthSuccessResponse, rememberMe: boolean):
     tenantKey: data.user.tenantKey,
     issuedAtUtc: new Date().toISOString(),
     expiresAtUtc: data.expiresAtUtc,
+    roles: data.user.roles ?? [],
+    permissions: data.user.permissions ?? [],
+    scopes: data.user.scopes ?? [],
   };
 
   clearStoredSession();
@@ -138,6 +157,29 @@ export function getCurrentRole(): UserRole | null {
   return getSession()?.role ?? null;
 }
 
+export function getCurrentRoles(): string[] {
+  const session = getSession();
+  if (!session) return [];
+  const expanded = session.roles ?? [];
+  return Array.from(new Set([session.role, ...expanded].filter(Boolean)));
+}
+
+export function hasAnyAssignedRole(allowedRoles: string[]): boolean {
+  const roles = getCurrentRoles().map((value) => value.toLowerCase());
+  return allowedRoles.some((role) => roles.includes(role.toLowerCase()));
+}
+
+export function getAssignedScopes(scopeType: string) {
+  const session = getSession();
+  return (session?.scopes ?? []).filter(
+    (scope) => scope.scopeType.toLowerCase() === scopeType.toLowerCase()
+  );
+}
+
+export function hasScope(scopeType: string, scopeEntityId: string): boolean {
+  return getAssignedScopes(scopeType).some((scope) => scope.scopeEntityId === scopeEntityId);
+}
+
 export function isPlatformAdmin(): boolean {
   return getCurrentRole() === 'PlatformAdmin';
 }
@@ -166,7 +208,23 @@ export function canManageTenantUsers(): boolean {
   return hasPermission('admin.users.manage');
 }
 
+export function canManageEnterpriseAccessControl(): boolean {
+  return (
+    hasPermission('admin.roles.manage') ||
+    hasPermission('admin.permissions.manage') ||
+    hasPermission('admin.scopes.manage')
+  );
+}
+
 export function hasPermission(permission: AppPermission): boolean {
+  const session = getSession();
+  if (!session) return false;
+
+  const explicitPermissions = session.permissions ?? [];
+  if (explicitPermissions.includes(permission)) {
+    return true;
+  }
+
   return roleHasPermission(getCurrentRole(), permission);
 }
 
@@ -180,7 +238,7 @@ export function hasAnyRole(allowedRoles: UserRole[]): boolean {
 }
 
 export function canAccessAdmin(): boolean {
-  return isPlatformAdmin() || isTenantAdmin();
+  return isPlatformAdmin() || isTenantAdmin() || hasPermission('admin.access');
 }
 
 export function canManageAdminSettings(): boolean {
@@ -217,6 +275,30 @@ export function canViewFinance(): boolean {
 
 export function canViewReports(): boolean {
   return hasPermission('finance.reports.view');
+}
+
+export function canViewPayroll(): boolean {
+  return hasPermission('payroll.view');
+}
+
+export function canManagePayroll(): boolean {
+  return hasPermission('payroll.manage');
+}
+
+export function canSubmitPayrollRuns(): boolean {
+  return hasPermission('payroll.run.submit');
+}
+
+export function canApprovePayrollRuns(): boolean {
+  return hasPermission('payroll.run.approve');
+}
+
+export function canRejectPayrollRuns(): boolean {
+  return hasPermission('payroll.run.reject');
+}
+
+export function canPostPayrollRuns(): boolean {
+  return hasPermission('payroll.run.post');
 }
 
 export function canEditUserRole(targetRole: UserRole): boolean {
@@ -302,7 +384,11 @@ export async function forgotPassword(email: string): Promise<ForgotPasswordRespo
   return (await parseApiResponse(response)) as ForgotPasswordResponse;
 }
 
-export async function resetPassword(email: string, token: string, newPassword: string): Promise<{ message: string }> {
+export async function resetPassword(
+  email: string,
+  token: string,
+  newPassword: string
+): Promise<{ message: string }> {
   const response = await fetch(`${getApiBaseUrl()}/api/auth/reset-password`, {
     method: 'POST',
     headers: {

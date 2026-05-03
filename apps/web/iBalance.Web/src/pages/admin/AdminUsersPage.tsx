@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   activateAdminUser,
@@ -15,6 +16,7 @@ import {
 } from '../../lib/api';
 import {
   canEditUserRole,
+  canManageEnterpriseAccessControl,
   canManageUsers,
   getAssignableRoles,
   getCurrentRole,
@@ -52,6 +54,7 @@ export function AdminUsersPage() {
   const qc = useQueryClient();
   const currentRole = getCurrentRole();
   const platformAdmin = isPlatformAdmin();
+  const canManageAccessControl = canManageEnterpriseAccessControl();
 
   const [mode, setMode] = useState<Mode>('create');
   const [selectedUserId, setSelectedUserId] = useState<string>('');
@@ -280,20 +283,22 @@ export function AdminUsersPage() {
 
         {resetNotice ? (
           <div className="kv" style={{ marginBottom: 16 }}>
-            <div className="kv-row">
-              <span>Password Reset</span>
-              <span>{resetNotice.email}</span>
-            </div>
-            <div className="kv-row">
-              <span>Delivery</span>
-              <span>Instructions sent by email</span>
-            </div>
-            <div className="kv-row">
-              <span>Expires</span>
-              <span>{formatUtcDate(resetNotice.expiresAtUtc)}</span>
-            </div>
+            <div className="kv-row"><span>Password Reset</span><span>{resetNotice.email}</span></div>
+            <div className="kv-row"><span>Delivery</span><span>Instructions sent by email</span></div>
+            <div className="kv-row"><span>Expires</span><span>{formatUtcDate(resetNotice.expiresAtUtc)}</span></div>
           </div>
         ) : null}
+
+        <div className="panel" style={{ marginBottom: 16 }}>
+          <div className="muted">
+            User creation and legacy role assignment remain here. Enterprise role-permission mapping, departmental scopes, and maker/checker setup now live in Access Control.
+          </div>
+          {canManageAccessControl ? (
+            <div className="inline-actions" style={{ marginTop: 12 }}>
+              <Link to="/admin/access-control" className="button">Open Access Control</Link>
+            </div>
+          ) : null}
+        </div>
 
         <div className="inline-actions" style={{ justifyContent: 'space-between', marginBottom: 16 }}>
           <div className="inline-actions">
@@ -310,21 +315,12 @@ export function AdminUsersPage() {
         <div className="form-grid two">
           <div className="form-row">
             <label>Search</label>
-            <input
-              className="input"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Email, first name, last name, display name"
-            />
+            <input className="input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Email, first name, last name, display name" />
           </div>
 
           <div className="form-row">
             <label>Status Filter</label>
-            <select
-              className="select"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
-            >
+            <select className="select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}>
               <option value="all">All Users</option>
               <option value="active">Active Only</option>
               <option value="inactive">Inactive Only</option>
@@ -333,11 +329,7 @@ export function AdminUsersPage() {
 
           <div className="form-row">
             <label>Role Filter</label>
-            <select
-              className="select"
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-            >
+            <select className="select" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
               <option value="all">All Roles</option>
               {availableRoles.map((role) => (
                 <option key={role} value={role}>
@@ -349,18 +341,14 @@ export function AdminUsersPage() {
 
           <div className="form-row">
             <label>Existing Users</label>
-            <select
-              className="select"
-              value={selectedUserId}
-              onChange={(e) => {
-                const id = e.target.value;
-                setSelectedUserId(id);
-                const user = (usersQ.data?.items || []).find((x) => x.id === id);
-                if (user) {
-                  startEdit(user);
-                }
-              }}
-            >
+            <select className="select" value={selectedUserId} onChange={(e) => {
+              const id = e.target.value;
+              setSelectedUserId(id);
+              const user = (usersQ.data?.items || []).find((x) => x.id === id);
+              if (user) {
+                startEdit(user);
+              }
+            }}>
               <option value="">— Select User —</option>
               {filteredUsers.map((user) => (
                 <option key={user.id} value={user.id}>
@@ -383,22 +371,10 @@ export function AdminUsersPage() {
         </div>
 
         <div className="form-grid two">
-          <div className="form-row">
-            <label>Email</label>
-            <input
-              className="input"
-              value={form.email}
-              onChange={(e) => setForm((s) => ({ ...s, email: e.target.value }))}
-            />
-          </div>
-
+          <div className="form-row"><label>Email</label><input className="input" value={form.email} onChange={(e) => setForm((s) => ({ ...s, email: e.target.value }))} /></div>
           <div className="form-row">
             <label>Role</label>
-            <select
-              className="select"
-              value={form.role}
-              onChange={(e) => setForm((s) => ({ ...s, role: e.target.value }))}
-            >
+            <select className="select" value={form.role} onChange={(e) => setForm((s) => ({ ...s, role: e.target.value }))}>
               {availableRoles.map((role) => (
                 <option key={role} value={role}>
                   {role}
@@ -406,64 +382,28 @@ export function AdminUsersPage() {
               ))}
             </select>
           </div>
-
-          <div className="form-row">
-            <label>First Name</label>
-            <input
-              className="input"
-              value={form.firstName}
-              onChange={(e) => setForm((s) => ({ ...s, firstName: e.target.value }))}
-            />
-          </div>
-
-          <div className="form-row">
-            <label>Last Name</label>
-            <input
-              className="input"
-              value={form.lastName}
-              onChange={(e) => setForm((s) => ({ ...s, lastName: e.target.value }))}
-            />
-          </div>
+          <div className="form-row"><label>First Name</label><input className="input" value={form.firstName} onChange={(e) => setForm((s) => ({ ...s, firstName: e.target.value }))} /></div>
+          <div className="form-row"><label>Last Name</label><input className="input" value={form.lastName} onChange={(e) => setForm((s) => ({ ...s, lastName: e.target.value }))} /></div>
 
           {mode === 'create' ? (
             <div className="form-row">
               <label>Temporary Password</label>
-              <input
-                className="input"
-                type="password"
-                value={form.password}
-                onChange={(e) => setForm((s) => ({ ...s, password: e.target.value }))}
-              />
+              <input className="input" type="password" value={form.password} onChange={(e) => setForm((s) => ({ ...s, password: e.target.value }))} />
             </div>
           ) : null}
 
           <div className="form-row">
             <label>
-              <input
-                type="checkbox"
-                checked={form.isActive}
-                onChange={(e) => setForm((s) => ({ ...s, isActive: e.target.checked }))}
-              />
+              <input type="checkbox" checked={form.isActive} onChange={(e) => setForm((s) => ({ ...s, isActive: e.target.checked }))} />
               {' '}User is active
             </label>
           </div>
         </div>
 
         <div className="inline-actions" style={{ justifyContent: 'space-between', marginTop: 16 }}>
-          <button className="button" onClick={startCreate}>
-            Reset Form
-          </button>
-
-          <button
-            className="button primary"
-            onClick={submitForm}
-            disabled={createMut.isPending || updateMut.isPending}
-          >
-            {createMut.isPending || updateMut.isPending
-              ? 'Saving…'
-              : mode === 'create'
-                ? 'Create User'
-                : 'Update User'}
+          <button className="button" onClick={startCreate}>Reset Form</button>
+          <button className="button primary" onClick={submitForm} disabled={createMut.isPending || updateMut.isPending}>
+            {createMut.isPending || updateMut.isPending ? 'Saving…' : mode === 'create' ? 'Create User' : 'Update User'}
           </button>
         </div>
       </section>
@@ -480,70 +420,25 @@ export function AdminUsersPage() {
           ) : (
             filteredUsers.map((user) => (
               <div key={user.id} className="kv" style={{ marginBottom: 12 }}>
-                <div className="kv-row">
-                  <span>Name</span>
-                  <span>{user.displayName}</span>
-                </div>
-                <div className="kv-row">
-                  <span>Email</span>
-                  <span>{user.email}</span>
-                </div>
-                <div className="kv-row">
-                  <span>Role</span>
-                  <span>{user.role}</span>
-                </div>
-                <div className="kv-row">
-                  <span>Status</span>
-                  <span>{user.isActive ? 'Active' : 'Inactive'}</span>
-                </div>
-                <div className="kv-row">
-                  <span>Created</span>
-                  <span>{formatUtcDate(user.createdOnUtc)}</span>
-                </div>
-                <div className="kv-row">
-                  <span>Last Modified</span>
-                  <span>{formatUtcDate(user.lastModifiedOnUtc)}</span>
-                </div>
-                <div className="kv-row">
-                  <span>Password Reset Expires</span>
-                  <span>{formatUtcDate(user.passwordResetTokenExpiresOnUtc)}</span>
-                </div>
+                <div className="kv-row"><span>Name</span><span>{user.displayName}</span></div>
+                <div className="kv-row"><span>Email</span><span>{user.email}</span></div>
+                <div className="kv-row"><span>Role</span><span>{user.role}</span></div>
+                <div className="kv-row"><span>Status</span><span>{user.isActive ? 'Active' : 'Inactive'}</span></div>
+                <div className="kv-row"><span>Created</span><span>{formatUtcDate(user.createdOnUtc)}</span></div>
+                <div className="kv-row"><span>Last Modified</span><span>{formatUtcDate(user.lastModifiedOnUtc)}</span></div>
+                <div className="kv-row"><span>Password Reset Expires</span><span>{formatUtcDate(user.passwordResetTokenExpiresOnUtc)}</span></div>
 
                 <div className="inline-actions" style={{ marginTop: 12 }}>
-                  {canEditUserRole(user.role as any) ? (
-                    <button className="button" onClick={() => startEdit(user)}>
-                      Edit
-                    </button>
-                  ) : null}
-
+                  {canEditUserRole(user.role as any) ? (<button className="button" onClick={() => startEdit(user)}>Edit</button>) : null}
                   {canEditUserRole(user.role as any) ? (
                     user.isActive ? (
-                      <button
-                        className="button danger"
-                        onClick={() => deactivateMut.mutate(user.id)}
-                        disabled={deactivateMut.isPending}
-                      >
-                        Deactivate
-                      </button>
+                      <button className="button danger" onClick={() => deactivateMut.mutate(user.id)} disabled={deactivateMut.isPending}>Deactivate</button>
                     ) : (
-                      <button
-                        className="button"
-                        onClick={() => activateMut.mutate(user.id)}
-                        disabled={activateMut.isPending}
-                      >
-                        Activate
-                      </button>
+                      <button className="button" onClick={() => activateMut.mutate(user.id)} disabled={activateMut.isPending}>Activate</button>
                     )
                   ) : null}
-
                   {canEditUserRole(user.role as any) ? (
-                    <button
-                      className="button"
-                      onClick={() => passwordResetMut.mutate(user.id)}
-                      disabled={passwordResetMut.isPending}
-                    >
-                      Send Password Reset
-                    </button>
+                    <button className="button" onClick={() => passwordResetMut.mutate(user.id)} disabled={passwordResetMut.isPending}>Send Password Reset</button>
                   ) : null}
                 </div>
               </div>

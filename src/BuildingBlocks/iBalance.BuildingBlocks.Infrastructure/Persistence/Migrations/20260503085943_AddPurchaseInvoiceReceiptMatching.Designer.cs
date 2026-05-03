@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using iBalance.BuildingBlocks.Infrastructure.Persistence;
 namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260503085943_AddPurchaseInvoiceReceiptMatching")]
+    partial class AddPurchaseInvoiceReceiptMatching
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -3339,301 +3342,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.ToTable("BillingSettings", "platform");
                 });
 
-            modelBuilder.Entity("iBalance.Modules.Platform.Domain.Entities.DepartmentWorkflowPolicy", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("EnforceSegregationOfDuties")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime>("LastModifiedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("MakerCheckerRequired")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("MinimumApproverCount")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ModuleCode")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<Guid>("OrganizationDepartmentId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("OrganizationDepartmentId");
-
-                    b.HasIndex("TenantId", "ModuleCode", "OrganizationDepartmentId")
-                        .IsUnique();
-
-                    b.ToTable("DepartmentWorkflowPolicies", "platform");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Platform.Domain.Entities.OrganizationBranch", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
-
-                    b.Property<DateTime>("CreatedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime>("LastModifiedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId", "Code")
-                        .IsUnique();
-
-                    b.ToTable("OrganizationBranches", "platform");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Platform.Domain.Entities.OrganizationCostCenter", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
-
-                    b.Property<DateTime>("CreatedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime>("LastModifiedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId", "Code")
-                        .IsUnique();
-
-                    b.ToTable("OrganizationCostCenters", "platform");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Platform.Domain.Entities.OrganizationDepartment", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
-
-                    b.Property<DateTime>("CreatedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime>("LastModifiedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId", "Code")
-                        .IsUnique();
-
-                    b.ToTable("OrganizationDepartments", "platform");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Platform.Domain.Entities.SecurityPermission", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Action")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
-
-                    b.Property<DateTime>("CreatedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsSystemDefined")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime>("LastModifiedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Module")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId", "Code")
-                        .IsUnique();
-
-                    b.ToTable("SecurityPermissions", "platform");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Platform.Domain.Entities.SecurityRole", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
-
-                    b.Property<DateTime>("CreatedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsSystemDefined")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime>("LastModifiedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId", "Code")
-                        .IsUnique();
-
-                    b.ToTable("SecurityRoles", "platform");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Platform.Domain.Entities.SecurityRolePermission", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("SecurityPermissionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("SecurityRoleId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SecurityPermissionId");
-
-                    b.HasIndex("SecurityRoleId");
-
-                    b.HasIndex("TenantId", "SecurityRoleId", "SecurityPermissionId")
-                        .IsUnique();
-
-                    b.ToTable("SecurityRolePermissions", "platform");
-                });
-
             modelBuilder.Entity("iBalance.Modules.Platform.Domain.Entities.SubscriptionPackage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3963,80 +3671,6 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("UserAccounts", "platform");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Platform.Domain.Entities.UserScopeAssignment", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ScopeCode")
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
-
-                    b.Property<Guid>("ScopeEntityId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ScopeName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("ScopeType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("UserAccountId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserAccountId");
-
-                    b.HasIndex("TenantId", "UserAccountId", "ScopeType", "ScopeEntityId")
-                        .IsUnique();
-
-                    b.ToTable("UserScopeAssignments", "platform");
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Platform.Domain.Entities.UserSecurityRoleAssignment", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedOnUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsPrimary")
-                        .HasColumnType("boolean");
-
-                    b.Property<Guid>("SecurityRoleId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("UserAccountId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SecurityRoleId");
-
-                    b.HasIndex("UserAccountId");
-
-                    b.HasIndex("TenantId", "UserAccountId", "SecurityRoleId")
-                        .IsUnique();
-
-                    b.ToTable("UserSecurityRoleAssignments", "platform");
                 });
 
             modelBuilder.Entity("iBalance.Modules.Finance.Domain.Entities.BankAccount", b =>
@@ -4632,60 +4266,12 @@ namespace iBalance.BuildingBlocks.Infrastructure.Persistence.Migrations
                     b.Navigation("Vendor");
                 });
 
-            modelBuilder.Entity("iBalance.Modules.Platform.Domain.Entities.DepartmentWorkflowPolicy", b =>
-                {
-                    b.HasOne("iBalance.Modules.Platform.Domain.Entities.OrganizationDepartment", null)
-                        .WithMany()
-                        .HasForeignKey("OrganizationDepartmentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Platform.Domain.Entities.SecurityRolePermission", b =>
-                {
-                    b.HasOne("iBalance.Modules.Platform.Domain.Entities.SecurityPermission", null)
-                        .WithMany()
-                        .HasForeignKey("SecurityPermissionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("iBalance.Modules.Platform.Domain.Entities.SecurityRole", null)
-                        .WithMany()
-                        .HasForeignKey("SecurityRoleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("iBalance.Modules.Platform.Domain.Entities.TenantSubscriptionApplication", b =>
                 {
                     b.HasOne("iBalance.Modules.Platform.Domain.Entities.SubscriptionPackage", null)
                         .WithMany()
                         .HasForeignKey("SubscriptionPackageId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Platform.Domain.Entities.UserScopeAssignment", b =>
-                {
-                    b.HasOne("iBalance.Modules.Platform.Domain.Entities.UserAccount", null)
-                        .WithMany()
-                        .HasForeignKey("UserAccountId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("iBalance.Modules.Platform.Domain.Entities.UserSecurityRoleAssignment", b =>
-                {
-                    b.HasOne("iBalance.Modules.Platform.Domain.Entities.SecurityRole", null)
-                        .WithMany()
-                        .HasForeignKey("SecurityRoleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("iBalance.Modules.Platform.Domain.Entities.UserAccount", null)
-                        .WithMany()
-                        .HasForeignKey("UserAccountId")
-                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

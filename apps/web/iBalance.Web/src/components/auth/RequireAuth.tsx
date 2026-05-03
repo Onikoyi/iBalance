@@ -2,13 +2,24 @@ import type { PropsWithChildren } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getCurrentTenantLicense } from '../../lib/api';
-import { hasAnyRole, isAuthenticated, isPlatformAdmin, type UserRole } from '../../lib/auth';
+import {
+  hasAnyRole,
+  hasPermission,
+  isAuthenticated,
+  isPlatformAdmin,
+  type UserRole,
+} from '../../lib/auth';
 
 type RequireAuthProps = PropsWithChildren<{
   allowedRoles?: UserRole[];
+  requiredPermissions?: string[];
 }>;
 
-export function RequireAuth({ children, allowedRoles }: RequireAuthProps) {
+export function RequireAuth({
+  children,
+  allowedRoles,
+  requiredPermissions,
+}: RequireAuthProps) {
   const location = useLocation();
   const platformAdmin = isPlatformAdmin();
 
@@ -25,6 +36,13 @@ export function RequireAuth({ children, allowedRoles }: RequireAuthProps) {
 
   if (allowedRoles && allowedRoles.length > 0 && !hasAnyRole(allowedRoles)) {
     return <Navigate to="/dashboard" replace state={{ deniedFrom: location.pathname }} />;
+  }
+
+  if (requiredPermissions && requiredPermissions.length > 0) {
+    const denied = requiredPermissions.some((permission: string) => !hasPermission(permission as any));
+    if (denied) {
+      return <Navigate to="/dashboard" replace state={{ deniedFrom: location.pathname }} />;
+    }
   }
 
   if (platformAdmin) {

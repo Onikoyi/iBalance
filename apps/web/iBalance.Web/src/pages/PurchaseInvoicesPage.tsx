@@ -8,6 +8,7 @@ import {
   getFixedAssetClasses,
   getFixedAssets,
   getPurchaseInvoices,
+  getPurchaseOrderReceiptsForInvoiceMatching,
   getTaxCodes,
   getTenantReadableError,
   getVendors,
@@ -40,6 +41,7 @@ const emptyForm: CreatePurchaseInvoiceRequest = {
   description: '',
   lines: [{ ...emptyLine }],
   taxCodeIds: [],
+  purchaseOrderReceiptIds: [],
 };
 
 function formatDateTime(value?: string | null) {
@@ -209,6 +211,13 @@ export function PurchaseInvoicesPage() {
     queryFn: getFixedAssets,
     enabled: canView,
   });
+
+  const receiptMatchingQ = useQuery({
+    queryKey: ['ap-purchase-order-receipts-matching', form.vendorId || null],
+    queryFn: () => getPurchaseOrderReceiptsForInvoiceMatching(form.vendorId || null),
+    enabled: canView && !!form.vendorId,
+  });
+
 
   const taxCodesQ = useQuery({
     queryKey: ['tax-codes', 'purchases', 'active'],
@@ -1017,6 +1026,59 @@ export function PurchaseInvoicesPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            
+            <div className="section-heading" style={{ marginTop: 16 }}>
+              <div>
+                <h2>Receipt Matching</h2>
+                <span className="muted">Optional for procurement-backed invoices. Select one or more receipts for this vendor to control available value before approval.</span>
+              </div>
+            </div>
+
+            <div className="panel" style={{ marginBottom: 16 }}>
+              {!form.vendorId ? (
+                <div className="muted">Select vendor first to load available purchase order receipts.</div>
+              ) : receiptMatchingQ.isLoading ? (
+                <div className="muted">Loading available purchase order receipts...</div>
+              ) : (receiptMatchingQ.data?.items?.length ?? 0) === 0 ? (
+                <div className="muted">No available purchase order receipts found for the selected vendor.</div>
+              ) : (
+                <div className="detail-stack">
+                  {receiptMatchingQ.data?.items.map((receipt) => {
+                    const checked = (form.purchaseOrderReceiptIds ?? []).includes(receipt.id);
+
+                    return (
+                      <label
+                        key={receipt.id}
+                        className="muted"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: 8,
+                          marginBottom: 8,
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            const current = form.purchaseOrderReceiptIds ?? [];
+                            const next = e.target.checked
+                              ? [...current, receipt.id]
+                              : current.filter((value) => value !== receipt.id);
+
+                            setForm((state) => ({ ...state, purchaseOrderReceiptIds: next }));
+                          }}
+                        />
+                        <span>
+                          <strong>{receipt.receiptNumber}</strong> — {receipt.purchaseOrderNumber || 'PO'} — Available {formatAmount(receipt.availableAmount)} / Total {formatAmount(receipt.totalAmount)}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="section-heading" style={{ marginTop: 16 }}>
