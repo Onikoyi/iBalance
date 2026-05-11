@@ -17,7 +17,13 @@ import {
   getBudgetAwareReadableError,
   type BudgetAwareApiResponse,
 } from '../lib/api';
-import { canApproveWorkflows, canCreateJournals, canViewFinance } from '../lib/auth';
+import {
+  canApproveCustomerReceipts,
+  canCreateCustomerReceipts,
+  canPostCustomerReceipts,
+  canSubmitCustomerReceipts,
+  canViewAccountsReceivable,
+} from '../lib/auth';
 
 type ReceiptFormState = {
   customerId: string;
@@ -115,9 +121,11 @@ function parseDecimal(value: string) {
 
 export function CustomerReceiptsPage() {
   const qc = useQueryClient();
-  const canView = canViewFinance();
-  const canCreate = canCreateJournals();
-  const canApprove = canApproveWorkflows();
+  const canView = canViewAccountsReceivable();
+const canCreate = canCreateCustomerReceipts();
+const canSubmitApproval = canSubmitCustomerReceipts();
+const canApprove = canApproveCustomerReceipts();
+const canPost = canPostCustomerReceipts();
 
   const [form, setForm] = useState<ReceiptFormState>(emptyForm);
   const [message, setMessage] = useState('');
@@ -357,7 +365,7 @@ export function CustomerReceiptsPage() {
   function submitForApproval(customerReceiptId: string) {
     setMessage('');
 
-    if (!canCreate) {
+    if (!canSubmitApproval) {
       setMessage('You do not have permission to submit customer receipts for approval.');
       return;
     }
@@ -401,7 +409,7 @@ export function CustomerReceiptsPage() {
   function submitPosting(customerReceiptId: string) {
     setMessage('');
 
-    if (!canApprove) {
+    if (!canPost) {
       setMessage('You do not have permission to post customer receipts.');
       return;
     }

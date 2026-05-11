@@ -6,7 +6,7 @@ import {
   hasAnyRole,
   hasPermission,
   isAuthenticated,
-  isPlatformAdmin,
+  shouldBypassLicenseEnforcement,
   type UserRole,
 } from '../../lib/auth';
 
@@ -21,12 +21,12 @@ export function RequireAuth({
   requiredPermissions,
 }: RequireAuthProps) {
   const location = useLocation();
-  const platformAdmin = isPlatformAdmin();
+  const bypassLicense = shouldBypassLicenseEnforcement();
 
   const licenseQ = useQuery({
     queryKey: ['current-tenant-license'],
     queryFn: getCurrentTenantLicense,
-    enabled: isAuthenticated() && !platformAdmin,
+    enabled: isAuthenticated() && !bypassLicense,
     staleTime: 60_000,
   });
 
@@ -34,18 +34,16 @@ export function RequireAuth({
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
-  if (allowedRoles && allowedRoles.length > 0 && !hasAnyRole(allowedRoles)) {
+  if (requiredPermissions && requiredPermissions.length > 0) {
+    const granted = requiredPermissions.some((permission) => hasPermission(permission as any));
+    if (!granted) {
+      return <Navigate to="/dashboard" replace state={{ deniedFrom: location.pathname }} />;
+    }
+  } else if (allowedRoles && allowedRoles.length > 0 && !hasAnyRole(allowedRoles)) {
     return <Navigate to="/dashboard" replace state={{ deniedFrom: location.pathname }} />;
   }
 
-  if (requiredPermissions && requiredPermissions.length > 0) {
-    const denied = requiredPermissions.some((permission: string) => !hasPermission(permission as any));
-    if (denied) {
-      return <Navigate to="/dashboard" replace state={{ deniedFrom: location.pathname }} />;
-    }
-  }
-
-  if (platformAdmin) {
+  if (bypassLicense) {
     return <>{children}</>;
   }
 

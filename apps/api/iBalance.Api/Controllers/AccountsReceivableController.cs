@@ -1,3 +1,4 @@
+using iBalance.Api.Security;
 using iBalance.Api.Services;
 using iBalance.BuildingBlocks.Application.Security;
 using iBalance.BuildingBlocks.Application.Tenancy;
@@ -15,6 +16,7 @@ namespace iBalance.Api.Controllers;
 [Route("api/finance/ar")]
 public sealed class AccountsReceivableController : ControllerBase
 {
+    [Authorize(Policy = AuthorizationPolicies.ArView)]
     [HttpGet("customers")]
     public async Task<IActionResult> GetCustomers(
         [FromServices] ApplicationDbContext dbContext,
@@ -60,7 +62,7 @@ public sealed class AccountsReceivableController : ControllerBase
     }
 
     [HttpPost("customers")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.ArCustomerManage)]
     public async Task<IActionResult> CreateCustomer(
         [FromBody] CreateCustomerRequest request,
         [FromServices] ApplicationDbContext dbContext,
@@ -130,6 +132,7 @@ public sealed class AccountsReceivableController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.ArView)]
     [HttpGet("sales-invoices")]
     public async Task<IActionResult> GetSalesInvoices(
         [FromServices] ApplicationDbContext dbContext,
@@ -194,7 +197,7 @@ public sealed class AccountsReceivableController : ControllerBase
     }
 
     [HttpPost("sales-invoices")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.ArInvoiceCreate)]
     public async Task<IActionResult> CreateSalesInvoice(
         [FromBody] CreateSalesInvoiceRequest request,
         [FromServices] ApplicationDbContext dbContext,
@@ -425,7 +428,7 @@ public sealed class AccountsReceivableController : ControllerBase
     }
 
         [HttpPost("sales-invoices/{salesInvoiceId:guid}/submit")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.ArInvoiceSubmit)]
     public async Task<IActionResult> SubmitSalesInvoiceForApproval(
         Guid salesInvoiceId,
         [FromServices] ApplicationDbContext dbContext,
@@ -496,7 +499,7 @@ public sealed class AccountsReceivableController : ControllerBase
     }
 
     [HttpPost("sales-invoices/{salesInvoiceId:guid}/approve")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
+    [Authorize(Policy = AuthorizationPolicies.ArInvoiceApprove)]
     public async Task<IActionResult> ApproveSalesInvoice(
         Guid salesInvoiceId,
         [FromServices] ApplicationDbContext dbContext,
@@ -565,7 +568,7 @@ public sealed class AccountsReceivableController : ControllerBase
     }
 
     [HttpPost("sales-invoices/{salesInvoiceId:guid}/reject")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
+    [Authorize(Policy = AuthorizationPolicies.ArInvoiceReject)]
     public async Task<IActionResult> RejectSalesInvoice(
         Guid salesInvoiceId,
         [FromBody] RejectSalesInvoiceRequest request,
@@ -641,7 +644,8 @@ public sealed class AccountsReceivableController : ControllerBase
     }
 
 
-    [HttpGet("sales-invoices/rejected")]
+    [Authorize(Policy = AuthorizationPolicies.ArView)]
+[HttpGet("sales-invoices/rejected")]
 public async Task<IActionResult> GetRejectedSalesInvoices(
     [FromServices] ApplicationDbContext dbContext,
     [FromServices] ITenantContextAccessor tenantContextAccessor,
@@ -773,7 +777,7 @@ public async Task<IActionResult> GetRejectedSalesInvoices(
 
 
 [HttpPut("sales-invoices/{salesInvoiceId:guid}")]
-[Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+[Authorize(Policy = AuthorizationPolicies.ArInvoiceCreate)]
 public async Task<IActionResult> UpdateRejectedSalesInvoice(
     Guid salesInvoiceId,
     [FromBody] UpdateSalesInvoiceRequest request,
@@ -1080,7 +1084,7 @@ public async Task<IActionResult> UpdateRejectedSalesInvoice(
 
 
 [HttpDelete("sales-invoices/{salesInvoiceId:guid}")]
-[Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+[Authorize(Policy = AuthorizationPolicies.ArInvoiceCreate)]
 public async Task<IActionResult> DeleteRejectedSalesInvoice(
     Guid salesInvoiceId,
     [FromServices] ApplicationDbContext dbContext,
@@ -1158,7 +1162,7 @@ public async Task<IActionResult> DeleteRejectedSalesInvoice(
 
 
     [HttpPost("sales-invoices/{salesInvoiceId:guid}/post")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.ArInvoicePost)]
     public async Task<IActionResult> PostSalesInvoice(
         Guid salesInvoiceId,
         [FromBody] PostSalesInvoiceRequest request,
@@ -1525,6 +1529,7 @@ if (BudgetEvaluationSupport.IsBudgetConsumableAccountCategory(revenueLedgerAccou
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.ArView)]
     [HttpGet("customer-receipts")]
     public async Task<IActionResult> GetCustomerReceipts(
         [FromServices] ApplicationDbContext dbContext,
@@ -1607,6 +1612,7 @@ if (BudgetEvaluationSupport.IsBudgetConsumableAccountCategory(revenueLedgerAccou
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.ArView)]
     [HttpGet("customer-receipts/{customerReceiptId:guid}")]
     public async Task<IActionResult> GetCustomerReceiptDetail(
         Guid customerReceiptId,
@@ -1728,6 +1734,7 @@ if (BudgetEvaluationSupport.IsBudgetConsumableAccountCategory(revenueLedgerAccou
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.ArView)]
     [HttpGet("customer-receipts/rejected")]
 public async Task<IActionResult> GetRejectedCustomerReceipts(
     [FromServices] ApplicationDbContext dbContext,
@@ -1823,7 +1830,7 @@ public async Task<IActionResult> GetRejectedCustomerReceipts(
 
 
     [HttpPut("customer-receipts/{customerReceiptId:guid}")]
-[Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+[Authorize(Policy = AuthorizationPolicies.ArReceiptCreate)]
 public async Task<IActionResult> UpdateRejectedCustomerReceipt(
     Guid customerReceiptId,
     [FromBody] UpdateCustomerReceiptRequest request,
@@ -2011,7 +2018,7 @@ public async Task<IActionResult> UpdateRejectedCustomerReceipt(
 
 
 [HttpDelete("customer-receipts/{customerReceiptId:guid}")]
-[Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+[Authorize(Policy = AuthorizationPolicies.ArReceiptCreate)]
 public async Task<IActionResult> DeleteRejectedCustomerReceipt(
     Guid customerReceiptId,
     [FromServices] ApplicationDbContext dbContext,
@@ -2079,7 +2086,7 @@ public async Task<IActionResult> DeleteRejectedCustomerReceipt(
 
 
     [HttpPost("customer-receipts")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.ArReceiptCreate)]
     public async Task<IActionResult> CreateCustomerReceipt(
         [FromBody] CreateCustomerReceiptRequest request,
         [FromServices] ApplicationDbContext dbContext,
@@ -2210,7 +2217,7 @@ public async Task<IActionResult> DeleteRejectedCustomerReceipt(
     }
 
     [HttpPost("customer-receipts/{customerReceiptId:guid}/submit")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.ArReceiptSubmit)]
     public async Task<IActionResult> SubmitCustomerReceiptForApproval(
         Guid customerReceiptId,
         [FromServices] ApplicationDbContext dbContext,
@@ -2276,7 +2283,7 @@ public async Task<IActionResult> DeleteRejectedCustomerReceipt(
     }
 
     [HttpPost("customer-receipts/{customerReceiptId:guid}/approve")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
+    [Authorize(Policy = AuthorizationPolicies.ArReceiptApprove)]
     public async Task<IActionResult> ApproveCustomerReceipt(
         Guid customerReceiptId,
         [FromServices] ApplicationDbContext dbContext,
@@ -2341,7 +2348,7 @@ public async Task<IActionResult> DeleteRejectedCustomerReceipt(
     }
 
     [HttpPost("customer-receipts/{customerReceiptId:guid}/reject")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
+    [Authorize(Policy = AuthorizationPolicies.ArReceiptReject)]
     public async Task<IActionResult> RejectCustomerReceipt(
         Guid customerReceiptId,
         [FromBody] RejectCustomerReceiptRequest request,
@@ -2417,7 +2424,7 @@ public async Task<IActionResult> DeleteRejectedCustomerReceipt(
     }
 
     [HttpPost("customer-receipts/{customerReceiptId:guid}/post")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
+    [Authorize(Policy = AuthorizationPolicies.ArReceiptPost)]
     public async Task<IActionResult> PostCustomerReceipt(
         Guid customerReceiptId,
         [FromBody] PostCustomerReceiptRequest request,

@@ -123,7 +123,11 @@ export function AdminSubscriptionApplicationsPage() {
   }
 
   if (applicationsQ.isError || !applicationsQ.data) {
-    return <div className="panel error-panel">We could not load subscription applications at this time.</div>;
+    return (
+      <div className="panel error-panel">
+        {getTenantReadableError(applicationsQ.error, 'We could not load subscription applications at this time.')}
+      </div>
+    );
   }
 
   const items = applicationsQ.data.items;
@@ -143,8 +147,8 @@ export function AdminSubscriptionApplicationsPage() {
         </div>
 
         {infoText ? (
-          <div className="panel" style={{ marginBottom: 16 }}>
-            <div className="muted">{infoText}</div>
+          <div className="success-panel" style={{ marginBottom: 16 }}>
+            {infoText}
           </div>
         ) : null}
 
@@ -269,16 +273,16 @@ export function AdminSubscriptionApplicationsPage() {
                         <>
                           <button
                             className="button primary"
-                            onClick={() => confirmPayment(item.id)}
-                            disabled={confirmMut.isPending}
+                            onClick={() => void confirmPayment(item.id)}
+                            disabled={confirmMut.isPending || rejectMut.isPending}
                           >
                             {confirmMut.isPending && selectedApplicationId === item.id ? 'Confirming…' : 'Confirm Payment'}
                           </button>
 
                           <button
                             className="button danger"
-                            onClick={() => rejectApplication(item.id)}
-                            disabled={rejectMut.isPending}
+                            onClick={() => void rejectApplication(item.id)}
+                            disabled={confirmMut.isPending || rejectMut.isPending}
                           >
                             {rejectMut.isPending && selectedApplicationId === item.id ? 'Rejecting…' : 'Reject'}
                           </button>

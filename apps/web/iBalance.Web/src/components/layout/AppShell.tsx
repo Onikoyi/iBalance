@@ -12,6 +12,8 @@ import {
 } from '../../lib/api';
 import {
   canAccessAdmin,
+  canSwitchTenantContext,
+  getDisplayRoles,
   getSession,
   isPlatformAdmin,
   logout,
@@ -19,11 +21,16 @@ import {
 
 function licenseLabel(value?: number) {
   switch (value) {
-    case 1: return 'Active';
-    case 2: return 'Renewal Due Soon';
-    case 3: return 'Expired';
-    case 4: return 'Suspended';
-    default: return 'Unavailable';
+    case 1:
+      return 'Active';
+    case 2:
+      return 'Renewal Due Soon';
+    case 3:
+      return 'Expired';
+    case 4:
+      return 'Suspended';
+    default:
+      return 'Unavailable';
   }
 }
 
@@ -124,11 +131,16 @@ function LogoSlot({
   );
 }
 
+function formatRoleLabel(role: string) {
+  return role.replace(/([a-z])([A-Z])/g, '$1 $2');
+}
+
 export function AppShell({ children }: PropsWithChildren) {
   const location = useLocation();
   const nav = useNavigate();
   const session = getSession();
   const platformAdmin = isPlatformAdmin();
+  const canSwitchTenant = canSwitchTenantContext();
 
   const [tenantKeyInput, setTenantKeyInput] = useState(getTenantKey());
 
@@ -137,6 +149,17 @@ export function AppShell({ children }: PropsWithChildren) {
 
   const tenantLogo = getTenantLogoDataUrl();
   const companyLogo = getCompanyLogoDataUrl();
+
+  const displayedRoles = useMemo(() => {
+    return getDisplayRoles().map((role) => formatRoleLabel(role));
+  }, []);
+
+  const roleSummary =
+    displayedRoles.length > 0
+      ? displayedRoles.join(', ')
+      : formatRoleLabel(session?.role || 'Not available');
+
+  const primaryRoleLabel = formatRoleLabel(session?.role || 'Not available');
 
   const licenseQ = useQuery({
     queryKey: ['current-tenant-license'],
@@ -148,7 +171,7 @@ export function AppShell({ children }: PropsWithChildren) {
   function saveTenantContext() {
     const normalizedTenantKey = tenantKeyInput.trim().toLowerCase();
 
-    if (!normalizedTenantKey) {
+    if (!normalizedTenantKey || !canSwitchTenant) {
       return;
     }
 
@@ -200,15 +223,26 @@ export function AppShell({ children }: PropsWithChildren) {
             </div>
 
             <div className="topbar-session-row">
-              <span>
-                Signed in as <strong>{session?.userEmail || 'Not available'}</strong>
-              </span>
-              <span>
-                Role <strong>{session?.role || 'Not available'}</strong>
-              </span>
-              <span>
-                Access <strong>{licenseSummary.label}</strong>
-              </span>
+              <div>
+                <span>
+                  Signed in as <strong>{session?.userEmail || 'Not available'}</strong>
+                </span>
+              </div>
+              <div>
+                <span>
+                  Primary Role <strong>{primaryRoleLabel}</strong>
+                </span>
+              </div>
+              <div>
+                <span>
+                  Assigned Roles <strong>{roleSummary}</strong>
+                </span>
+              </div>
+              <div>
+                <span>
+                  Access <strong>{licenseSummary.label}</strong>
+                </span>
+              </div>
             </div>
           </div>
 
@@ -235,40 +269,42 @@ export function AppShell({ children }: PropsWithChildren) {
           </div>
         </header>
 
-        <section className="panel tenant-context-panel">
-          <div className="section-heading">
-            <div>
-              <h2>Tenant workspace</h2>
-              <div className="muted">Switch tenant context carefully when working across organizations.</div>
-            </div>
-          </div>
-
-          <div className="form-grid two">
-            <div className="form-row">
-              <label>Tenant Key</label>
-              <input
-                className="input"
-                value={tenantKeyInput}
-                onChange={(e) => setTenantKeyInput(e.target.value)}
-                placeholder="Enter tenant key"
-              />
-            </div>
-
-            <div className="form-row">
-              <label>Apply</label>
-              <div className="inline-actions">
-                <button className="button" onClick={saveTenantContext}>
-                  Update Tenant Context
-                </button>
+        {canSwitchTenant ? (
+          <section className="panel tenant-context-panel">
+            <div className="section-heading">
+              <div>
+                <h2>Tenant workspace</h2>
+                <div className="muted">Switch tenant context carefully when working across organizations.</div>
               </div>
             </div>
-          </div>
-        </section> 
+
+            <div className="form-grid two">
+              <div className="form-row">
+                <label>Tenant Key</label>
+                <input
+                  className="input"
+                  value={tenantKeyInput}
+                  onChange={(e) => setTenantKeyInput(e.target.value)}
+                  placeholder="Enter tenant key"
+                />
+              </div>
+
+              <div className="form-row">
+                <label>Apply</label>
+                <div className="inline-actions">
+                  <button className="button" onClick={saveTenantContext}>
+                    Update Tenant Context
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         <main className="page-content">{children}</main>
 
         <footer className="app-footer">
-          <span>© Nikosoft Technologies — iBalance Accounting Cloud</span>
+          <span>© Nikosoft Technologies — iBalance ERP Cloud</span>
           <span>{getTenantKey() || 'Organization Workspace'}</span>
         </footer>
       </div>

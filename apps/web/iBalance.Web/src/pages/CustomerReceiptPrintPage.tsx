@@ -6,7 +6,7 @@ import {
   getTenantKey,
   getTenantLogoDataUrl,
 } from '../lib/api';
-import { canViewFinance } from '../lib/auth';
+import { canViewAccountsReceivable } from '../lib/auth';
 
 function formatUtcDate(value?: string | null) {
   if (!value) return '—';
@@ -361,7 +361,7 @@ function buildReceiptHtml(args: {
 
 export function CustomerReceiptPrintPage() {
   const { customerReceiptId } = useParams<{ customerReceiptId: string }>();
-  const canView = canViewFinance();
+  const canView = canViewAccountsReceivable();
 
   const tenantLogo = getTenantLogoDataUrl();
   const companyLogo = getCompanyLogoDataUrl();

@@ -42,6 +42,9 @@ public sealed class AccessControlController : ControllerBase
             new { Code = "admin.roles.manage", Module = "admin", Action = "manage", Name = "Manage Roles", Description = "Manage enterprise roles." },
             new { Code = "admin.permissions.manage", Module = "admin", Action = "manage", Name = "Manage Permissions", Description = "Manage enterprise permissions." },
             new { Code = "admin.scopes.manage", Module = "admin", Action = "manage", Name = "Manage Scopes", Description = "Manage departments, branches, and cost centers." },
+            new { Code = "admin.settings.manage", Module = "admin", Action = "manage", Name = "Manage Administration Settings", Description = "Manage administrative and commercial settings." },
+            new { Code = "license.recovery.bypass", Module = "admin", Action = "bypass", Name = "Bypass License Enforcement", Description = "Allow protected recovery access when license is blocked." },
+
             new { Code = "finance.view", Module = "finance", Action = "view", Name = "View Finance", Description = "Access finance workspaces." },
             new { Code = "finance.setup.manage", Module = "finance", Action = "manage", Name = "Manage Finance Setup", Description = "Maintain finance setup." },
             new { Code = "finance.transactions.create", Module = "finance", Action = "create", Name = "Create Finance Transactions", Description = "Create finance transactions." },
@@ -51,22 +54,81 @@ public sealed class AccessControlController : ControllerBase
             new { Code = "finance.transactions.post", Module = "finance", Action = "post", Name = "Post Finance Transactions", Description = "Post finance transactions." },
             new { Code = "finance.transactions.delete", Module = "finance", Action = "delete", Name = "Delete Finance Transactions", Description = "Delete finance transactions." },
             new { Code = "finance.reports.view", Module = "finance", Action = "report", Name = "View Finance Reports", Description = "View and print finance reports." },
+
+            new { Code = "finance.journals.create", Module = "finance", Action = "create", Name = "Create Journals", Description = "Create journal entries." },
+            new { Code = "finance.journals.post", Module = "finance", Action = "post", Name = "Post Journals", Description = "Post journal entries." },
+            new { Code = "finance.journals.reverse", Module = "finance", Action = "reverse", Name = "Reverse Journals", Description = "Reverse journal entries." },
+            new { Code = "finance.fiscal-periods.manage", Module = "finance", Action = "manage", Name = "Manage Fiscal Periods", Description = "Maintain fiscal periods and year setup." },
+
+            new { Code = "budget.view", Module = "budget", Action = "view", Name = "View Budgets", Description = "View budget workspaces." },
+            new { Code = "budget.manage", Module = "budget", Action = "manage", Name = "Manage Budgets", Description = "Manage budget setup and maintenance." },
+            new { Code = "budget.create", Module = "budget", Action = "create", Name = "Create Budgets", Description = "Create budgets." },
+            new { Code = "budget.submit", Module = "budget", Action = "submit", Name = "Submit Budgets", Description = "Submit budgets for approval." },
+            new { Code = "budget.approve", Module = "budget", Action = "approve", Name = "Approve Budgets", Description = "Approve budgets." },
+            new { Code = "budget.reject", Module = "budget", Action = "reject", Name = "Reject Budgets", Description = "Reject budgets." },
+            new { Code = "budget.lock", Module = "budget", Action = "lock", Name = "Lock Budgets", Description = "Lock approved budgets." },
+            new { Code = "budget.close", Module = "budget", Action = "close", Name = "Close Budgets", Description = "Close budgets." },
+            new { Code = "budget.transfer", Module = "budget", Action = "transfer", Name = "Transfer Budget Amounts", Description = "Transfer budget amounts." },
+            new { Code = "budget.reports.view", Module = "budget", Action = "report", Name = "View Budget Reports", Description = "View budget reports." },
+
             new { Code = "payroll.view", Module = "payroll", Action = "view", Name = "View Payroll", Description = "Access payroll workspace." },
             new { Code = "payroll.manage", Module = "payroll", Action = "manage", Name = "Manage Payroll Setup", Description = "Manage payroll masters and setup." },
             new { Code = "payroll.run.submit", Module = "payroll", Action = "submit", Name = "Submit Payroll Runs", Description = "Submit payroll runs." },
             new { Code = "payroll.run.approve", Module = "payroll", Action = "approve", Name = "Approve Payroll Runs", Description = "Approve payroll runs." },
             new { Code = "payroll.run.reject", Module = "payroll", Action = "reject", Name = "Reject Payroll Runs", Description = "Reject payroll runs." },
             new { Code = "payroll.run.post", Module = "payroll", Action = "post", Name = "Post Payroll Runs", Description = "Post payroll runs." },
+
             new { Code = "procurement.view", Module = "procurement", Action = "view", Name = "View Procurement", Description = "Access procurement workspaces." },
             new { Code = "procurement.requisition.create", Module = "procurement", Action = "create", Name = "Create Requisitions", Description = "Create requisitions." },
             new { Code = "procurement.requisition.submit", Module = "procurement", Action = "submit", Name = "Submit Requisitions", Description = "Submit requisitions." },
             new { Code = "procurement.requisition.approve", Module = "procurement", Action = "approve", Name = "Approve Requisitions", Description = "Approve requisitions." },
+            new { Code = "procurement.requisition.reject", Module = "procurement", Action = "reject", Name = "Reject Requisitions", Description = "Reject requisitions." },
             new { Code = "procurement.po.create", Module = "procurement", Action = "create", Name = "Create Purchase Orders", Description = "Create purchase orders." },
+            new { Code = "procurement.po.approve", Module = "procurement", Action = "approve", Name = "Approve Purchase Orders", Description = "Approve purchase orders." },
             new { Code = "procurement.receipt.create", Module = "procurement", Action = "create", Name = "Create Receipts", Description = "Create receipts." },
-            new { Code = "inventory.view", Module = "inventory", Action = "view", Name = "View Inventory", Description = "Access inventory workspaces." },
-            new { Code = "inventory.manage", Module = "inventory", Action = "manage", Name = "Manage Inventory", Description = "Manage inventory." },
+
+            new { Code = "ap.view", Module = "ap", Action = "view", Name = "View Accounts Payable", Description = "Access accounts payable workspaces." },
+            new { Code = "ap.invoice.create", Module = "ap", Action = "create", Name = "Create Purchase Invoices", Description = "Create purchase invoices." },
+            new { Code = "ap.invoice.submit", Module = "ap", Action = "submit", Name = "Submit Purchase Invoices", Description = "Submit purchase invoices." },
+            new { Code = "ap.invoice.approve", Module = "ap", Action = "approve", Name = "Approve Purchase Invoices", Description = "Approve purchase invoices." },
+            new { Code = "ap.invoice.reject", Module = "ap", Action = "reject", Name = "Reject Purchase Invoices", Description = "Reject purchase invoices." },
+            new { Code = "ap.invoice.post", Module = "ap", Action = "post", Name = "Post Purchase Invoices", Description = "Post purchase invoices." },
+            new { Code = "ap.payment.create", Module = "ap", Action = "create", Name = "Create Vendor Payments", Description = "Create vendor payments." },
+            new { Code = "ap.payment.submit", Module = "ap", Action = "submit", Name = "Submit Vendor Payments", Description = "Submit vendor payments." },
+            new { Code = "ap.payment.approve", Module = "ap", Action = "approve", Name = "Approve Vendor Payments", Description = "Approve vendor payments." },
+            new { Code = "ap.payment.reject", Module = "ap", Action = "reject", Name = "Reject Vendor Payments", Description = "Reject vendor payments." },
+            new { Code = "ap.payment.post", Module = "ap", Action = "post", Name = "Post Vendor Payments", Description = "Post vendor payments." },
+
+            new { Code = "ar.view", Module = "ar", Action = "view", Name = "View Accounts Receivable", Description = "Access accounts receivable workspaces." },
+            new { Code = "ar.invoice.create", Module = "ar", Action = "create", Name = "Create Sales Invoices", Description = "Create sales invoices." },
+            new { Code = "ar.invoice.submit", Module = "ar", Action = "submit", Name = "Submit Sales Invoices", Description = "Submit sales invoices." },
+            new { Code = "ar.invoice.approve", Module = "ar", Action = "approve", Name = "Approve Sales Invoices", Description = "Approve sales invoices." },
+            new { Code = "ar.invoice.reject", Module = "ar", Action = "reject", Name = "Reject Sales Invoices", Description = "Reject sales invoices." },
+            new { Code = "ar.invoice.post", Module = "ar", Action = "post", Name = "Post Sales Invoices", Description = "Post sales invoices." },
+            new { Code = "ar.receipt.create", Module = "ar", Action = "create", Name = "Create Customer Receipts", Description = "Create customer receipts." },
+            new { Code = "ar.receipt.submit", Module = "ar", Action = "submit", Name = "Submit Customer Receipts", Description = "Submit customer receipts." },
+            new { Code = "ar.receipt.approve", Module = "ar", Action = "approve", Name = "Approve Customer Receipts", Description = "Approve customer receipts." },
+            new { Code = "ar.receipt.reject", Module = "ar", Action = "reject", Name = "Reject Customer Receipts", Description = "Reject customer receipts." },
+            new { Code = "ar.receipt.post", Module = "ar", Action = "post", Name = "Post Customer Receipts", Description = "Post customer receipts." },
+
             new { Code = "treasury.view", Module = "treasury", Action = "view", Name = "View Treasury", Description = "Access treasury workspaces." },
             new { Code = "treasury.manage", Module = "treasury", Action = "manage", Name = "Manage Treasury", Description = "Manage treasury operations." },
+            new { Code = "treasury.bankaccounts.manage", Module = "treasury", Action = "manage", Name = "Manage Bank Accounts", Description = "Maintain bank accounts." },
+            new { Code = "treasury.reconciliation.manage", Module = "treasury", Action = "manage", Name = "Manage Reconciliation", Description = "Perform bank reconciliation activities." },
+
+            new { Code = "inventory.view", Module = "inventory", Action = "view", Name = "View Inventory", Description = "Access inventory workspaces." },
+            new { Code = "inventory.manage", Module = "inventory", Action = "manage", Name = "Manage Inventory", Description = "Manage inventory." },
+
+            new { Code = "fixedassets.view", Module = "fixedassets", Action = "view", Name = "View Fixed Assets", Description = "Access fixed asset workspaces." },
+            new { Code = "fixedassets.manage", Module = "fixedassets", Action = "manage", Name = "Manage Fixed Assets", Description = "Manage fixed assets." },
+            new { Code = "fixedassets.depreciation.run", Module = "fixedassets", Action = "run", Name = "Run Depreciation", Description = "Run asset depreciation." },
+            new { Code = "fixedassets.disposal.post", Module = "fixedassets", Action = "post", Name = "Post Asset Disposal", Description = "Post asset disposal transactions." },
+
+            new { Code = "workflow.approve", Module = "workflow", Action = "approve", Name = "Approve Workflows", Description = "Approve workflow transactions across modules." },
+            new { Code = "workflow.reject", Module = "workflow", Action = "reject", Name = "Reject Workflows", Description = "Reject workflow transactions across modules." },
+            new { Code = "workflow.reopen", Module = "workflow", Action = "reopen", Name = "Reopen Workflows", Description = "Reopen workflow transactions where policy allows." },
+
+            new { Code = "reports.view", Module = "reports", Action = "view", Name = "View Reports", Description = "View cross-module reports." },
             new { Code = "reports.export", Module = "reports", Action = "export", Name = "Export Reports", Description = "Export and print reports." }
         };
 
@@ -103,27 +165,30 @@ public sealed class AccessControlController : ControllerBase
                 Code = "PLATFORM_ADMIN",
                 Name = "Platform Admin",
                 Description = "Platform-wide administrative access.",
-                PermissionCodes = new[]
-                {
-                    "admin.access","admin.users.manage","admin.roles.manage","admin.permissions.manage","admin.scopes.manage",
-                    "finance.view","finance.setup.manage","finance.transactions.create","finance.transactions.submit","finance.transactions.approve","finance.transactions.reject","finance.transactions.post","finance.transactions.delete","finance.reports.view",
-                    "payroll.view","payroll.manage","payroll.run.submit","payroll.run.approve","payroll.run.reject","payroll.run.post",
-                    "procurement.view","procurement.requisition.create","procurement.requisition.submit","procurement.requisition.approve","procurement.po.create","procurement.receipt.create",
-                    "inventory.view","inventory.manage","treasury.view","treasury.manage","reports.export"
-                }
+                PermissionCodes = permissionSeed.Select(x => x.Code).ToArray()
             },
             new
             {
                 Code = "TENANT_ADMIN",
                 Name = "Tenant Admin",
                 Description = "Tenant administrative access.",
+                PermissionCodes = permissionSeed.Where(x => !string.Equals(x.Code, "license.recovery.bypass", StringComparison.OrdinalIgnoreCase)).Select(x => x.Code).ToArray()
+            },
+            new
+            {
+                Code = "FINANCE_CONTROLLER",
+                Name = "Finance Controller",
+                Description = "Cross-finance controlling and approval authority.",
                 PermissionCodes = new[]
                 {
-                    "admin.access","admin.users.manage","admin.roles.manage","admin.permissions.manage","admin.scopes.manage",
-                    "finance.view","finance.setup.manage","finance.transactions.create","finance.transactions.submit","finance.transactions.approve","finance.transactions.reject","finance.transactions.post","finance.transactions.delete","finance.reports.view",
-                    "payroll.view","payroll.manage","payroll.run.submit","payroll.run.approve","payroll.run.reject","payroll.run.post",
-                    "procurement.view","procurement.requisition.create","procurement.requisition.submit","procurement.requisition.approve","procurement.po.create","procurement.receipt.create",
-                    "inventory.view","inventory.manage","treasury.view","treasury.manage","reports.export"
+                    "finance.view","finance.setup.manage","finance.transactions.create","finance.transactions.submit","finance.transactions.approve","finance.transactions.reject","finance.transactions.post","finance.reports.view",
+                    "finance.journals.create","finance.journals.post","finance.journals.reverse","finance.fiscal-periods.manage",
+                    "budget.view","budget.manage","budget.create","budget.submit","budget.approve","budget.reject","budget.lock","budget.close","budget.transfer","budget.reports.view",
+                    "ap.view","ap.invoice.create","ap.invoice.submit","ap.invoice.approve","ap.invoice.reject","ap.invoice.post","ap.payment.create","ap.payment.submit","ap.payment.approve","ap.payment.reject","ap.payment.post",
+                    "ar.view","ar.invoice.create","ar.invoice.submit","ar.invoice.approve","ar.invoice.reject","ar.invoice.post","ar.receipt.create","ar.receipt.submit","ar.receipt.approve","ar.receipt.reject","ar.receipt.post",
+                    "treasury.view","treasury.manage","treasury.bankaccounts.manage","treasury.reconciliation.manage",
+                    "fixedassets.view","fixedassets.manage","fixedassets.depreciation.run","fixedassets.disposal.post",
+                    "reports.view","reports.export","workflow.approve","workflow.reject","workflow.reopen"
                 }
             },
             new
@@ -133,7 +198,13 @@ public sealed class AccessControlController : ControllerBase
                 Description = "Core finance operational role.",
                 PermissionCodes = new[]
                 {
-                    "finance.view","finance.setup.manage","finance.transactions.create","finance.transactions.submit","finance.transactions.post","finance.reports.view","reports.export"
+                    "finance.view","finance.setup.manage","finance.transactions.create","finance.transactions.submit","finance.transactions.post","finance.reports.view",
+                    "finance.journals.create","finance.journals.post","finance.journals.reverse","finance.fiscal-periods.manage",
+                    "budget.view","budget.create","budget.submit","budget.reports.view",
+                    "ap.view","ap.invoice.create","ap.invoice.submit","ap.invoice.post","ap.payment.create","ap.payment.submit","ap.payment.post",
+                    "ar.view","ar.invoice.create","ar.invoice.submit","ar.invoice.post","ar.receipt.create","ar.receipt.submit","ar.receipt.post",
+                    "fixedassets.view","fixedassets.manage","fixedassets.depreciation.run",
+                    "reports.view","reports.export"
                 }
             },
             new
@@ -144,8 +215,13 @@ public sealed class AccessControlController : ControllerBase
                 PermissionCodes = new[]
                 {
                     "finance.view","finance.transactions.approve","finance.transactions.reject","finance.reports.view",
+                    "budget.view","budget.approve","budget.reject","budget.lock","budget.close","budget.reports.view",
                     "payroll.view","payroll.run.approve","payroll.run.reject",
-                    "procurement.view","procurement.requisition.approve","reports.export"
+                    "procurement.view","procurement.requisition.approve","procurement.requisition.reject","procurement.po.approve",
+                    "ap.view","ap.invoice.approve","ap.invoice.reject","ap.payment.approve","ap.payment.reject",
+                    "ar.view","ar.invoice.approve","ar.invoice.reject","ar.receipt.approve","ar.receipt.reject",
+                    "workflow.approve","workflow.reject",
+                    "reports.view","reports.export"
                 }
             },
             new
@@ -155,67 +231,16 @@ public sealed class AccessControlController : ControllerBase
                 Description = "Read-only access.",
                 PermissionCodes = new[]
                 {
-                    "finance.view","finance.reports.view","reports.export"
-                }
-            },
-            new
-            {
-                Code = "PROCUREMENT_OFFICER",
-                Name = "Procurement Officer",
-                Description = "Departmental procurement processing.",
-                PermissionCodes = new[]
-                {
-                    "procurement.view","procurement.requisition.create","procurement.requisition.submit","procurement.po.create","procurement.receipt.create","reports.export"
-                }
-            },
-            new
-            {
-                Code = "PAYROLL_OFFICER",
-                Name = "Payroll Officer",
-                Description = "Departmental payroll processing.",
-                PermissionCodes = new[]
-                {
-                    "payroll.view","payroll.manage","payroll.run.submit","reports.export"
-                }
-            },
-            new
-            {
-                Code = "TREASURY_OFFICER",
-                Name = "Treasury Officer",
-                Description = "Departmental treasury processing.",
-                PermissionCodes = new[]
-                {
-                    "treasury.view","treasury.manage","reports.export"
-                }
-            },
-            new
-            {
-                Code = "HR_OFFICER",
-                Name = "HR Officer",
-                Description = "Human resource administrative role.",
-                PermissionCodes = new[]
-                {
-                    "payroll.view","payroll.manage","reports.export"
-                }
-            },
-            new
-            {
-                Code = "INVENTORY_OFFICER",
-                Name = "Inventory Officer",
-                Description = "Departmental inventory control role.",
-                PermissionCodes = new[]
-                {
-                    "inventory.view","inventory.manage","reports.export"
-                }
-            },
-            new
-            {
-                Code = "BUDGET_OWNER",
-                Name = "Budget Owner",
-                Description = "Departmental budget ownership role.",
-                PermissionCodes = new[]
-                {
-                    "finance.view","finance.reports.view","reports.export"
+                    "finance.view","finance.reports.view",
+                    "budget.view","budget.reports.view",
+                    "payroll.view",
+                    "procurement.view",
+                    "ap.view",
+                    "ar.view",
+                    "treasury.view",
+                    "inventory.view",
+                    "fixedassets.view",
+                    "reports.view","reports.export"
                 }
             },
             new
@@ -225,7 +250,125 @@ public sealed class AccessControlController : ControllerBase
                 Description = "Read-only cross-functional audit role.",
                 PermissionCodes = new[]
                 {
-                    "finance.view","finance.reports.view","payroll.view","procurement.view","inventory.view","treasury.view","reports.export"
+                    "finance.view","finance.reports.view",
+                    "budget.view","budget.reports.view",
+                    "payroll.view",
+                    "procurement.view",
+                    "ap.view",
+                    "ar.view",
+                    "treasury.view",
+                    "inventory.view",
+                    "fixedassets.view",
+                    "reports.view","reports.export"
+                }
+            },
+            new
+            {
+                Code = "BUDGET_OFFICER",
+                Name = "Budget Officer",
+                Description = "Departmental budget preparation role.",
+                PermissionCodes = new[]
+                {
+                    "finance.view",
+                    "budget.view","budget.manage","budget.create","budget.submit","budget.transfer","budget.reports.view",
+                    "reports.view","reports.export"
+                }
+            },
+            new
+            {
+                Code = "BUDGET_OWNER",
+                Name = "Budget Owner",
+                Description = "Departmental budget ownership role.",
+                PermissionCodes = new[]
+                {
+                    "finance.view",
+                    "budget.view","budget.approve","budget.reject","budget.lock","budget.close","budget.reports.view",
+                    "reports.view","reports.export"
+                }
+            },
+            new
+            {
+                Code = "PAYROLL_OFFICER",
+                Name = "Payroll Officer",
+                Description = "Departmental payroll processing.",
+                PermissionCodes = new[]
+                {
+                    "payroll.view","payroll.manage","payroll.run.submit","reports.view","reports.export"
+                }
+            },
+            new
+            {
+                Code = "HR_OFFICER",
+                Name = "HR Officer",
+                Description = "Human resource administrative role.",
+                PermissionCodes = new[]
+                {
+                    "payroll.view","payroll.manage","reports.view","reports.export"
+                }
+            },
+            new
+            {
+                Code = "PROCUREMENT_OFFICER",
+                Name = "Procurement Officer",
+                Description = "Departmental procurement processing.",
+                PermissionCodes = new[]
+                {
+                    "procurement.view","procurement.requisition.create","procurement.requisition.submit","procurement.po.create","procurement.receipt.create",
+                    "reports.view","reports.export"
+                }
+            },
+            new
+            {
+                Code = "TREASURY_OFFICER",
+                Name = "Treasury Officer",
+                Description = "Departmental treasury processing.",
+                PermissionCodes = new[]
+                {
+                    "treasury.view","treasury.manage","treasury.bankaccounts.manage","treasury.reconciliation.manage",
+                    "reports.view","reports.export"
+                }
+            },
+            new
+            {
+                Code = "INVENTORY_OFFICER",
+                Name = "Inventory Officer",
+                Description = "Departmental inventory control role.",
+                PermissionCodes = new[]
+                {
+                    "inventory.view","inventory.manage","reports.view","reports.export"
+                }
+            },
+            new
+            {
+                Code = "AP_OFFICER",
+                Name = "AP Officer",
+                Description = "Accounts payable operational role.",
+                PermissionCodes = new[]
+                {
+                    "ap.view","ap.invoice.create","ap.invoice.submit","ap.invoice.post","ap.payment.create","ap.payment.submit","ap.payment.post",
+                    "reports.view","reports.export"
+                }
+            },
+            new
+            {
+                Code = "AR_OFFICER",
+                Name = "AR Officer",
+                Description = "Accounts receivable operational role.",
+                PermissionCodes = new[]
+                {
+                    "ar.view","ar.invoice.create","ar.invoice.submit","ar.invoice.post","ar.receipt.create","ar.receipt.submit","ar.receipt.post",
+                    "reports.view","reports.export"
+                }
+            },
+            new
+            {
+                Code = "FIXED_ASSET_OFFICER",
+                Name = "Fixed Asset Officer",
+                Description = "Fixed asset operational role.",
+                PermissionCodes = new[]
+                {
+                    "fixedassets.view","fixedassets.manage","fixedassets.depreciation.run","fixedassets.disposal.post",
+                    "reports.view","reports.export"
                 }
             }
         };

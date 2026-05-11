@@ -810,6 +810,26 @@ export type UpdateAdminUserRequest = {
   isActive: boolean;
 };
 
+export type AdminRoleBreakdownDto = {
+  platformAdmin: number;
+  tenantAdmin: number;
+  financeController: number;
+  accountant: number;
+  approver: number;
+  viewer: number;
+  auditor: number;
+  budgetOfficer: number;
+  budgetOwner: number;
+  payrollOfficer: number;
+  hrOfficer: number;
+  procurementOfficer: number;
+  treasuryOfficer: number;
+  inventoryOfficer: number;
+  apOfficer: number;
+  arOfficer: number;
+  fixedAssetOfficer: number;
+};
+
 export type TenantOverviewResponse = {
   tenantId: string;
   tenantKey: string;
@@ -827,13 +847,7 @@ export type TenantOverviewResponse = {
     total: number;
     active: number;
     inactive: number;
-    byRole: {
-      platformAdmin: number;
-      tenantAdmin: number;
-      accountant: number;
-      approver: number;
-      viewer: number;
-    };
+    byRole: AdminRoleBreakdownDto;
   };
 };
 
@@ -853,17 +867,11 @@ export type PlatformAdminTenantSummaryDto = {
     daysRemaining?: number | null;
     renewalWarning: string;
   };
-  users: {
+    users: {
     total: number;
     active: number;
     inactive: number;
-    byRole: {
-      platformAdmin: number;
-      tenantAdmin: number;
-      accountant: number;
-      approver: number;
-      viewer: number;
-    };
+    byRole: AdminRoleBreakdownDto;
   };
 };
 

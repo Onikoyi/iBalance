@@ -8,17 +8,19 @@ using iBalance.Modules.Finance.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using iBalance.Api.Security;
 
 namespace iBalance.Api.Controllers;
 
 [ApiController]
-[Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant,Approver,Viewer")]
+[Authorize]
 [Route("api/finance/budgets")]
 public sealed class BudgetsController : ControllerBase
 
 {
 
- [HttpGet]
+[Authorize(Policy = AuthorizationPolicies.BudgetView)]
+[HttpGet]
 public async Task<IActionResult> GetBudgets(
     [FromServices] ApplicationDbContext dbContext,
     [FromServices] ITenantContextAccessor tenantContextAccessor,
@@ -69,6 +71,7 @@ public async Task<IActionResult> GetBudgets(
     });
 }
 
+    [Authorize(Policy = AuthorizationPolicies.BudgetView)]
     [HttpGet("rejected")]
     public async Task<IActionResult> GetRejectedBudgets(
         [FromServices] ApplicationDbContext dbContext,
@@ -116,7 +119,8 @@ public async Task<IActionResult> GetBudgets(
 
     
 
-    [HttpGet("{budgetId:guid}")]
+[Authorize(Policy = AuthorizationPolicies.BudgetView)]
+[HttpGet("{budgetId:guid}")]
 public async Task<IActionResult> GetBudgetDetail(
     Guid budgetId,
     [FromServices] ApplicationDbContext dbContext,
@@ -189,7 +193,7 @@ public async Task<IActionResult> GetBudgetDetail(
 }
 
     [HttpPost]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.BudgetCreate)]
     public async Task<IActionResult> CreateBudget(
         [FromBody] CreateBudgetRequest request,
         [FromServices] ApplicationDbContext dbContext,
@@ -243,7 +247,7 @@ public async Task<IActionResult> GetBudgetDetail(
     }
 
     [HttpPut("{budgetId:guid}")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.BudgetManage)]
     public async Task<IActionResult> UpdateBudget(
         Guid budgetId,
         [FromBody] CreateBudgetRequest request,
@@ -397,7 +401,7 @@ catch (DbUpdateException ex)
     }
 
     [HttpDelete("{budgetId:guid}")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.BudgetManage)]
     public async Task<IActionResult> DeleteBudget(
         Guid budgetId,
         [FromServices] ApplicationDbContext dbContext,
@@ -443,7 +447,7 @@ catch (DbUpdateException ex)
     }
 
     [HttpPost("{budgetId:guid}/submit")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.BudgetSubmit)]
     public async Task<IActionResult> SubmitBudget(
         Guid budgetId,
         [FromServices] ApplicationDbContext dbContext,
@@ -469,7 +473,7 @@ catch (DbUpdateException ex)
     }
 
     [HttpPost("{budgetId:guid}/approve")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
+    [Authorize(Policy = AuthorizationPolicies.BudgetApprove)]
     public async Task<IActionResult> ApproveBudget(
         Guid budgetId,
         [FromServices] ApplicationDbContext dbContext,
@@ -492,7 +496,7 @@ catch (DbUpdateException ex)
     }
 
     [HttpPost("{budgetId:guid}/reject")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
+    [Authorize(Policy = AuthorizationPolicies.BudgetReject)]
     public async Task<IActionResult> RejectBudget(
         Guid budgetId,
         [FromBody] RejectBudgetRequest request,
@@ -521,7 +525,7 @@ catch (DbUpdateException ex)
     }
 
     [HttpPost("{budgetId:guid}/lock")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
+    [Authorize(Policy = AuthorizationPolicies.BudgetLock)]
     public async Task<IActionResult> LockBudget(
         Guid budgetId,
         [FromServices] ApplicationDbContext dbContext,
@@ -544,7 +548,7 @@ catch (DbUpdateException ex)
     }
 
     [HttpPost("{budgetId:guid}/close")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
+    [Authorize(Policy = AuthorizationPolicies.BudgetClose)]
     public async Task<IActionResult> CloseBudget(
         Guid budgetId,
         [FromBody] CloseBudgetRequest request,
@@ -573,7 +577,7 @@ catch (DbUpdateException ex)
     }
 
     [HttpPost("{budgetId:guid}/overrun-policy")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
+    [Authorize(Policy = AuthorizationPolicies.BudgetManage)]
     public async Task<IActionResult> SetOverrunPolicy(
         Guid budgetId,
         [FromBody] SetBudgetOverrunPolicyRequest request,
@@ -603,7 +607,7 @@ catch (DbUpdateException ex)
     }
 
     [HttpPost("{budgetId:guid}/transfers")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
+    [Authorize(Policy = AuthorizationPolicies.BudgetTransfer)]
     public async Task<IActionResult> TransferBudgetAmount(
         Guid budgetId,
         [FromBody] TransferBudgetRequest request,
@@ -723,6 +727,7 @@ return Ok(new
 
     }
 
+    [Authorize(Policy = AuthorizationPolicies.BudgetView)]
     [HttpGet("upload-template")]
     public IActionResult DownloadBudgetUploadTemplate()
     {
@@ -735,7 +740,7 @@ return Ok(new
     }
 
     [HttpPost("upload")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.BudgetCreate)]
     public async Task<IActionResult> UploadBudget(
         [FromBody] UploadBudgetRequest request,
         [FromServices] ApplicationDbContext dbContext,
@@ -861,6 +866,7 @@ return Ok(new
     }
 
 
+[Authorize(Policy = AuthorizationPolicies.BudgetReportsView)]
 [HttpGet("reports/budget-vs-actual-consolidated")]
 public async Task<IActionResult> GetConsolidatedBudgetVsActual(
     [FromQuery] DateTime periodStartUtc,
@@ -1059,7 +1065,7 @@ var budgets = await budgetsQuery
     });
 }
 
-
+    [Authorize(Policy = AuthorizationPolicies.BudgetReportsView)]
     [HttpGet("reports/budget-vs-actual")]
     public async Task<IActionResult> GetBudgetVsActual(
         [FromQuery] Guid budgetId,

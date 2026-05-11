@@ -11,7 +11,11 @@ import {
   type PurchaseRequisitionDto,
   type UpdatePurchaseRequisitionRequest,
 } from '../lib/api';
-import { canViewFinance } from '../lib/auth';
+import {
+  canCreatePurchaseRequisitions,
+  canSubmitPurchaseRequisitions,
+  canViewProcurement,
+} from '../lib/auth';
 
 function dateInputToUtc(value: string) {
   return value ? new Date(`${value}T00:00:00.000Z`).toISOString() : '';
@@ -19,7 +23,9 @@ function dateInputToUtc(value: string) {
 
 export function RejectedPurchaseRequisitionsPage() {
   const qc = useQueryClient();
-  const canView = canViewFinance();
+  const canView = canViewProcurement();
+  const canManage = canCreatePurchaseRequisitions();
+  const canSubmitApproval = canSubmitPurchaseRequisitions();
   const [selected, setSelected] = useState<PurchaseRequisitionDto | null>(null);
   const [message, setMessage] = useState('');
   const [errorText, setErrorText] = useState('');
@@ -131,7 +137,7 @@ export function RejectedPurchaseRequisitionsPage() {
                   <td>{item.requestedByName}</td>
                   <td>{item.department || '—'}</td>
                   <td>{item.purpose}</td>
-                  <td><div className="inline-actions"><button className="button" type="button" onClick={() => setSelected(item)}>Edit</button><button className="button danger" type="button" onClick={() => deleteMut.mutate(item.id)}>Delete</button></div></td>
+                  <td><div className="inline-actions"><button className="button" type="button" onClick={() => setSelected(item)}>Edit</button><button className="button danger" type="button" disabled={!canManage} onClick={() => deleteMut.mutate(item.id)}>Delete</button></div></td>
                 </tr>
               ))}
             </tbody>
@@ -163,7 +169,7 @@ export function RejectedPurchaseRequisitionsPage() {
           ))}
           <div className="inline-actions" style={{ marginTop: 12 }}>
             <button className="button primary" type="button" onClick={save} disabled={updateMut.isPending}>Save Changes</button>
-            <button className="button secondary" type="button" onClick={() => resubmitMut.mutate(selected.id)} disabled={resubmitMut.isPending}>Resubmit</button>
+            <button className="button secondary" type="button" onClick={() => canSubmitApproval ? resubmitMut.mutate(selected.id) : setErrorText('You do not have permission to resubmit purchase requisitions.')} disabled={resubmitMut.isPending || !canSubmitApproval}>Resubmit</button>
           </div>
         </section>
       ) : null}

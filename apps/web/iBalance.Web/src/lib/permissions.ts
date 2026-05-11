@@ -7,92 +7,494 @@ export type AppPermission =
   | 'admin.roles.manage'
   | 'admin.permissions.manage'
   | 'admin.scopes.manage'
+  | 'license.recovery.bypass'
   | 'finance.view'
   | 'finance.setup.manage'
+  | 'finance.transactions.create'
+  | 'finance.transactions.submit'
+  | 'finance.transactions.approve'
+  | 'finance.transactions.reject'
+  | 'finance.transactions.post'
+  | 'finance.transactions.delete'
+  | 'finance.reports.view'
   | 'finance.journals.create'
   | 'finance.journals.post'
   | 'finance.journals.reverse'
   | 'finance.fiscal-periods.manage'
-  | 'finance.reports.view'
-  | 'license.recovery.bypass'
+  | 'budget.view'
+  | 'budget.manage'
+  | 'budget.create'
+  | 'budget.submit'
+  | 'budget.approve'
+  | 'budget.reject'
+  | 'budget.lock'
+  | 'budget.close'
+  | 'budget.transfer'
+  | 'budget.reports.view'
   | 'payroll.view'
   | 'payroll.manage'
   | 'payroll.run.submit'
   | 'payroll.run.approve'
   | 'payroll.run.reject'
-  | 'payroll.run.post';
+  | 'payroll.run.post'
+  | 'procurement.view'
+  | 'procurement.requisition.create'
+  | 'procurement.requisition.submit'
+  | 'procurement.requisition.approve'
+  | 'procurement.requisition.reject'
+  | 'procurement.po.create'
+  | 'procurement.po.approve'
+  | 'procurement.receipt.create'
+  | 'ap.view'
+  | 'ap.invoice.create'
+  | 'ap.invoice.submit'
+  | 'ap.invoice.approve'
+  | 'ap.invoice.reject'
+  | 'ap.invoice.post'
+  | 'ap.payment.create'
+  | 'ap.payment.submit'
+  | 'ap.payment.approve'
+  | 'ap.payment.reject'
+  | 'ap.payment.post'
+  | 'ar.view'
+  | 'ar.invoice.create'
+  | 'ar.invoice.submit'
+  | 'ar.invoice.approve'
+  | 'ar.invoice.reject'
+  | 'ar.invoice.post'
+  | 'ar.receipt.create'
+  | 'ar.receipt.submit'
+  | 'ar.receipt.approve'
+  | 'ar.receipt.reject'
+  | 'ar.receipt.post'
+  | 'treasury.view'
+  | 'treasury.manage'
+  | 'treasury.bankaccounts.manage'
+  | 'treasury.reconciliation.manage'
+  | 'inventory.view'
+  | 'inventory.manage'
+  | 'fixedassets.view'
+  | 'fixedassets.manage'
+  | 'fixedassets.depreciation.run'
+  | 'fixedassets.disposal.post'
+  | 'workflow.approve'
+  | 'workflow.reject'
+  | 'workflow.reopen'
+  | 'reports.view'
+  | 'reports.export';
 
-  const rolePermissions: Record<UserRole, AppPermission[]> = {
-    PlatformAdmin: [
-      'admin.access',
-      'admin.settings.manage',
-      'admin.users.manage',
-      'admin.roles.manage',
-      'admin.permissions.manage',
-      'admin.scopes.manage',
-      'finance.view',
-      'finance.setup.manage',
-      'finance.journals.create',
-      'finance.journals.post',
-      'finance.journals.reverse',
-      'finance.fiscal-periods.manage',
-      'finance.reports.view',
-      'payroll.view',
-      'payroll.manage',
-      'payroll.run.submit',
-      'payroll.run.approve',
-      'payroll.run.reject',
-      'payroll.run.post',
-      'license.recovery.bypass',
-    ],
-    TenantAdmin: [
-      'admin.access',
-      'admin.users.manage',
-      'admin.roles.manage',
-      'admin.permissions.manage',
-      'admin.scopes.manage',
-      'finance.view',
-      'finance.setup.manage',
-      'finance.journals.create',
-      'finance.journals.post',
-      'finance.journals.reverse',
-      'finance.fiscal-periods.manage',
-      'finance.reports.view',
-      'payroll.view',
-      'payroll.manage',
-      'payroll.run.submit',
-      'payroll.run.approve',
-      'payroll.run.reject',
-      'payroll.run.post',
-    ],
-    Accountant: [
-      'finance.view',
-      'finance.setup.manage',
-      'finance.journals.create',
-      'finance.journals.post',
-      'finance.journals.reverse',
-      'finance.fiscal-periods.manage',
-      'finance.reports.view',
-      'payroll.view',
-      'payroll.manage',
-      'payroll.run.submit',
-      'payroll.run.post',
-    ],
-    Approver: [
-      'finance.view',
-      'finance.journals.post',
-      'finance.journals.reverse',
-      'finance.reports.view',
-      'payroll.view',
-      'payroll.run.approve',
-      'payroll.run.reject',
-    ],
-    Viewer: [
-      'finance.view',
-      'finance.reports.view',
-      'payroll.view',
-    ],
-  };
+const rolePermissions: Record<UserRole, AppPermission[]> = {
+  PlatformAdmin: [
+    'admin.access',
+    'admin.settings.manage',
+    'admin.users.manage',
+    'admin.roles.manage',
+    'admin.permissions.manage',
+    'admin.scopes.manage',
+    'license.recovery.bypass',
+    'finance.view',
+    'finance.setup.manage',
+    'finance.transactions.create',
+    'finance.transactions.submit',
+    'finance.transactions.approve',
+    'finance.transactions.reject',
+    'finance.transactions.post',
+    'finance.transactions.delete',
+    'finance.reports.view',
+    'finance.journals.create',
+    'finance.journals.post',
+    'finance.journals.reverse',
+    'finance.fiscal-periods.manage',
+    'budget.view',
+    'budget.manage',
+    'budget.create',
+    'budget.submit',
+    'budget.approve',
+    'budget.reject',
+    'budget.lock',
+    'budget.close',
+    'budget.transfer',
+    'budget.reports.view',
+    'payroll.view',
+    'payroll.manage',
+    'payroll.run.submit',
+    'payroll.run.approve',
+    'payroll.run.reject',
+    'payroll.run.post',
+    'procurement.view',
+    'procurement.requisition.create',
+    'procurement.requisition.submit',
+    'procurement.requisition.approve',
+    'procurement.requisition.reject',
+    'procurement.po.create',
+    'procurement.po.approve',
+    'procurement.receipt.create',
+    'ap.view',
+    'ap.invoice.create',
+    'ap.invoice.submit',
+    'ap.invoice.approve',
+    'ap.invoice.reject',
+    'ap.invoice.post',
+    'ap.payment.create',
+    'ap.payment.submit',
+    'ap.payment.approve',
+    'ap.payment.reject',
+    'ap.payment.post',
+    'ar.view',
+    'ar.invoice.create',
+    'ar.invoice.submit',
+    'ar.invoice.approve',
+    'ar.invoice.reject',
+    'ar.invoice.post',
+    'ar.receipt.create',
+    'ar.receipt.submit',
+    'ar.receipt.approve',
+    'ar.receipt.reject',
+    'ar.receipt.post',
+    'treasury.view',
+    'treasury.manage',
+    'treasury.bankaccounts.manage',
+    'treasury.reconciliation.manage',
+    'inventory.view',
+    'inventory.manage',
+    'fixedassets.view',
+    'fixedassets.manage',
+    'fixedassets.depreciation.run',
+    'fixedassets.disposal.post',
+    'workflow.approve',
+    'workflow.reject',
+    'workflow.reopen',
+    'reports.view',
+    'reports.export',
+  ],
+  TenantAdmin: [
+    'admin.access',
+    'admin.settings.manage',
+    'admin.users.manage',
+    'admin.roles.manage',
+    'admin.permissions.manage',
+    'admin.scopes.manage',
+    'finance.view',
+    'finance.setup.manage',
+    'finance.transactions.create',
+    'finance.transactions.submit',
+    'finance.transactions.approve',
+    'finance.transactions.reject',
+    'finance.transactions.post',
+    'finance.transactions.delete',
+    'finance.reports.view',
+    'finance.journals.create',
+    'finance.journals.post',
+    'finance.journals.reverse',
+    'finance.fiscal-periods.manage',
+    'budget.view',
+    'budget.manage',
+    'budget.create',
+    'budget.submit',
+    'budget.approve',
+    'budget.reject',
+    'budget.lock',
+    'budget.close',
+    'budget.transfer',
+    'budget.reports.view',
+    'payroll.view',
+    'payroll.manage',
+    'payroll.run.submit',
+    'payroll.run.approve',
+    'payroll.run.reject',
+    'payroll.run.post',
+    'procurement.view',
+    'procurement.requisition.create',
+    'procurement.requisition.submit',
+    'procurement.requisition.approve',
+    'procurement.requisition.reject',
+    'procurement.po.create',
+    'procurement.po.approve',
+    'procurement.receipt.create',
+    'ap.view',
+    'ap.invoice.create',
+    'ap.invoice.submit',
+    'ap.invoice.approve',
+    'ap.invoice.reject',
+    'ap.invoice.post',
+    'ap.payment.create',
+    'ap.payment.submit',
+    'ap.payment.approve',
+    'ap.payment.reject',
+    'ap.payment.post',
+    'ar.view',
+    'ar.invoice.create',
+    'ar.invoice.submit',
+    'ar.invoice.approve',
+    'ar.invoice.reject',
+    'ar.invoice.post',
+    'ar.receipt.create',
+    'ar.receipt.submit',
+    'ar.receipt.approve',
+    'ar.receipt.reject',
+    'ar.receipt.post',
+    'treasury.view',
+    'treasury.manage',
+    'treasury.bankaccounts.manage',
+    'treasury.reconciliation.manage',
+    'inventory.view',
+    'inventory.manage',
+    'fixedassets.view',
+    'fixedassets.manage',
+    'fixedassets.depreciation.run',
+    'fixedassets.disposal.post',
+    'workflow.approve',
+    'workflow.reject',
+    'workflow.reopen',
+    'reports.view',
+    'reports.export',
+  ],
+  FinanceController: [
+    'finance.view',
+    'finance.setup.manage',
+    'finance.transactions.create',
+    'finance.transactions.submit',
+    'finance.transactions.approve',
+    'finance.transactions.reject',
+    'finance.transactions.post',
+    'finance.reports.view',
+    'finance.journals.create',
+    'finance.journals.post',
+    'finance.journals.reverse',
+    'finance.fiscal-periods.manage',
+    'budget.view',
+    'budget.manage',
+    'budget.create',
+    'budget.submit',
+    'budget.approve',
+    'budget.reject',
+    'budget.lock',
+    'budget.close',
+    'budget.transfer',
+    'budget.reports.view',
+    'ap.view',
+    'ap.invoice.create',
+    'ap.invoice.submit',
+    'ap.invoice.approve',
+    'ap.invoice.reject',
+    'ap.invoice.post',
+    'ap.payment.create',
+    'ap.payment.submit',
+    'ap.payment.approve',
+    'ap.payment.reject',
+    'ap.payment.post',
+    'ar.view',
+    'ar.invoice.create',
+    'ar.invoice.submit',
+    'ar.invoice.approve',
+    'ar.invoice.reject',
+    'ar.invoice.post',
+    'ar.receipt.create',
+    'ar.receipt.submit',
+    'ar.receipt.approve',
+    'ar.receipt.reject',
+    'ar.receipt.post',
+    'treasury.view',
+    'treasury.manage',
+    'treasury.bankaccounts.manage',
+    'treasury.reconciliation.manage',
+    'fixedassets.view',
+    'fixedassets.manage',
+    'fixedassets.depreciation.run',
+    'fixedassets.disposal.post',
+    'workflow.approve',
+    'workflow.reject',
+    'workflow.reopen',
+    'reports.view',
+    'reports.export',
+  ],
+  Accountant: [
+    'finance.view',
+    'finance.setup.manage',
+    'finance.transactions.create',
+    'finance.transactions.submit',
+    'finance.transactions.post',
+    'finance.reports.view',
+    'finance.journals.create',
+    'finance.journals.post',
+    'finance.journals.reverse',
+    'finance.fiscal-periods.manage',
+    'budget.view',
+    'budget.create',
+    'budget.submit',
+    'budget.reports.view',
+    'ap.view',
+    'ap.invoice.create',
+    'ap.invoice.submit',
+    'ap.invoice.post',
+    'ap.payment.create',
+    'ap.payment.submit',
+    'ap.payment.post',
+    'ar.view',
+    'ar.invoice.create',
+    'ar.invoice.submit',
+    'ar.invoice.post',
+    'ar.receipt.create',
+    'ar.receipt.submit',
+    'ar.receipt.post',
+    'fixedassets.view',
+    'fixedassets.manage',
+    'fixedassets.depreciation.run',
+    'reports.view',
+    'reports.export',
+  ],
+  Approver: [
+    'finance.view',
+    'finance.transactions.approve',
+    'finance.transactions.reject',
+    'finance.reports.view',
+    'budget.view',
+    'budget.approve',
+    'budget.reject',
+    'budget.lock',
+    'budget.close',
+    'budget.reports.view',
+    'payroll.view',
+    'payroll.run.approve',
+    'payroll.run.reject',
+    'procurement.view',
+    'procurement.requisition.approve',
+    'procurement.requisition.reject',
+    'procurement.po.approve',
+    'ap.view',
+    'ap.invoice.approve',
+    'ap.invoice.reject',
+    'ap.payment.approve',
+    'ap.payment.reject',
+    'ar.view',
+    'ar.invoice.approve',
+    'ar.invoice.reject',
+    'ar.receipt.approve',
+    'ar.receipt.reject',
+    'workflow.approve',
+    'workflow.reject',
+    'reports.view',
+    'reports.export',
+  ],
+  Viewer: [
+    'finance.view',
+    'finance.reports.view',
+    'budget.view',
+    'budget.reports.view',
+    'payroll.view',
+    'procurement.view',
+    'ap.view',
+    'ar.view',
+    'treasury.view',
+    'inventory.view',
+    'fixedassets.view',
+    'reports.view',
+    'reports.export',
+  ],
+  Auditor: [
+    'finance.view',
+    'finance.reports.view',
+    'budget.view',
+    'budget.reports.view',
+    'payroll.view',
+    'procurement.view',
+    'ap.view',
+    'ar.view',
+    'treasury.view',
+    'inventory.view',
+    'fixedassets.view',
+    'reports.view',
+    'reports.export',
+  ],
+  BudgetOfficer: [
+    'finance.view',
+    'budget.view',
+    'budget.manage',
+    'budget.create',
+    'budget.submit',
+    'budget.transfer',
+    'budget.reports.view',
+    'reports.view',
+    'reports.export',
+  ],
+  BudgetOwner: [
+    'finance.view',
+    'budget.view',
+    'budget.approve',
+    'budget.reject',
+    'budget.lock',
+    'budget.close',
+    'budget.reports.view',
+    'reports.view',
+    'reports.export',
+  ],
+  PayrollOfficer: [
+    'payroll.view',
+    'payroll.manage',
+    'payroll.run.submit',
+    'reports.view',
+    'reports.export',
+  ],
+  HrOfficer: [
+    'payroll.view',
+    'payroll.manage',
+    'reports.view',
+    'reports.export',
+  ],
+  ProcurementOfficer: [
+    'procurement.view',
+    'procurement.requisition.create',
+    'procurement.requisition.submit',
+    'procurement.po.create',
+    'procurement.receipt.create',
+    'reports.view',
+    'reports.export',
+  ],
+  TreasuryOfficer: [
+    'treasury.view',
+    'treasury.manage',
+    'treasury.bankaccounts.manage',
+    'treasury.reconciliation.manage',
+    'reports.view',
+    'reports.export',
+  ],
+  InventoryOfficer: [
+    'inventory.view',
+    'inventory.manage',
+    'reports.view',
+    'reports.export',
+  ],
+  ApOfficer: [
+    'ap.view',
+    'ap.invoice.create',
+    'ap.invoice.submit',
+    'ap.invoice.post',
+    'ap.payment.create',
+    'ap.payment.submit',
+    'ap.payment.post',
+    'reports.view',
+    'reports.export',
+  ],
+  ArOfficer: [
+    'ar.view',
+    'ar.invoice.create',
+    'ar.invoice.submit',
+    'ar.invoice.post',
+    'ar.receipt.create',
+    'ar.receipt.submit',
+    'ar.receipt.post',
+    'reports.view',
+    'reports.export',
+  ],
+  FixedAssetOfficer: [
+    'fixedassets.view',
+    'fixedassets.manage',
+    'fixedassets.depreciation.run',
+    'fixedassets.disposal.post',
+    'reports.view',
+    'reports.export',
+  ],
+};
 
 export function getRolePermissions(role: UserRole | null | undefined): AppPermission[] {
   if (!role) {
@@ -111,13 +513,47 @@ export function roleHasPermission(
 
 export function getAssignableRolesForRole(role: UserRole | null | undefined): UserRole[] {
   if (role === 'PlatformAdmin') {
-    return ['TenantAdmin', 'Accountant', 'Approver', 'Viewer'];
+    return [
+      'PlatformAdmin',
+      'TenantAdmin',
+      'FinanceController',
+      'Accountant',
+      'Approver',
+      'Viewer',
+      'Auditor',
+      'BudgetOfficer',
+      'BudgetOwner',
+      'PayrollOfficer',
+      'HrOfficer',
+      'ProcurementOfficer',
+      'TreasuryOfficer',
+      'InventoryOfficer',
+      'ApOfficer',
+      'ArOfficer',
+      'FixedAssetOfficer',
+    ];
   }
 
   if (role === 'TenantAdmin') {
-    return ['TenantAdmin', 'Accountant', 'Approver', 'Viewer'];
+    return [
+      'TenantAdmin',
+      'FinanceController',
+      'Accountant',
+      'Approver',
+      'Viewer',
+      'Auditor',
+      'BudgetOfficer',
+      'BudgetOwner',
+      'PayrollOfficer',
+      'HrOfficer',
+      'ProcurementOfficer',
+      'TreasuryOfficer',
+      'InventoryOfficer',
+      'ApOfficer',
+      'ArOfficer',
+      'FixedAssetOfficer',
+    ];
   }
 
   return [];
 }
-

@@ -95,6 +95,18 @@ public sealed class AuthController : ControllerBase
         dbContext.UserAccounts.Add(user);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await EnsureDefaultEnterpriseRoleAssignmentAsync(
+            dbContext,
+            tenantContext.TenantId,
+            user,
+            cancellationToken);
+
+        var authorizationProfile = await BuildAuthorizationProfileAsync(
+            dbContext,
+            tenantContext.TenantId,
+            user,
+            cancellationToken);
+
         var jwtOptions = jwtOptionsAccessor.Value;
         var expiresAtUtc = DateTime.UtcNow.AddMinutes(jwtOptions.ExpiryMinutes);
 
@@ -102,6 +114,7 @@ public sealed class AuthController : ControllerBase
             user,
             tenantContext.TenantId,
             tenantContext.TenantKey,
+            authorizationProfile,
             jwtOptions,
             expiresAtUtc);
 
@@ -119,9 +132,18 @@ public sealed class AuthController : ControllerBase
                 user.FirstName,
                 user.LastName,
                 DisplayName = user.FullName,
-                user.Role,
+                Role = authorizationProfile.PrimaryRole,
                 TenantId = tenantContext.TenantId,
-                TenantKey = tenantContext.TenantKey
+                TenantKey = tenantContext.TenantKey,
+                Roles = authorizationProfile.Roles,
+                Permissions = authorizationProfile.Permissions,
+                Scopes = authorizationProfile.Scopes.Select(x => new
+                {
+                    x.ScopeType,
+                    x.ScopeEntityId,
+                    x.ScopeCode,
+                    x.ScopeName
+                }).ToList()
             }
         });
     }
@@ -236,10 +258,23 @@ public sealed class AuthController : ControllerBase
         var jwtOptions = jwtOptionsAccessor.Value;
         var expiresAtUtc = DateTime.UtcNow.AddMinutes(jwtOptions.ExpiryMinutes);
 
+        await EnsureDefaultEnterpriseRoleAssignmentAsync(
+            dbContext,
+            tenantContext.TenantId,
+            user,
+            cancellationToken);
+
+        var authorizationProfile = await BuildAuthorizationProfileAsync(
+            dbContext,
+            tenantContext.TenantId,
+            user,
+            cancellationToken);
+
         var token = BuildAccessToken(
             user,
             tenantContext.TenantId,
             tenantContext.TenantKey,
+            authorizationProfile,
             jwtOptions,
             expiresAtUtc);
 
@@ -259,9 +294,18 @@ public sealed class AuthController : ControllerBase
                 user.FirstName,
                 user.LastName,
                 DisplayName = user.FullName,
-                user.Role,
+                Role = authorizationProfile.PrimaryRole,
                 TenantId = tenantContext.TenantId,
-                TenantKey = tenantContext.TenantKey
+                TenantKey = tenantContext.TenantKey,
+                Roles = authorizationProfile.Roles,
+                Permissions = authorizationProfile.Permissions,
+                Scopes = authorizationProfile.Scopes.Select(x => new
+                {
+                    x.ScopeType,
+                    x.ScopeEntityId,
+                    x.ScopeCode,
+                    x.ScopeName
+                }).ToList()
             }
         });
     }
@@ -455,7 +499,14 @@ public sealed class AuthController : ControllerBase
             });
         }
 
-        var isPlatformAdmin = string.Equals(user.Role, "PlatformAdmin", StringComparison.OrdinalIgnoreCase);
+        var authorizationProfile = await BuildAuthorizationProfileAsync(
+            dbContext,
+            tenantContext.TenantId,
+            user,
+            cancellationToken);
+
+        var isPlatformAdmin = authorizationProfile.Roles.Any(x =>
+            string.Equals(x, "PlatformAdmin", StringComparison.OrdinalIgnoreCase));
 
         return Ok(new
         {
@@ -464,18 +515,191 @@ public sealed class AuthController : ControllerBase
             user.FirstName,
             user.LastName,
             DisplayName = user.FullName,
-            user.Role,
+            Role = authorizationProfile.PrimaryRole,
             user.IsActive,
             TenantId = tenantContext.TenantId,
             TenantKey = tenantContext.TenantKey,
+            Roles = authorizationProfile.Roles,
+            Permissions = authorizationProfile.Permissions,
+            Scopes = authorizationProfile.Scopes.Select(x => new
+            {
+                x.ScopeType,
+                x.ScopeEntityId,
+                x.ScopeCode,
+                x.ScopeName
+            }).ToList(),
             LicenseBypassAllowed = isPlatformAdmin
         });
+    }
+
+    private static async Task EnsureDefaultEnterpriseRoleAssignmentAsync(
+        ApplicationDbContext dbContext,
+        Guid tenantId,
+        UserAccount user,
+        CancellationToken cancellationToken)
+    {
+        var hasAssignments = await dbContext.Set<UserSecurityRoleAssignment>()
+            .AnyAsync(x => x.TenantId == tenantId && x.UserAccountId == user.Id, cancellationToken);
+
+        if (hasAssignments)
+        {
+            return;
+        }
+
+        var legacyRoleCode = ToSecurityRoleCode(user.Role);
+
+        var role = await dbContext.Set<SecurityRole>()
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Code == legacyRoleCode, cancellationToken);
+
+        if (role is null)
+        {
+            return;
+        }
+
+        dbContext.Set<UserSecurityRoleAssignment>().Add(new UserSecurityRoleAssignment(
+            Guid.NewGuid(),
+            tenantId,
+            user.Id,
+            role.Id,
+            true));
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task<AuthorizationProfileDto> BuildAuthorizationProfileAsync(
+        ApplicationDbContext dbContext,
+        Guid tenantId,
+        UserAccount user,
+        CancellationToken cancellationToken)
+    {
+        var assignedRoles = await dbContext.Set<UserSecurityRoleAssignment>()
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.UserAccountId == user.Id)
+            .Join(
+                dbContext.Set<SecurityRole>().AsNoTracking(),
+                assignment => assignment.SecurityRoleId,
+                role => role.Id,
+                (assignment, role) => new
+                {
+                    role.Code,
+                    assignment.IsPrimary,
+                    role.IsActive
+                })
+            .Where(x => x.IsActive)
+            .ToListAsync(cancellationToken);
+
+        var hasEnterpriseAssignments = assignedRoles.Count > 0;
+
+        var roleCodes = assignedRoles
+            .OrderByDescending(x => x.IsPrimary)
+            .Select(x => ToLegacyRoleName(x.Code))
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (!hasEnterpriseAssignments)
+        {
+            roleCodes = new List<string> { user.Role };
+        }
+
+        var primaryRole =
+            assignedRoles
+                .OrderByDescending(x => x.IsPrimary)
+                .Select(x => ToLegacyRoleName(x.Code))
+                .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x))
+            ?? user.Role;
+
+        var permissions = await dbContext.Set<UserSecurityRoleAssignment>()
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.UserAccountId == user.Id)
+            .Join(
+                dbContext.Set<SecurityRolePermission>().AsNoTracking(),
+                assignment => assignment.SecurityRoleId,
+                mapping => mapping.SecurityRoleId,
+                (assignment, mapping) => mapping)
+            .Join(
+                dbContext.Set<SecurityPermission>().AsNoTracking(),
+                mapping => mapping.SecurityPermissionId,
+                permission => permission.Id,
+                (mapping, permission) => permission)
+            .Where(x => x.IsActive)
+            .Select(x => x.Code)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        var scopes = await dbContext.Set<UserScopeAssignment>()
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.UserAccountId == user.Id)
+            .Select(x => new AuthorizationScopeDto(
+                x.ScopeType,
+                x.ScopeEntityId.ToString(),
+                x.ScopeCode,
+                x.ScopeName))
+            .ToListAsync(cancellationToken);
+
+        return new AuthorizationProfileDto(
+            primaryRole,
+            roleCodes,
+            permissions,
+            scopes);
+    }
+
+    private static string ToSecurityRoleCode(string legacyRole)
+    {
+        return legacyRole.Trim().ToUpperInvariant() switch
+        {
+            "PLATFORMADMIN" => "PLATFORM_ADMIN",
+            "TENANTADMIN" => "TENANT_ADMIN",
+            "FINANCECONTROLLER" => "FINANCE_CONTROLLER",
+            "BUDGETOFFICER" => "BUDGET_OFFICER",
+            "BUDGETOWNER" => "BUDGET_OWNER",
+            "PAYROLLOFFICER" => "PAYROLL_OFFICER",
+            "HROFFICER" => "HR_OFFICER",
+            "PROCUREMENTOFFICER" => "PROCUREMENT_OFFICER",
+            "TREASURYOFFICER" => "TREASURY_OFFICER",
+            "INVENTORYOFFICER" => "INVENTORY_OFFICER",
+            "APOFFICER" => "AP_OFFICER",
+            "AROFFICER" => "AR_OFFICER",
+            "FIXEDASSETOFFICER" => "FIXED_ASSET_OFFICER",
+            _ => legacyRole.Trim().Replace(" ", "_").ToUpperInvariant()
+        };
+    }
+
+    private static string ToLegacyRoleName(string roleCode)
+    {
+        return roleCode.Trim().ToUpperInvariant() switch
+        {
+            "PLATFORM_ADMIN" => "PlatformAdmin",
+            "TENANT_ADMIN" => "TenantAdmin",
+            "FINANCE_CONTROLLER" => "FinanceController",
+            "ACCOUNTANT" => "Accountant",
+            "APPROVER" => "Approver",
+            "VIEWER" => "Viewer",
+            "AUDITOR" => "Auditor",
+            "BUDGET_OFFICER" => "BudgetOfficer",
+            "BUDGET_OWNER" => "BudgetOwner",
+            "PAYROLL_OFFICER" => "PayrollOfficer",
+            "HR_OFFICER" => "HrOfficer",
+            "PROCUREMENT_OFFICER" => "ProcurementOfficer",
+            "TREASURY_OFFICER" => "TreasuryOfficer",
+            "INVENTORY_OFFICER" => "InventoryOfficer",
+            "AP_OFFICER" => "ApOfficer",
+            "AR_OFFICER" => "ArOfficer",
+            "FIXED_ASSET_OFFICER" => "FixedAssetOfficer",
+            _ => roleCode.Trim()
+        };
+    }
+
+    private static string BuildScopeClaimValue(AuthorizationScopeDto scope)
+    {
+        return $"{scope.ScopeType}|{scope.ScopeEntityId}|{scope.ScopeCode}|{scope.ScopeName}";
     }
 
     private static string BuildAccessToken(
         UserAccount user,
         Guid tenantId,
         string tenantKey,
+        AuthorizationProfileDto authorizationProfile,
         JwtOptions jwtOptions,
         DateTime expiresAtUtc)
     {
@@ -485,10 +709,25 @@ public sealed class AuthController : ControllerBase
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(ClaimTypes.Email, user.Email),
             new(ClaimTypes.Name, user.FullName),
-            new(ClaimTypes.Role, user.Role),
+            new(ClaimTypes.Role, authorizationProfile.PrimaryRole),
             new("tenant_id", tenantId.ToString()),
             new("tenant_key", tenantKey)
         };
+
+        foreach (var role in authorizationProfile.Roles.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            claims.Add(new Claim("assigned_role", role));
+        }
+
+        foreach (var permission in authorizationProfile.Permissions.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            claims.Add(new Claim("permission", permission));
+        }
+
+        foreach (var scope in authorizationProfile.Scopes)
+        {
+            claims.Add(new Claim("scope", BuildScopeClaimValue(scope)));
+        }
 
         var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SecretKey));
         var credentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
@@ -503,6 +742,18 @@ public sealed class AuthController : ControllerBase
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
+
+    private sealed record AuthorizationScopeDto(
+        string ScopeType,
+        string ScopeEntityId,
+        string? ScopeCode,
+        string? ScopeName);
+
+    private sealed record AuthorizationProfileDto(
+        string PrimaryRole,
+        IReadOnlyCollection<string> Roles,
+        IReadOnlyCollection<string> Permissions,
+        IReadOnlyCollection<AuthorizationScopeDto> Scopes);
 
     public sealed record RegisterRequest(
         string Email,

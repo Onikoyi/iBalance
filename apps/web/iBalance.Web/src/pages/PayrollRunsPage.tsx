@@ -17,16 +17,22 @@ import {
   useState,
   type PayrollRunLineDetailDto,
   type PayrollRunSummaryDto,
-  canManageFinanceSetup,
-  canPostJournals,
+  canApprovePayrollRunAction,
+  canCreatePayrollRuns,
+  canPostPayrollRunAction,
+  canRejectPayrollRunAction,
+  canSubmitPayrollRunAction,
   canViewFinance,
 } from './PayrollShared';
 
 export function PayrollRunsPage() {
   const queryClient = useQueryClient();
   const canView = canViewFinance();
-  const canManage = canManageFinanceSetup();
-  const canPost = canPostJournals();
+  const canCreateRun = canCreatePayrollRuns();
+  const canSubmitRun = canSubmitPayrollRunAction();
+  const canApproveRun = canApprovePayrollRunAction();
+  const canRejectRun = canRejectPayrollRunAction();
+  const canPost = canPostPayrollRunAction();
   const [message, setMessage] = useState('');
   const [errorText, setErrorText] = useState('');
   const [payrollRunPeriod, setPayrollRunPeriod] = useState(new Date().toISOString().slice(0, 7));
@@ -131,8 +137,8 @@ export function PayrollRunsPage() {
   }
 
   if (!canView) return <div className="panel error-panel">You do not have access to Payroll Runs.</div>;
-  if (runsQ.isLoading || accountsQ.isLoading) return <div className="panel">Loading Payroll runs...</div>;
-  if (runsQ.isError || accountsQ.isError) return <div className="panel error-panel">Unable to load Payroll runs.</div>;
+  if (runsQ.isLoading) return <div className="panel">Loading Payroll runs...</div>;
+  if (runsQ.isError) return <div className="panel error-panel">Unable to load Payroll runs.</div>;
 
   const runs = ((((runsQ.data as any)?.items ?? []) as PayrollRunSummaryDto[]).filter((run) => run.status !== 4));
   const selectedRun = runs.find((run) => run.id === selectedRunId);
@@ -145,10 +151,11 @@ export function PayrollRunsPage() {
         <div className="muted">Maker/Checker workflow with persisted payroll line-item breakdown.</div>
         {message ? <div className="success-panel">{message}</div> : null}
         {errorText ? <div className="error-panel">{errorText}</div> : null}
+        {accountsQ.isError ? <div className="panel" style={{ marginTop: 12 }}><div className="muted">Ledger accounts could not be loaded. Payroll runs can still be reviewed and workflow actions can continue, but GL posting is temporarily unavailable until accounts load successfully.</div></div> : null}
 
         <div className="form-grid three">
           <div className="form-row"><label>Payroll Period</label><input className="input" type="month" value={payrollRunPeriod} onChange={(e) => setPayrollRunPeriod(e.target.value)} /></div>
-          <div className="form-row"><label>Generate</label><button className="button primary" type="button" disabled={!canManage || generateRunMut.isPending || !payrollRunPeriod} onClick={() => generateRunMut.mutate(payrollRunPeriod)}>Generate Payroll Run</button></div>
+          <div className="form-row"><label>Generate</label><button className="button primary" type="button" disabled={!canCreateRun || generateRunMut.isPending || !payrollRunPeriod} onClick={() => generateRunMut.mutate(payrollRunPeriod)}>Generate Payroll Run</button></div>
           <div className="form-row">
             <label>Select Run</label>
             <select
@@ -174,8 +181,8 @@ export function PayrollRunsPage() {
         <h3>Payroll Runs</h3>
         <div className="table-wrap">
           <table className="data-table">
-            <thead><tr><th>Period</th><th>Status</th><th style={{ textAlign: 'right' }}>Employees</th><th style={{ textAlign: 'right' }}>Gross</th><th style={{ textAlign: 'right' }}>Deductions</th><th style={{ textAlign: 'right' }}>Net Pay</th><th>Journal</th>{canManage ? <th style={{ width: 140 }}>Actions</th> : null}</tr></thead>
-            <tbody>{runs.map((run) => <tr key={run.id}><td>{run.payrollPeriod}</td><td>{payrollStatusLabel(run.status)}</td><td style={{ textAlign: 'right' }}>{run.employeeCount}</td><td style={{ textAlign: 'right' }}>{formatAmount(run.totalGrossPay)}</td><td style={{ textAlign: 'right' }}>{formatAmount(run.totalDeductions)}</td><td style={{ textAlign: 'right' }}>{formatAmount(run.totalNetPay)}</td><td>{run.journalEntryId || '—'}</td>{canManage ? <td><button className="button danger" type="button" disabled={run.status !== 0 || !!run.journalEntryId || deleteRunMut.isPending} onClick={() => removePayrollRun(run)}>Delete</button></td> : null}</tr>)}</tbody>
+            <thead><tr><th>Period</th><th>Status</th><th style={{ textAlign: 'right' }}>Employees</th><th style={{ textAlign: 'right' }}>Gross</th><th style={{ textAlign: 'right' }}>Deductions</th><th style={{ textAlign: 'right' }}>Net Pay</th><th>Journal</th>{canCreateRun ? <th style={{ width: 140 }}>Actions</th> : null}</tr></thead>
+            <tbody>{runs.map((run) => <tr key={run.id}><td>{run.payrollPeriod}</td><td>{payrollStatusLabel(run.status)}</td><td style={{ textAlign: 'right' }}>{run.employeeCount}</td><td style={{ textAlign: 'right' }}>{formatAmount(run.totalGrossPay)}</td><td style={{ textAlign: 'right' }}>{formatAmount(run.totalDeductions)}</td><td style={{ textAlign: 'right' }}>{formatAmount(run.totalNetPay)}</td><td>{run.journalEntryId || '—'}</td>{canCreateRun ? <td><button className="button danger" type="button" disabled={run.status !== 0 || !!run.journalEntryId || deleteRunMut.isPending} onClick={() => removePayrollRun(run)}>Delete</button></td> : null}</tr>)}</tbody>
           </table>
         </div>
       </section>
@@ -184,13 +191,13 @@ export function PayrollRunsPage() {
         <section className="panel">
           <h3>Maker / Checker Actions</h3>
           <div className="form-grid three">
-            <button className="button secondary" type="button" disabled={!canManage || selectedRun.status !== 0 || submitRunMut.isPending} onClick={() => submitRunMut.mutate(selectedRun.id)}>Submit for Approval</button>
-            <button className="button secondary" type="button" disabled={!canPost || selectedRun.status !== 1 || approveRunMut.isPending} onClick={() => approveRunMut.mutate(selectedRun.id)}>Approve Payroll</button>
+            <button className="button secondary" type="button" disabled={!canSubmitRun || selectedRun.status !== 0 || submitRunMut.isPending} onClick={() => submitRunMut.mutate(selectedRun.id)}>Submit for Approval</button>
+            <button className="button secondary" type="button" disabled={!canApproveRun || selectedRun.status !== 1 || approveRunMut.isPending} onClick={() => approveRunMut.mutate(selectedRun.id)}>Approve Payroll</button>
           </div>
 
           <div className="form-grid two" style={{ marginTop: 12 }}>
             <div className="form-row"><label>Reject Reason</label><input className="input" value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} /></div>
-            <div className="form-row"><label>Reject</label><button className="button danger" type="button" disabled={!canPost || selectedRun.status !== 1 || !rejectionReason.trim()} onClick={() => rejectRunMut.mutate({ runId: selectedRun.id, reason: rejectionReason })}>Reject Payroll</button></div>
+            <div className="form-row"><label>Reject</label><button className="button danger" type="button" disabled={!canRejectRun || selectedRun.status !== 1 || !rejectionReason.trim()} onClick={() => rejectRunMut.mutate({ runId: selectedRun.id, reason: rejectionReason })}>Reject Payroll</button></div>
           </div>
 
           <div className="panel" style={{ marginTop: 16 }}>
@@ -233,7 +240,7 @@ export function PayrollRunsPage() {
               <button
                 className="button success"
                 type="button"
-                disabled={!canPost || selectedRun.status !== 1 || !postingDate || !salaryExpenseAccountId || !deductionsPayableAccountId || !netSalaryPayableAccountId || postRunMut.isPending}
+                disabled={!canPost || accountsQ.isError || selectedRun.status !== 1 || !postingDate || !salaryExpenseAccountId || !deductionsPayableAccountId || !netSalaryPayableAccountId || postRunMut.isPending}
                 onClick={() =>
                   postRunMut.mutate({
                     runId: selectedRun.id,

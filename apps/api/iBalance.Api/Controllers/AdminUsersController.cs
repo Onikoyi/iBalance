@@ -16,12 +16,25 @@ namespace iBalance.Api.Controllers;
 [Route("api/admin/users")]
 public sealed class AdminUsersController : ControllerBase
 {
-    private static readonly string[] SupportedRoles =
+        private static readonly string[] SupportedRoles =
     [
+        "PlatformAdmin",
         "TenantAdmin",
+        "FinanceController",
         "Accountant",
         "Approver",
-        "Viewer"
+        "Viewer",
+        "Auditor",
+        "BudgetOfficer",
+        "BudgetOwner",
+        "PayrollOfficer",
+        "HrOfficer",
+        "ProcurementOfficer",
+        "TreasuryOfficer",
+        "InventoryOfficer",
+        "ApOfficer",
+        "ArOfficer",
+        "FixedAssetOfficer"
     ];
 
     [HttpGet]
@@ -73,12 +86,18 @@ public sealed class AdminUsersController : ControllerBase
     }
 
     [HttpGet("roles")]
-    public IActionResult GetAssignableRoles()
+    public IActionResult GetAssignableRoles(
+        [FromServices] ICurrentUserService currentUserService)
     {
+        var isPlatformAdmin = currentUserService.HasAnyRole("PlatformAdmin");
+        var items = isPlatformAdmin
+            ? SupportedRoles
+            : SupportedRoles.Where(x => !string.Equals(x, "PlatformAdmin", StringComparison.OrdinalIgnoreCase)).ToArray();
+
         return Ok(new
         {
-            Count = SupportedRoles.Length,
-            Items = SupportedRoles
+            Count = items.Length,
+            Items = items
         });
     }
 
@@ -434,7 +453,7 @@ public sealed class AdminUsersController : ControllerBase
         return SupportedRoles.First(x => string.Equals(x, role.Trim(), StringComparison.OrdinalIgnoreCase));
     }
 
-    private static bool IsSelfDemotionOrDeactivation(
+        private static bool IsSelfDemotionOrDeactivation(
         UserAccount targetUser,
         string requestedRole,
         bool requestedIsActive,
@@ -453,6 +472,19 @@ public sealed class AdminUsersController : ControllerBase
         if (!requestedIsActive)
         {
             return true;
+        }
+
+        var currentUserRoles = currentUserService.Roles;
+
+        var currentlyHasProtectedAdministrativeAccess =
+            currentUserRoles.Any(x => string.Equals(x, "PlatformAdmin", StringComparison.OrdinalIgnoreCase)) ||
+            currentUserRoles.Any(x => string.Equals(x, "TenantAdmin", StringComparison.OrdinalIgnoreCase)) ||
+            string.Equals(targetUser.Role, "PlatformAdmin", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(targetUser.Role, "TenantAdmin", StringComparison.OrdinalIgnoreCase);
+
+        if (!currentlyHasProtectedAdministrativeAccess)
+        {
+            return false;
         }
 
         return !string.Equals(requestedRole, "TenantAdmin", StringComparison.OrdinalIgnoreCase) &&

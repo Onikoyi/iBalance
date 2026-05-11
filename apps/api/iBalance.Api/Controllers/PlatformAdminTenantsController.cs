@@ -1,3 +1,4 @@
+using iBalance.Api.Security;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
 using iBalance.Modules.Platform.Domain.Entities;
 using iBalance.Modules.Platform.Domain.Enums;
@@ -8,10 +9,11 @@ using Microsoft.EntityFrameworkCore;
 namespace iBalance.Api.Controllers;
 
 [ApiController]
-[Authorize(Roles = "PlatformAdmin")]
+[Authorize]
 [Route("api/admin/platform/tenants")]
 public sealed class PlatformAdminTenantsController : ControllerBase
 {
+    [Authorize(Policy = AuthorizationPolicies.AdminAccess)]
     [HttpGet]
     public async Task<IActionResult> GetTenants(
         [FromServices] ApplicationDbContext dbContext,
@@ -63,11 +65,23 @@ public sealed class PlatformAdminTenantsController : ControllerBase
             var activeUsers = tenantUsers.Count(x => x.IsActive);
             var inactiveUsers = tenantUsers.Count(x => !x.IsActive);
 
+            var platformAdmins = tenantUsers.Count(x => x.Role == "PlatformAdmin");
             var tenantAdmins = tenantUsers.Count(x => x.Role == "TenantAdmin");
+            var financeControllers = tenantUsers.Count(x => x.Role == "FinanceController");
             var accountants = tenantUsers.Count(x => x.Role == "Accountant");
             var approvers = tenantUsers.Count(x => x.Role == "Approver");
             var viewers = tenantUsers.Count(x => x.Role == "Viewer");
-            var platformAdmins = tenantUsers.Count(x => x.Role == "PlatformAdmin");
+            var auditors = tenantUsers.Count(x => x.Role == "Auditor");
+            var budgetOfficers = tenantUsers.Count(x => x.Role == "BudgetOfficer");
+            var budgetOwners = tenantUsers.Count(x => x.Role == "BudgetOwner");
+            var payrollOfficers = tenantUsers.Count(x => x.Role == "PayrollOfficer");
+            var hrOfficers = tenantUsers.Count(x => x.Role == "HrOfficer");
+            var procurementOfficers = tenantUsers.Count(x => x.Role == "ProcurementOfficer");
+            var treasuryOfficers = tenantUsers.Count(x => x.Role == "TreasuryOfficer");
+            var inventoryOfficers = tenantUsers.Count(x => x.Role == "InventoryOfficer");
+            var apOfficers = tenantUsers.Count(x => x.Role == "ApOfficer");
+            var arOfficers = tenantUsers.Count(x => x.Role == "ArOfficer");
+            var fixedAssetOfficers = tenantUsers.Count(x => x.Role == "FixedAssetOfficer");
 
             var (licenseStatus, daysRemaining, renewalWarning) =
                 ComputeLicenseSummary(tenant.Status, tenantLicense, utcNow);
@@ -99,9 +113,21 @@ public sealed class PlatformAdminTenantsController : ControllerBase
                     {
                         PlatformAdmin = platformAdmins,
                         TenantAdmin = tenantAdmins,
+                        FinanceController = financeControllers,
                         Accountant = accountants,
                         Approver = approvers,
-                        Viewer = viewers
+                        Viewer = viewers,
+                        Auditor = auditors,
+                        BudgetOfficer = budgetOfficers,
+                        BudgetOwner = budgetOwners,
+                        PayrollOfficer = payrollOfficers,
+                        HrOfficer = hrOfficers,
+                        ProcurementOfficer = procurementOfficers,
+                        TreasuryOfficer = treasuryOfficers,
+                        InventoryOfficer = inventoryOfficers,
+                        ApOfficer = apOfficers,
+                        ArOfficer = arOfficers,
+                        FixedAssetOfficer = fixedAssetOfficers
                     }
                 }
             };
@@ -114,6 +140,7 @@ public sealed class PlatformAdminTenantsController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.AdminAccess)]
     [HttpGet("{tenantId:guid}")]
     public async Task<IActionResult> GetTenantDetail(
         Guid tenantId,
@@ -208,6 +235,7 @@ public sealed class PlatformAdminTenantsController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.AdminSettingsManage)]
     [HttpPost("{tenantId:guid}/renew-license")]
     public async Task<IActionResult> RenewLicense(
         Guid tenantId,
@@ -279,6 +307,7 @@ public sealed class PlatformAdminTenantsController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.AdminSettingsManage)]
     [HttpPost("{tenantId:guid}/change-package")]
     public async Task<IActionResult> ChangePackage(
         Guid tenantId,
@@ -354,6 +383,7 @@ public sealed class PlatformAdminTenantsController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.AdminSettingsManage)]
     [HttpPost("{tenantId:guid}/suspend")]
     public async Task<IActionResult> SuspendTenant(
         Guid tenantId,
@@ -392,6 +422,7 @@ public sealed class PlatformAdminTenantsController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.AdminSettingsManage)]
     [HttpPost("{tenantId:guid}/reactivate")]
     public async Task<IActionResult> ReactivateTenant(
         Guid tenantId,

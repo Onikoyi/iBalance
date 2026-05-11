@@ -1,4 +1,4 @@
-import { getTenantKey } from './api';
+import { getTenantKey, setTenantKey } from './api';
 import {
   getAssignableRolesForRole,
   roleHasPermission,
@@ -8,9 +8,21 @@ import {
 export type UserRole =
   | 'PlatformAdmin'
   | 'TenantAdmin'
+  | 'FinanceController'
   | 'Accountant'
   | 'Approver'
-  | 'Viewer';
+  | 'Viewer'
+  | 'Auditor'
+  | 'BudgetOfficer'
+  | 'BudgetOwner'
+  | 'PayrollOfficer'
+  | 'HrOfficer'
+  | 'ProcurementOfficer'
+  | 'TreasuryOfficer'
+  | 'InventoryOfficer'
+  | 'ApOfficer'
+  | 'ArOfficer'
+  | 'FixedAssetOfficer';
 
 export type AuthSession = {
   accessToken: string;
@@ -65,6 +77,13 @@ type ForgotPasswordResponse = {
 
 const authKey = 'ibalance.auth.session';
 
+const genericDisplaySuppressedRoles = new Set<string>([
+  'Approver',
+  'Viewer',
+  'Accountant',
+  'Auditor',
+]);
+
 function getApiBaseUrl() {
   return import.meta.env.VITE_API_BASE_URL || 'http://localhost:5071';
 }
@@ -76,6 +95,21 @@ function getStoredRawSession(): string | null {
 function clearStoredSession() {
   localStorage.removeItem(authKey);
   sessionStorage.removeItem(authKey);
+}
+
+function normalizeTenantKeyForSession(session: AuthSession | null): AuthSession | null {
+  if (!session?.tenantKey) {
+    return session;
+  }
+
+  if (session.role !== 'PlatformAdmin') {
+    const currentTenantKey = getTenantKey();
+    if (currentTenantKey.trim() !== session.tenantKey.trim()) {
+      setTenantKey(session.tenantKey);
+    }
+  }
+
+  return session;
 }
 
 async function parseApiResponse(response: Response) {
@@ -118,6 +152,8 @@ function setSessionFromResponse(data: AuthSuccessResponse, rememberMe: boolean):
     sessionStorage.setItem(authKey, serialized);
   }
 
+  normalizeTenantKeyForSession(session);
+
   return session;
 }
 
@@ -138,7 +174,7 @@ export function getSession(): AuthSession | null {
       return null;
     }
 
-    return parsed;
+    return normalizeTenantKeyForSession(parsed);
   } catch {
     clearStoredSession();
     return null;
@@ -164,6 +200,19 @@ export function getCurrentRoles(): string[] {
   return Array.from(new Set([session.role, ...expanded].filter(Boolean)));
 }
 
+export function getDisplayRoles(): string[] {
+  const allRoles = getCurrentRoles();
+  if (allRoles.length === 0) return [];
+
+  const specificRoles = allRoles.filter((role) => !genericDisplaySuppressedRoles.has(role));
+
+  if (specificRoles.length > 0) {
+    return specificRoles;
+  }
+
+  return allRoles;
+}
+
 export function hasAnyAssignedRole(allowedRoles: string[]): boolean {
   const roles = getCurrentRoles().map((value) => value.toLowerCase());
   return allowedRoles.some((role) => roles.includes(role.toLowerCase()));
@@ -186,6 +235,10 @@ export function isPlatformAdmin(): boolean {
 
 export function isTenantAdmin(): boolean {
   return getCurrentRole() === 'TenantAdmin';
+}
+
+export function canSwitchTenantContext(): boolean {
+  return isPlatformAdmin();
 }
 
 export function canManagePlatformAdministration(): boolean {
@@ -242,7 +295,7 @@ export function canAccessAdmin(): boolean {
 }
 
 export function canManageAdminSettings(): boolean {
-  return canManagePlatformCommercials();
+  return canManagePlatformCommercials() || hasPermission('admin.settings.manage');
 }
 
 export function canManageUsers(): boolean {
@@ -254,7 +307,7 @@ export function canManageFinanceSetup(): boolean {
 }
 
 export function canCreateJournals(): boolean {
-  return hasPermission('finance.journals.create');
+  return hasPermission('finance.journals.create') || hasPermission('finance.transactions.create');
 }
 
 export function canPostOrReverseJournals(): boolean {
@@ -262,7 +315,7 @@ export function canPostOrReverseJournals(): boolean {
 }
 
 export function canApproveWorkflows(): boolean {
-  return hasAnyRole(['PlatformAdmin', 'TenantAdmin', 'Approver']);
+  return hasPermission('workflow.approve');
 }
 
 export function canManageFiscalPeriods(): boolean {
@@ -274,7 +327,7 @@ export function canViewFinance(): boolean {
 }
 
 export function canViewReports(): boolean {
-  return hasPermission('finance.reports.view');
+  return hasPermission('reports.view') || hasPermission('finance.reports.view');
 }
 
 export function canViewPayroll(): boolean {
@@ -299,6 +352,162 @@ export function canRejectPayrollRuns(): boolean {
 
 export function canPostPayrollRuns(): boolean {
   return hasPermission('payroll.run.post');
+}
+
+export function canViewBudget(): boolean {
+  return hasPermission('budget.view');
+}
+
+export function canViewProcurement(): boolean {
+  return hasPermission('procurement.view');
+}
+
+export function canCreatePurchaseRequisitions(): boolean {
+  return hasPermission('procurement.requisition.create');
+}
+
+export function canSubmitPurchaseRequisitions(): boolean {
+  return hasPermission('procurement.requisition.submit');
+}
+
+export function canApprovePurchaseRequisitions(): boolean {
+  return hasPermission('procurement.requisition.approve');
+}
+
+export function canRejectPurchaseRequisitions(): boolean {
+  return hasPermission('procurement.requisition.reject');
+}
+
+export function canCreatePurchaseOrders(): boolean {
+  return hasPermission('procurement.po.create');
+}
+
+export function canApprovePurchaseOrders(): boolean {
+  return hasPermission('procurement.po.approve');
+}
+
+export function canRejectPurchaseOrders(): boolean {
+  return hasPermission('procurement.po.approve') || hasPermission('workflow.reject');
+}
+
+export function canCreatePurchaseOrderReceipts(): boolean {
+  return hasPermission('procurement.receipt.create');
+}
+
+export function canViewAccountsPayable(): boolean {
+  return hasPermission('ap.view');
+}
+
+export function canCreatePurchaseInvoices(): boolean {
+  return hasPermission('ap.invoice.create');
+}
+
+export function canSubmitPurchaseInvoices(): boolean {
+  return hasPermission('ap.invoice.submit');
+}
+
+export function canApprovePurchaseInvoices(): boolean {
+  return hasPermission('ap.invoice.approve');
+}
+
+export function canRejectPurchaseInvoices(): boolean {
+  return hasPermission('ap.invoice.reject');
+}
+
+export function canPostPurchaseInvoices(): boolean {
+  return hasPermission('ap.invoice.post');
+}
+
+export function canCreateVendorPayments(): boolean {
+  return hasPermission('ap.payment.create');
+}
+
+export function canSubmitVendorPayments(): boolean {
+  return hasPermission('ap.payment.submit');
+}
+
+export function canApproveVendorPayments(): boolean {
+  return hasPermission('ap.payment.approve');
+}
+
+export function canRejectVendorPayments(): boolean {
+  return hasPermission('ap.payment.reject');
+}
+
+export function canPostVendorPayments(): boolean {
+  return hasPermission('ap.payment.post');
+}
+
+export function canViewAccountsReceivable(): boolean {
+  return hasPermission('ar.view');
+}
+
+export function canManageCustomers(): boolean {
+  return hasPermission('ar.invoice.create') || hasPermission('ar.receipt.create');
+}
+
+export function canCreateSalesInvoices(): boolean {
+  return hasPermission('ar.invoice.create');
+}
+
+export function canSubmitSalesInvoices(): boolean {
+  return hasPermission('ar.invoice.submit');
+}
+
+export function canApproveSalesInvoices(): boolean {
+  return hasPermission('ar.invoice.approve');
+}
+
+export function canRejectSalesInvoices(): boolean {
+  return hasPermission('ar.invoice.reject');
+}
+
+export function canPostSalesInvoices(): boolean {
+  return hasPermission('ar.invoice.post');
+}
+
+export function canCreateCustomerReceipts(): boolean {
+  return hasPermission('ar.receipt.create');
+}
+
+export function canSubmitCustomerReceipts(): boolean {
+  return hasPermission('ar.receipt.submit');
+}
+
+export function canApproveCustomerReceipts(): boolean {
+  return hasPermission('ar.receipt.approve');
+}
+
+export function canRejectCustomerReceipts(): boolean {
+  return hasPermission('ar.receipt.reject');
+}
+
+export function canPostCustomerReceipts(): boolean {
+  return hasPermission('ar.receipt.post');
+}
+
+export function canViewTreasury(): boolean {
+  return hasPermission('treasury.view');
+}
+
+export function canViewInventory(): boolean {
+  return hasPermission('inventory.view');
+}
+
+export function canViewFixedAssets(): boolean {
+  return hasPermission('fixedassets.view');
+}
+
+export function canManageFixedAssets(): boolean {
+  return hasPermission('fixedassets.manage');
+}
+
+export function canRunFixedAssetDepreciation(): boolean {
+  return hasPermission('fixedassets.depreciation.run');
+}
+
+export function canPostFixedAssetDisposals(): boolean {
+  return hasPermission('fixedassets.disposal.post');
 }
 
 export function canEditUserRole(targetRole: UserRole): boolean {

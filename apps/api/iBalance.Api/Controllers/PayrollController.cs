@@ -3,9 +3,11 @@ using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
 using iBalance.Modules.Finance.Domain.Entities;
 using iBalance.Modules.Finance.Domain.Enums;
+using iBalance.Modules.Platform.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace iBalance.Api.Controllers;
 
@@ -14,7 +16,99 @@ namespace iBalance.Api.Controllers;
 [Route("api/payroll")]
 public sealed class PayrollController : ControllerBase
 {
-[Authorize(Policy = AuthorizationPolicies.FinanceView)]
+    private sealed record PayrollScopeContext(bool IsUnrestricted, IReadOnlyCollection<string> DepartmentTokens);
+
+    private static bool IsCurrentUserPlatformAdmin(ClaimsPrincipal user)
+    {
+        return user.IsInRole("PlatformAdmin");
+    }
+
+    private static bool IsCurrentUserTenantAdmin(ClaimsPrincipal user)
+    {
+        return user.IsInRole("TenantAdmin");
+    }
+
+    private static string NormalizeScopeText(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim().ToLowerInvariant();
+    }
+
+    private static Guid? GetCurrentUserId(ClaimsPrincipal user)
+    {
+        var value = user.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Guid.TryParse(value, out var userId) ? userId : null;
+    }
+
+    private async Task<PayrollScopeContext> GetPayrollScopeContextAsync(
+        ApplicationDbContext dbContext,
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
+        if (IsCurrentUserPlatformAdmin(User) || IsCurrentUserTenantAdmin(User))
+        {
+            return new PayrollScopeContext(true, Array.Empty<string>());
+        }
+
+        var userId = GetCurrentUserId(User);
+        if (!userId.HasValue)
+        {
+            return new PayrollScopeContext(false, Array.Empty<string>());
+        }
+
+        var departmentTokens = await dbContext.Set<UserScopeAssignment>()
+            .AsNoTracking()
+            .Where(x =>
+                x.TenantId == tenantId &&
+                x.UserAccountId == userId.Value &&
+                x.ScopeType.ToLower() == "department")
+            .Select(x => new
+            {
+                x.ScopeCode,
+                x.ScopeName
+            })
+            .ToListAsync(cancellationToken);
+
+        var tokens = departmentTokens
+            .SelectMany(x => new[] { x.ScopeCode, x.ScopeName })
+            .Select(NormalizeScopeText)
+            .Where(x => x.Length > 0)
+            .Distinct()
+            .ToList();
+
+        return new PayrollScopeContext(false, tokens);
+    }
+
+    private static IQueryable<PayrollEmployee> ApplyEmployeePayrollScope(
+        IQueryable<PayrollEmployee> query,
+        PayrollScopeContext scope)
+    {
+        if (scope.IsUnrestricted)
+        {
+            return query;
+        }
+
+        if (scope.DepartmentTokens.Count == 0)
+        {
+            return query.Where(x => false);
+        }
+
+        return query.Where(x =>
+            x.Department != null &&
+            scope.DepartmentTokens.Contains(x.Department.Trim().ToLower()));
+    }
+
+    private static bool IsEmployeeDepartmentAllowed(string? department, PayrollScopeContext scope)
+    {
+        if (scope.IsUnrestricted)
+        {
+            return true;
+        }
+
+        var normalized = NormalizeScopeText(department);
+        return normalized.Length > 0 && scope.DepartmentTokens.Contains(normalized);
+    }
+
+[Authorize(Policy = AuthorizationPolicies.PayrollView)]
 [HttpGet("employees")]
 public async Task<IActionResult> GetEmployees(
     [FromServices] ApplicationDbContext dbContext,
@@ -23,8 +117,18 @@ public async Task<IActionResult> GetEmployees(
 {
     var tenantContext = tenantContextAccessor.Current;
 
-    var items = await dbContext.PayrollEmployees
-        .AsNoTracking()
+    if (!tenantContext.IsAvailable)
+    {
+        return BadRequest(new { Message = "Tenant context is required.", RequiredHeader = "X-Tenant-Key" });
+    }
+
+    var scope = await GetPayrollScopeContextAsync(dbContext, tenantContext.TenantId, cancellationToken);
+
+    var query = ApplyEmployeePayrollScope(
+        dbContext.PayrollEmployees.AsNoTracking(),
+        scope);
+
+    var items = await query
         .OrderBy(x => x.EmployeeNumber)
         .Select(x => new
         {
@@ -54,14 +158,16 @@ public async Task<IActionResult> GetEmployees(
     return Ok(new
     {
         TenantContextAvailable = tenantContext.IsAvailable,
-        TenantId = tenantContext.IsAvailable ? tenantContext.TenantId : (Guid?)null,
-        TenantKey = tenantContext.IsAvailable ? tenantContext.TenantKey : null,
+        TenantId = tenantContext.TenantId,
+        TenantKey = tenantContext.TenantKey,
+        ScopeApplied = !scope.IsUnrestricted,
+        ScopeDepartments = scope.DepartmentTokens,
         Count = items.Count,
         Items = items
     });
 }
 
-[Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+[Authorize(Policy = AuthorizationPolicies.PayrollManage)]
 [HttpPost("employees")]
 public async Task<IActionResult> CreateEmployee(
     [FromBody] CreatePayrollEmployeeRequest request,
@@ -80,6 +186,13 @@ public async Task<IActionResult> CreateEmployee(
     if (validation is not null)
     {
         return BadRequest(new { Message = validation });
+    }
+
+    var payrollScope = await GetPayrollScopeContextAsync(dbContext, tenantContext.TenantId, cancellationToken);
+
+    if (!IsEmployeeDepartmentAllowed(request.Department, payrollScope))
+    {
+        return Forbid();
     }
 
     var employeeNumber = request.EmployeeNumber.Trim().ToUpperInvariant();
@@ -118,7 +231,7 @@ public async Task<IActionResult> CreateEmployee(
     return Ok(new { Message = "Payroll employee created successfully.", employee.Id, employee.EmployeeNumber, employee.FullName });
 }
 
-[Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+[Authorize(Policy = AuthorizationPolicies.PayrollManage)]
 [HttpPut("employees/{employeeId:guid}")]
 public async Task<IActionResult> UpdateEmployee(
     [FromRoute] Guid employeeId,
@@ -146,6 +259,18 @@ public async Task<IActionResult> UpdateEmployee(
     if (employee is null)
     {
         return NotFound(new { Message = "Payroll employee was not found.", EmployeeId = employeeId });
+    }
+
+    var payrollScope = await GetPayrollScopeContextAsync(dbContext, tenantContext.TenantId, cancellationToken);
+
+    if (!IsEmployeeDepartmentAllowed(employee.Department, payrollScope))
+    {
+        return Forbid();
+    }
+
+    if (!IsEmployeeDepartmentAllowed(request.Department, payrollScope))
+    {
+        return Forbid();
     }
 
     employee.Update(
@@ -176,7 +301,7 @@ public async Task<IActionResult> UpdateEmployee(
     });
 }
 
-[Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+[Authorize(Policy = AuthorizationPolicies.PayrollManage)]
 [HttpDelete("employees/{employeeId:guid}")]
 public async Task<IActionResult> DeleteEmployee(
     [FromRoute] Guid employeeId,
@@ -197,6 +322,13 @@ public async Task<IActionResult> DeleteEmployee(
     if (employee is null)
     {
         return NotFound(new { Message = "Payroll employee was not found.", EmployeeId = employeeId });
+    }
+
+    var payrollScope = await GetPayrollScopeContextAsync(dbContext, tenantContext.TenantId, cancellationToken);
+
+    if (!IsEmployeeDepartmentAllowed(employee.Department, payrollScope))
+    {
+        return Forbid();
     }
 
     var hasSalaryStructure = await dbContext.PayrollSalaryStructures
@@ -230,7 +362,7 @@ public async Task<IActionResult> DeleteEmployee(
     });
 }
 
-[Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+[Authorize(Policy = AuthorizationPolicies.PayrollManage)]
 [HttpPost("employees/import")]
 public async Task<IActionResult> ImportEmployees(
     [FromBody] ImportPayrollEmployeesRequest request,
@@ -249,6 +381,7 @@ public async Task<IActionResult> ImportEmployees(
     {
         return BadRequest(new { Message = "At least one employee row is required." });
     }
+    var payrollScope = await GetPayrollScopeContextAsync(dbContext, tenantContext.TenantId, cancellationToken);
 
     var imported = new List<PayrollEmployee>();
     var errors = new List<object>();
@@ -263,6 +396,17 @@ public async Task<IActionResult> ImportEmployees(
         if (validation is not null)
         {
             errors.Add(new { Row = rowNumber, Message = validation });
+            continue;
+        }
+
+        if (!IsEmployeeDepartmentAllowed(item.Department, payrollScope))
+        {
+            errors.Add(new
+            {
+                Row = rowNumber,
+                Message = "You are not allowed to import an employee into this department.",
+                Department = item.Department
+            });
             continue;
         }
 
@@ -327,7 +471,7 @@ public async Task<IActionResult> ImportEmployees(
 
 
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceView)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollView)]
     [HttpGet("pay-groups")]
     public async Task<IActionResult> GetPayGroups(
         [FromServices] ApplicationDbContext dbContext,
@@ -361,7 +505,7 @@ public async Task<IActionResult> ImportEmployees(
         });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollManage)]
     [HttpPost("pay-groups")]
     public async Task<IActionResult> CreatePayGroup(
         [FromBody] CreatePayrollPayGroupRequest request,
@@ -396,7 +540,7 @@ public async Task<IActionResult> ImportEmployees(
         return Ok(new { Message = "Payroll pay group created successfully.", payGroup.Id, payGroup.Code });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollManage)]
     [HttpPut("pay-groups/{payGroupId:guid}")]
     public async Task<IActionResult> UpdatePayGroup(
         [FromRoute] Guid payGroupId,
@@ -445,7 +589,7 @@ public async Task<IActionResult> ImportEmployees(
         });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollManage)]
     [HttpDelete("pay-groups/{payGroupId:guid}")]
     public async Task<IActionResult> DeletePayGroup(
         [FromRoute] Guid payGroupId,
@@ -494,7 +638,7 @@ public async Task<IActionResult> ImportEmployees(
         });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceView)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollView)]
     [HttpGet("pay-elements")]
     public async Task<IActionResult> GetPayElements(
         [FromServices] ApplicationDbContext dbContext,
@@ -540,7 +684,7 @@ public async Task<IActionResult> ImportEmployees(
         });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollManage)]
     [HttpPost("pay-elements")]
     public async Task<IActionResult> CreatePayElement(
         [FromBody] CreatePayrollPayElementRequest request,
@@ -602,7 +746,7 @@ public async Task<IActionResult> ImportEmployees(
         return Ok(new { Message = "Payroll pay element created successfully.", element.Id, element.Code });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollManage)]
     [HttpPut("pay-elements/{payElementId:guid}")]
     public async Task<IActionResult> UpdatePayElement(
         [FromRoute] Guid payElementId,
@@ -677,7 +821,7 @@ public async Task<IActionResult> ImportEmployees(
         });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollManage)]
     [HttpDelete("pay-elements/{payElementId:guid}")]
     public async Task<IActionResult> DeletePayElement(
         [FromRoute] Guid payElementId,
@@ -711,7 +855,7 @@ public async Task<IActionResult> ImportEmployees(
         });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceView)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollView)]
     [HttpGet("salary-structures")]
     public async Task<IActionResult> GetSalaryStructures(
         [FromServices] ApplicationDbContext dbContext,
@@ -762,7 +906,7 @@ public async Task<IActionResult> ImportEmployees(
         });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollManage)]
     [HttpPost("salary-structures")]
     public async Task<IActionResult> CreateSalaryStructure(
         [FromBody] CreatePayrollSalaryStructureRequest request,
@@ -812,7 +956,7 @@ public async Task<IActionResult> ImportEmployees(
         return Ok(new { Message = "Payroll salary structure created successfully.", structure.Id });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollManage)]
     [HttpPut("salary-structures/{salaryStructureId:guid}")]
     public async Task<IActionResult> UpdateSalaryStructure(
         [FromRoute] Guid salaryStructureId,
@@ -881,7 +1025,7 @@ public async Task<IActionResult> ImportEmployees(
         });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollManage)]
     [HttpDelete("salary-structures/{salaryStructureId:guid}")]
     public async Task<IActionResult> DeleteSalaryStructure(
         [FromRoute] Guid salaryStructureId,
@@ -915,7 +1059,7 @@ public async Task<IActionResult> ImportEmployees(
     }
 
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceJournalsPost)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollRunPost)]
     [HttpPost("run/{runId:guid}/post")]
     public async Task<IActionResult> PostPayrollRun(
         [FromRoute] Guid runId,
@@ -1228,7 +1372,7 @@ public async Task<IActionResult> ImportEmployees(
 
 
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollRunSubmit)]
     [HttpPost("run/{runId:guid}/submit")]
     public async Task<IActionResult> SubmitPayrollRun(
         [FromRoute] Guid runId,
@@ -1276,7 +1420,7 @@ public async Task<IActionResult> ImportEmployees(
         });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceJournalsPost)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollRunApprove)]
     [HttpPost("run/{runId:guid}/approve")]
     public async Task<IActionResult> ApprovePayrollRun(
         [FromRoute] Guid runId,
@@ -1320,7 +1464,7 @@ public async Task<IActionResult> ImportEmployees(
         });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceJournalsPost)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollRunReject)]
     [HttpPost("run/{runId:guid}/reject")]
     public async Task<IActionResult> RejectPayrollRun(
         [FromRoute] Guid runId,
@@ -1372,7 +1516,7 @@ public async Task<IActionResult> ImportEmployees(
         });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollManage)]
     [HttpPost("run/{runId:guid}/reopen")]
     public async Task<IActionResult> ReopenRejectedPayrollRun(
         [FromRoute] Guid runId,
@@ -1413,7 +1557,7 @@ public async Task<IActionResult> ImportEmployees(
         });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollManage)]
     [HttpPost("run/{runId:guid}/resubmit")]
     public async Task<IActionResult> ResubmitRejectedPayrollRun(
         [FromRoute] Guid runId,
@@ -1459,7 +1603,7 @@ public async Task<IActionResult> ImportEmployees(
         });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollManage)]
     [HttpDelete("runs/{runId:guid}")]
     public async Task<IActionResult> DeletePayrollRun(
         [FromRoute] Guid runId,
@@ -1534,7 +1678,7 @@ public async Task<IActionResult> ImportEmployees(
     }
 
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceView)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollView)]
     [HttpGet("policy")]
     public async Task<IActionResult> GetPayrollPolicy(
         [FromServices] ApplicationDbContext dbContext,
@@ -1571,7 +1715,7 @@ public async Task<IActionResult> ImportEmployees(
         return Ok(policy);
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollManage)]
     [HttpPut("policy")]
     public async Task<IActionResult> UpsertPayrollPolicy(
         [FromBody] UpdatePayrollPolicySettingRequest request,
@@ -1633,7 +1777,7 @@ public async Task<IActionResult> ImportEmployees(
         });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceView)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollView)]
     [HttpGet("runs")]
     public async Task<IActionResult> GetPayrollRuns(
         [FromServices] ApplicationDbContext dbContext,
@@ -1671,7 +1815,7 @@ public async Task<IActionResult> ImportEmployees(
         });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceView)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollView)]
     [HttpGet("runs/{runId:guid}")]
     public async Task<IActionResult> GetPayrollRunDetail(
         [FromRoute] Guid runId,
@@ -1773,7 +1917,7 @@ public async Task<IActionResult> ImportEmployees(
         });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceView)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollView)]
     [HttpGet("runs/{runId:guid}/payslips")]
     public async Task<IActionResult> GetPayrollPayslips(
         [FromRoute] Guid runId,
@@ -1878,7 +2022,7 @@ public async Task<IActionResult> ImportEmployees(
 // PAYROLL / PHASE 1 — PAY GROUP COMPOSITION
 // ==========================================
 
-[Authorize(Policy = AuthorizationPolicies.FinanceView)]
+[Authorize(Policy = AuthorizationPolicies.PayrollView)]
 [HttpGet("pay-group-elements/{payGroupId:guid}")]
 public async Task<IActionResult> GetPayGroupElements(
     [FromRoute] Guid payGroupId,
@@ -1938,7 +2082,7 @@ public async Task<IActionResult> GetPayGroupElements(
     });
 }
 
-[Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+[Authorize(Policy = AuthorizationPolicies.PayrollManage)]
 [HttpPost("pay-group-elements")]
 public async Task<IActionResult> CreatePayGroupElement(
     [FromBody] CreatePayrollPayGroupElementRequest request,
@@ -1994,7 +2138,7 @@ public async Task<IActionResult> CreatePayGroupElement(
     return Ok(new { Message = "Pay group composition item created successfully.", item.Id, item.PayGroupId, item.PayElementId, item.Sequence });
 }
 
-[Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+[Authorize(Policy = AuthorizationPolicies.PayrollManage)]
 [HttpPut("pay-group-elements/{payGroupElementId:guid}")]
 public async Task<IActionResult> UpdatePayGroupElement(
     [FromRoute] Guid payGroupElementId,
@@ -2025,7 +2169,7 @@ public async Task<IActionResult> UpdatePayGroupElement(
     return Ok(new { Message = "Pay group composition item updated successfully.", item.Id, item.Sequence, item.IsActive });
 }
 
-[Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+[Authorize(Policy = AuthorizationPolicies.PayrollManage)]
 [HttpDelete("pay-group-elements/{payGroupElementId:guid}")]
 public async Task<IActionResult> DeletePayGroupElement(
     [FromRoute] Guid payGroupElementId,
@@ -2050,7 +2194,7 @@ public async Task<IActionResult> DeletePayGroupElement(
 }
 
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceView)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollView)]
     [HttpGet("runs/{runId:guid}/statutory-report")]
     public async Task<IActionResult> GetPayrollStatutoryReport(
         [FromRoute] Guid runId,
@@ -2120,7 +2264,7 @@ public async Task<IActionResult> DeletePayGroupElement(
         });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceView)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollView)]
     [HttpGet("employees/{employeeId:guid}/history")]
     public async Task<IActionResult> GetEmployeePayrollHistory(
         [FromRoute] Guid employeeId,
@@ -2187,7 +2331,7 @@ public async Task<IActionResult> DeletePayGroupElement(
         });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceView)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollView)]
     [HttpGet("salary-structure-overrides/{salaryStructureId:guid}")]
     public async Task<IActionResult> GetSalaryStructureOverrides(
         [FromRoute] Guid salaryStructureId,
@@ -2245,7 +2389,7 @@ public async Task<IActionResult> DeletePayGroupElement(
         });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollManage)]
     [HttpPost("salary-structure-overrides")]
     public async Task<IActionResult> CreateSalaryStructureOverride(
         [FromBody] CreatePayrollSalaryStructureOverrideRequest request,
@@ -2327,7 +2471,7 @@ public async Task<IActionResult> DeletePayGroupElement(
         });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollManage)]
     [HttpPut("salary-structure-overrides/{salaryStructureOverrideId:guid}")]
     public async Task<IActionResult> UpdateSalaryStructureOverride(
         [FromRoute] Guid salaryStructureOverrideId,
@@ -2377,7 +2521,7 @@ public async Task<IActionResult> DeletePayGroupElement(
         });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceSetupManage)]
+    [Authorize(Policy = AuthorizationPolicies.PayrollManage)]
     [HttpDelete("salary-structure-overrides/{salaryStructureOverrideId:guid}")]
     public async Task<IActionResult> DeleteSalaryStructureOverride(
         [FromRoute] Guid salaryStructureOverrideId,
@@ -2513,6 +2657,7 @@ private static string? ValidatePayGroupElementUpdateRequest(UpdatePayrollPayGrou
 
 
 
+    [Authorize(Policy = AuthorizationPolicies.PayrollManage)]
     [HttpPost("run")]
     public async Task<IActionResult> GeneratePayrollRun(
         [FromQuery] string period,

@@ -41,7 +41,7 @@ export function PublicShell({ children }: PropsWithChildren) {
               <div className="public-brand-divider" />
               <LogoSlot dataUrl={tenantLogo} fallbackText="Tenant" />
             </div>
-            <div className="public-brand-sub">iBalance • Accounting Cloud</div>
+            <div className="public-brand-sub">iBalance • ERP Cloud</div>
           </Link>
 
           <nav className="public-nav">
@@ -82,7 +82,7 @@ export function PublicShell({ children }: PropsWithChildren) {
 
       <footer className="public-footer">
         <div>
-          <strong>© Nikosoft Technologies</strong> — iBalance Accounting Cloud
+          <strong>© Nikosoft Technologies</strong> — iBalance ERP Cloud
         </div>
         <div className="muted">Tenant-ready •  Finance Suite • Audit-first</div>
       </footer>

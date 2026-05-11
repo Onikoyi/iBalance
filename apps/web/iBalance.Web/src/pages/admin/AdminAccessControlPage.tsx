@@ -207,6 +207,24 @@ export function AdminAccessControlPage() {
     return Boolean((role as any)?.isProtected);
   });
 
+  const isAnyQueryLoading =
+    rolesQ.isLoading ||
+    permissionsQ.isLoading ||
+    departmentsQ.isLoading ||
+    branchesQ.isLoading ||
+    costCentersQ.isLoading ||
+    userAssignmentsQ.isLoading ||
+    workflowPoliciesQ.isLoading;
+
+  const queryError =
+    rolesQ.error ||
+    permissionsQ.error ||
+    departmentsQ.error ||
+    branchesQ.error ||
+    costCentersQ.error ||
+    userAssignmentsQ.error ||
+    workflowPoliciesQ.error;
+
   function isRoleProtected(role: any) {
     return Boolean(role?.isProtected);
   }
@@ -217,6 +235,9 @@ export function AdminAccessControlPage() {
 
   function startRolePermissionEdit(roleId: string) {
     setSelectedRoleId(roleId);
+    setMessage('');
+    setErrorText('');
+
     const role = roles.find((item: any) => item.id === roleId);
     const currentPermissionIds = ((role as any)?.permissionIds ?? []) as string[];
     setSelectedRolePermissionIds([...currentPermissionIds]);
@@ -224,6 +245,9 @@ export function AdminAccessControlPage() {
 
   function startUserAssignmentEdit(userId: string) {
     setSelectedUserId(userId);
+    setMessage('');
+    setErrorText('');
+
     const user = users.find((item: any) => item.id === userId);
     if (!user) return;
 
@@ -237,6 +261,18 @@ export function AdminAccessControlPage() {
     return <div className="panel error-panel">You do not have access to enterprise access control setup.</div>;
   }
 
+  if (isAnyQueryLoading) {
+    return <div className="panel">Loading enterprise access control setup...</div>;
+  }
+
+  if (queryError) {
+    return (
+      <div className="panel error-panel">
+        {getTenantReadableError(queryError, 'Unable to load enterprise access control setup.')}
+      </div>
+    );
+  }
+
   return (
     <div className="page-grid">
       <section className="panel">
@@ -245,7 +281,17 @@ export function AdminAccessControlPage() {
             <h2>Enterprise Access Control</h2>
             <div className="muted">Setup roles, permissions, user scopes, departments, branches, cost centers, and departmental maker/checker policy.</div>
           </div>
-          <button className="button primary" type="button" onClick={() => seedDefaultsMut.mutate()} disabled={seedDefaultsMut.isPending}>
+          <button
+            className="button primary"
+            type="button"
+            onClick={() => {
+              setMessage('');
+              setErrorText('');
+              seedDefaultsMut.mutate();
+            }}
+            disabled={seedDefaultsMut.isPending || !platformAdmin}
+            title={!platformAdmin ? 'Only Platform Admin can seed protected default access-control data.' : undefined}
+          >
             {seedDefaultsMut.isPending ? 'Seeding…' : 'Seed Default Roles / Permissions'}
           </button>
         </div>
@@ -262,7 +308,18 @@ export function AdminAccessControlPage() {
           <div className="form-row"><label><input type="checkbox" checked={roleForm.isActive} onChange={(e) => setRoleForm((s) => ({ ...s, isActive: e.target.checked }))} /> Active</label></div>
         </div>
         <div className="inline-actions" style={{ marginTop: 12 }}>
-          <button className="button primary" type="button" onClick={() => createRoleMut.mutate(roleForm)}>Create Role</button>
+          <button
+            className="button primary"
+            type="button"
+            onClick={() => {
+              setMessage('');
+              setErrorText('');
+              createRoleMut.mutate(roleForm);
+            }}
+            disabled={createRoleMut.isPending}
+          >
+            {createRoleMut.isPending ? 'Creating…' : 'Create Role'}
+          </button>
         </div>
       </section>
 
@@ -276,7 +333,18 @@ export function AdminAccessControlPage() {
           <div className="form-row"><label>Description</label><input className="input" value={permissionForm.description} onChange={(e) => setPermissionForm((s) => ({ ...s, description: e.target.value }))} /></div>
         </div>
         <div className="inline-actions" style={{ marginTop: 12 }}>
-          <button className="button primary" type="button" onClick={() => createPermissionMut.mutate(permissionForm)}>Create Permission</button>
+          <button
+            className="button primary"
+            type="button"
+            onClick={() => {
+              setMessage('');
+              setErrorText('');
+              createPermissionMut.mutate(permissionForm);
+            }}
+            disabled={createPermissionMut.isPending}
+          >
+            {createPermissionMut.isPending ? 'Creating…' : 'Create Permission'}
+          </button>
         </div>
       </section>
 
@@ -287,19 +355,52 @@ export function AdminAccessControlPage() {
             <h4>Department</h4>
             <div className="form-row"><label>Code</label><input className="input" value={departmentForm.code} onChange={(e) => setDepartmentForm((s) => ({ ...s, code: e.target.value }))} /></div>
             <div className="form-row"><label>Name</label><input className="input" value={departmentForm.name} onChange={(e) => setDepartmentForm((s) => ({ ...s, name: e.target.value }))} /></div>
-            <button className="button primary" type="button" onClick={() => createDepartmentMut.mutate(departmentForm)}>Create Department</button>
+            <button
+              className="button primary"
+              type="button"
+              onClick={() => {
+                setMessage('');
+                setErrorText('');
+                createDepartmentMut.mutate(departmentForm);
+              }}
+              disabled={createDepartmentMut.isPending}
+            >
+              {createDepartmentMut.isPending ? 'Creating…' : 'Create Department'}
+            </button>
           </div>
           <div>
             <h4>Branch</h4>
             <div className="form-row"><label>Code</label><input className="input" value={branchForm.code} onChange={(e) => setBranchForm((s) => ({ ...s, code: e.target.value }))} /></div>
             <div className="form-row"><label>Name</label><input className="input" value={branchForm.name} onChange={(e) => setBranchForm((s) => ({ ...s, name: e.target.value }))} /></div>
-            <button className="button primary" type="button" onClick={() => createBranchMut.mutate(branchForm)}>Create Branch</button>
+            <button
+              className="button primary"
+              type="button"
+              onClick={() => {
+                setMessage('');
+                setErrorText('');
+                createBranchMut.mutate(branchForm);
+              }}
+              disabled={createBranchMut.isPending}
+            >
+              {createBranchMut.isPending ? 'Creating…' : 'Create Branch'}
+            </button>
           </div>
           <div>
             <h4>Cost Center</h4>
             <div className="form-row"><label>Code</label><input className="input" value={costCenterForm.code} onChange={(e) => setCostCenterForm((s) => ({ ...s, code: e.target.value }))} /></div>
             <div className="form-row"><label>Name</label><input className="input" value={costCenterForm.name} onChange={(e) => setCostCenterForm((s) => ({ ...s, name: e.target.value }))} /></div>
-            <button className="button primary" type="button" onClick={() => createCostCenterMut.mutate(costCenterForm)}>Create Cost Center</button>
+            <button
+              className="button primary"
+              type="button"
+              onClick={() => {
+                setMessage('');
+                setErrorText('');
+                createCostCenterMut.mutate(costCenterForm);
+              }}
+              disabled={createCostCenterMut.isPending}
+            >
+              {createCostCenterMut.isPending ? 'Creating…' : 'Create Cost Center'}
+            </button>
           </div>
         </div>
       </section>
@@ -362,10 +463,14 @@ export function AdminAccessControlPage() {
           <button
             className="button primary"
             type="button"
-            onClick={() => setRolePermissionsMut.mutate()}
-            disabled={!selectedRoleId || selectedRoleIsProtected}
+            onClick={() => {
+              setMessage('');
+              setErrorText('');
+              setRolePermissionsMut.mutate();
+            }}
+            disabled={!selectedRoleId || selectedRoleIsProtected || setRolePermissionsMut.isPending}
           >
-            Save Role Permissions
+            {setRolePermissionsMut.isPending ? 'Saving…' : 'Save Role Permissions'}
           </button>
         </div>
       </section>
@@ -445,10 +550,14 @@ export function AdminAccessControlPage() {
           <button
             className="button primary"
             type="button"
-            onClick={() => setUserAssignmentsMut.mutate()}
-            disabled={!selectedUserId || (!platformAdmin && selectedUserHasProtectedRole)}
+            onClick={() => {
+              setMessage('');
+              setErrorText('');
+              setUserAssignmentsMut.mutate();
+            }}
+            disabled={!selectedUserId || (!platformAdmin && selectedUserHasProtectedRole) || setUserAssignmentsMut.isPending}
           >
-            Save User Assignments
+            {setUserAssignmentsMut.isPending ? 'Saving…' : 'Save User Assignments'}
           </button>
         </div>
       </section>
@@ -470,7 +579,18 @@ export function AdminAccessControlPage() {
           <div className="form-row"><label>Notes</label><input className="input" value={policyForm.notes || ''} onChange={(e) => setPolicyForm((s) => ({ ...s, notes: e.target.value }))} /></div>
         </div>
         <div className="inline-actions" style={{ marginTop: 12 }}>
-          <button className="button primary" type="button" onClick={() => createPolicyMut.mutate(policyForm)}>Create Workflow Policy</button>
+          <button
+            className="button primary"
+            type="button"
+            onClick={() => {
+              setMessage('');
+              setErrorText('');
+              createPolicyMut.mutate(policyForm);
+            }}
+            disabled={createPolicyMut.isPending}
+          >
+            {createPolicyMut.isPending ? 'Creating…' : 'Create Workflow Policy'}
+          </button>
         </div>
         <div className="table-wrap" style={{ marginTop: 16 }}>
           <table className="data-table">

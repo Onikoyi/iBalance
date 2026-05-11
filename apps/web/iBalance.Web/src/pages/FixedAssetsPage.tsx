@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  canViewFinance,
-  canCreateJournals,
-  canPostOrReverseJournals,
+  canManageFixedAssets,
+  canPostFixedAssetDisposals,
+  canRunFixedAssetDepreciation,
+  canViewFixedAssets,
 } from '../lib/auth';
 import {
   createFixedAsset,
@@ -253,9 +254,10 @@ const emptyDepreciationForm: DepreciationFormState = {
 
 export function FixedAssetsPage() {
   const qc = useQueryClient();
-  const canView = canViewFinance();
-  const canManage = canCreateJournals();
-  const canPost = canPostOrReverseJournals();
+  const canView = canViewFixedAssets();
+  const canManage = canManageFixedAssets();
+  const canRunDepreciation = canRunFixedAssetDepreciation();
+  const canPostDisposals = canPostFixedAssetDisposals();
 
   const [infoText, setInfoText] = useState('');
   const [errorText, setErrorText] = useState('');
@@ -793,12 +795,12 @@ export function FixedAssetsPage() {
                   <td>
                     <div className="inline-actions" style={{ flexWrap: 'wrap' }}>
                       <button className="button" onClick={() => setAssetDetailId(item.id)}>View</button>
-                      {canPost && item.status === 1 ? <button className="button" onClick={() => openOperation('capitalize', item.id)}>Capitalize</button> : null}
-                      {canPost && item.status !== 1 && item.status !== 6 ? <button className="button" onClick={() => openOperation('improve', item.id)}>Improve</button> : null}
-                      {canPost && item.status !== 6 ? <button className="button" onClick={() => openOperation('transfer', item.id)}>Transfer</button> : null}
-                      {canPost && item.status !== 6 ? <button className="button" onClick={() => openOperation('reclassify', item.id)}>Reclassify</button> : null}
-                      {canPost && item.status !== 1 && item.status !== 6 ? <button className="button" onClick={() => openOperation('impair', item.id)}>Impair</button> : null}
-                      {canPost && item.status !== 1 && item.status !== 6 ? <button className="button danger" onClick={() => openOperation('dispose', item.id)}>Dispose</button> : null}
+                      {canManage && item.status === 1 ? <button className="button" onClick={() => openOperation('capitalize', item.id)}>Capitalize</button> : null}
+                      {canManage && item.status !== 1 && item.status !== 6 ? <button className="button" onClick={() => openOperation('improve', item.id)}>Improve</button> : null}
+                      {canManage && item.status !== 6 ? <button className="button" onClick={() => openOperation('transfer', item.id)}>Transfer</button> : null}
+                      {canManage && item.status !== 6 ? <button className="button" onClick={() => openOperation('reclassify', item.id)}>Reclassify</button> : null}
+                      {canManage && item.status !== 1 && item.status !== 6 ? <button className="button" onClick={() => openOperation('impair', item.id)}>Impair</button> : null}
+                      {canPostDisposals && item.status !== 1 && item.status !== 6 ? <button className="button danger" onClick={() => openOperation('dispose', item.id)}>Dispose</button> : null}
                     </div>
                   </td>
                 </tr>
@@ -819,7 +821,7 @@ export function FixedAssetsPage() {
         </div>
         <div className="hero-actions" style={{ marginTop: 12 }}>
           <button className="button" onClick={() => previewMut.mutate()} disabled={previewMut.isPending}>Preview</button>
-          <button className="button primary" onClick={() => runMut.mutate()} disabled={runMut.isPending}>Post Depreciation Run</button>
+          <button className="button primary" onClick={() => runMut.mutate()} disabled={runMut.isPending || !canRunDepreciation}>Post Depreciation Run</button>
         </div>
         {previewItems.length > 0 ? (
           <div className="table-wrap" style={{ marginTop: 16 }}>
@@ -959,12 +961,12 @@ export function FixedAssetsPage() {
             ) : null}
             <div className="modal-footer">
               <button className="button" onClick={() => setOperationMode('')}>Cancel</button>
-              {operationMode === 'capitalize' ? <button className="button primary" onClick={() => capitalizeMut.mutate()} disabled={capitalizeMut.isPending}>Post Capitalization</button> : null}
-              {operationMode === 'improve' ? <button className="button primary" onClick={() => improvementMut.mutate()} disabled={improvementMut.isPending}>Post Improvement</button> : null}
-              {operationMode === 'transfer' ? <button className="button primary" onClick={() => transferMut.mutate()} disabled={transferMut.isPending}>Save Transfer</button> : null}
-              {operationMode === 'reclassify' ? <button className="button primary" onClick={() => reclassifyMut.mutate()} disabled={reclassifyMut.isPending}>Save Reclassification</button> : null}
-              {operationMode === 'impair' ? <button className="button primary" onClick={() => impairMut.mutate()} disabled={impairMut.isPending}>Post Impairment</button> : null}
-              {operationMode === 'dispose' ? <button className="button danger" onClick={() => disposeMut.mutate()} disabled={disposeMut.isPending}>Post Disposal</button> : null}
+              {operationMode === 'capitalize' ? <button className="button primary" onClick={() => capitalizeMut.mutate()} disabled={capitalizeMut.isPending || !canManage}>Post Capitalization</button> : null}
+              {operationMode === 'improve' ? <button className="button primary" onClick={() => improvementMut.mutate()} disabled={improvementMut.isPending || !canManage}>Post Improvement</button> : null}
+              {operationMode === 'transfer' ? <button className="button primary" onClick={() => transferMut.mutate()} disabled={transferMut.isPending || !canManage}>Save Transfer</button> : null}
+              {operationMode === 'reclassify' ? <button className="button primary" onClick={() => reclassifyMut.mutate()} disabled={reclassifyMut.isPending || !canManage}>Save Reclassification</button> : null}
+              {operationMode === 'impair' ? <button className="button primary" onClick={() => impairMut.mutate()} disabled={impairMut.isPending || !canManage}>Post Impairment</button> : null}
+              {operationMode === 'dispose' ? <button className="button danger" onClick={() => disposeMut.mutate()} disabled={disposeMut.isPending || !canPostDisposals}>Post Disposal</button> : null}
             </div>
           </div>
         </div>

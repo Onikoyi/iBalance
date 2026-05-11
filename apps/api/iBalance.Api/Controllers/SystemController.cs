@@ -1,3 +1,4 @@
+using iBalance.Api.Security;
 using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
 using iBalance.BuildingBlocks.Infrastructure.Security;
@@ -36,7 +37,7 @@ public sealed class SystemController : ControllerBase
         });
     }
 
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin")]
+    [Authorize(Policy = AuthorizationPolicies.AdminUsersManage)]
     [HttpPost("test-user-accounts")]
     public async Task<IActionResult> CreateTestUserAccount(
         [FromBody] CreateTestUserAccountRequest request,
@@ -116,7 +117,7 @@ public sealed class SystemController : ControllerBase
         });
     }
 
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin")]
+    [Authorize(Policy = AuthorizationPolicies.AdminUsersManage)]
     [HttpGet("test-user-accounts")]
     public async Task<IActionResult> GetTestUserAccounts(
         [FromServices] ApplicationDbContext dbContext,

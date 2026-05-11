@@ -11,7 +11,11 @@ import {
   type RejectedCustomerReceiptDto,
   type UpdateCustomerReceiptRequest,
 } from '../lib/api';
-import { canManageFinanceSetup, canViewFinance } from '../lib/auth';
+import {
+  canManageCustomers,
+  canSubmitCustomerReceipts,
+  canViewAccountsReceivable,
+} from '../lib/auth';
 
 const emptyForm: UpdateCustomerReceiptRequest = {
   customerId: '',
@@ -75,8 +79,9 @@ function salesInvoiceStatusLabel(value: number) {
 
 export function RejectedCustomerReceiptsPage() {
   const qc = useQueryClient();
-  const canView = canViewFinance();
-  const canManage = canManageFinanceSetup();
+  const canView = canViewAccountsReceivable();
+const canManage = canManageCustomers();
+const canSubmitApproval = canSubmitCustomerReceipts();
 
   const [selectedReceipt, setSelectedReceipt] = useState<RejectedCustomerReceiptDto | null>(null);
   const [form, setForm] = useState<UpdateCustomerReceiptRequest>(emptyForm);
@@ -295,7 +300,7 @@ export function RejectedCustomerReceiptsPage() {
     setErrorText('');
     setInfoText('');
 
-    if (!canManage) {
+    if (!canSubmitApproval) {
       setErrorText('You do not have permission to submit rejected customer receipts for approval.');
       return;
     }
@@ -426,7 +431,7 @@ export function RejectedCustomerReceiptsPage() {
                         <button
                           className="button"
                           onClick={() => submitForApproval(receipt)}
-                          disabled={submitMut.isPending}
+                          disabled={submitMut.isPending || !canSubmitApproval}
                         >
                           {submitMut.isPending ? 'Submitting…' : 'Resubmit'}
                         </button>

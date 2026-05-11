@@ -15,7 +15,7 @@ import {
   type PurchaseOrderReceiptDto,
   type WarehouseDto,
 } from '../lib/api';
-import { canManageFinanceSetup, canViewFinance } from '../lib/auth';
+import { canCreatePurchaseOrderReceipts, canViewProcurement } from '../lib/auth';
 
 type ReceiptLineForm = {
   purchaseOrderLineId: string;
@@ -55,8 +55,8 @@ function dateInputToUtc(value: string) {
 
 export function PurchaseOrderReceiptsPage() {
   const qc = useQueryClient();
-  const canView = canViewFinance();
-  const canManage = canManageFinanceSetup();
+  const canView = canViewProcurement();
+  const canManage = canCreatePurchaseOrderReceipts();
 
   const [selectedPurchaseOrderId, setSelectedPurchaseOrderId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
@@ -116,11 +116,19 @@ export function PurchaseOrderReceiptsPage() {
     onError: (error) => setErrorText(getTenantReadableError(error, 'Unable to create purchase order receipt.')),
   });
 
-  const purchaseOrders = ((purchaseOrdersQ.data?.items ?? []) as PurchaseOrderDto[]).filter((po) => po.status === 3 || po.status === 4);
+  const purchaseOrders = ((purchaseOrdersQ.data?.items ?? []) as PurchaseOrderDto[]).filter(
+    (po) => po.status === 3 || po.status === 4
+  );
   const receipts = (receiptsQ.data?.items ?? []) as PurchaseOrderReceiptDto[];
-  const itemMap = new Map(((itemsQ.data?.items ?? []) as InventoryItemDto[]).map((item) => [item.id, item]));
-  const warehouses = ((warehousesQ.data?.items ?? []) as WarehouseDto[]).filter((warehouse) => warehouse.isActive);
-  const postingAccounts = ((accountsQ.data?.items ?? []) as LedgerAccountDto[]).filter((account) => account.isPostingAllowed && account.isActive && !account.isHeader);
+  const itemMap = new Map(
+    ((itemsQ.data?.items ?? []) as InventoryItemDto[]).map((item) => [item.id, item])
+  );
+  const warehouses = ((warehousesQ.data?.items ?? []) as WarehouseDto[]).filter(
+    (warehouse) => warehouse.isActive
+  );
+  const postingAccounts = ((accountsQ.data?.items ?? []) as LedgerAccountDto[]).filter(
+    (account) => account.isPostingAllowed && account.isActive && !account.isHeader
+  );
 
   const selectedPurchaseOrder = useMemo(
     () => purchaseOrders.find((po) => po.id === selectedPurchaseOrderId) || null,
@@ -245,9 +253,17 @@ export function PurchaseOrderReceiptsPage() {
     });
   }
 
-  if (!canView) return <div className="panel error-panel">You do not have access to Purchase Order Receipts.</div>;
-  if (purchaseOrdersQ.isLoading || receiptsQ.isLoading || itemsQ.isLoading || warehousesQ.isLoading || accountsQ.isLoading) return <div className="panel">Loading purchase order receipts...</div>;
-  if (purchaseOrdersQ.isError || receiptsQ.isError || itemsQ.isError || warehousesQ.isError || accountsQ.isError) return <div className="panel error-panel">Unable to load purchase order receipt workspace.</div>;
+  if (!canView) {
+    return <div className="panel error-panel">You do not have access to Purchase Order Receipts.</div>;
+  }
+
+  if (purchaseOrdersQ.isLoading || receiptsQ.isLoading) {
+    return <div className="panel">Loading purchase order receipts...</div>;
+  }
+
+  if (purchaseOrdersQ.isError || receiptsQ.isError || !purchaseOrdersQ.data || !receiptsQ.data) {
+    return <div className="panel error-panel">Unable to load purchase order receipt workspace.</div>;
+  }
 
   return (
     <div className="page-grid">
@@ -263,6 +279,30 @@ export function PurchaseOrderReceiptsPage() {
 
         {message ? <div className="success-panel">{message}</div> : null}
         {errorText ? <div className="error-panel">{errorText}</div> : null}
+
+        {itemsQ.isError ? (
+          <div className="panel" style={{ marginTop: 12 }}>
+            <div className="muted">
+              Inventory items could not be loaded. Receipt entry remains available, but item-assisted selection is temporarily limited.
+            </div>
+          </div>
+        ) : null}
+
+        {warehousesQ.isError ? (
+          <div className="panel" style={{ marginTop: 12 }}>
+            <div className="muted">
+              Warehouses could not be loaded. Receipt workspace remains available, but warehouse-backed stock receipts are temporarily unavailable.
+            </div>
+          </div>
+        ) : null}
+
+        {accountsQ.isError ? (
+          <div className="panel" style={{ marginTop: 12 }}>
+            <div className="muted">
+              Ledger accounts could not be loaded. You can still review the receipt workspace, but receipt posting for stock items is unavailable until ledger accounts load successfully.
+            </div>
+          </div>
+        ) : null}
 
         <div className="form-grid two">
           <div className="form-row">
@@ -284,7 +324,12 @@ export function PurchaseOrderReceiptsPage() {
 
           <div className="form-row">
             <label>Warehouse</label>
-            <select className="input" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}>
+            <select
+              className="input"
+              value={warehouseId}
+              disabled={warehousesQ.isLoading || warehousesQ.isError}
+              onChange={(e) => setWarehouseId(e.target.value)}
+            >
               <option value="">Select warehouse when stock items are involved</option>
               {warehouses.map((warehouse) => (
                 <option key={warehouse.id} value={warehouse.id}>
@@ -296,7 +341,12 @@ export function PurchaseOrderReceiptsPage() {
 
           <div className="form-row">
             <label>Inventory Control Ledger</label>
-            <select className="input" value={inventoryLedgerAccountId} onChange={(e) => setInventoryLedgerAccountId(e.target.value)}>
+            <select
+              className="input"
+              value={inventoryLedgerAccountId}
+              disabled={accountsQ.isLoading || accountsQ.isError}
+              onChange={(e) => setInventoryLedgerAccountId(e.target.value)}
+            >
               <option value="">Select inventory control ledger</option>
               {postingAccounts.map((account) => (
                 <option key={account.id} value={account.id}>
@@ -308,7 +358,12 @@ export function PurchaseOrderReceiptsPage() {
 
           <div className="form-row">
             <label>Receipt Clearing Ledger</label>
-            <select className="input" value={receiptClearingLedgerAccountId} onChange={(e) => setReceiptClearingLedgerAccountId(e.target.value)}>
+            <select
+              className="input"
+              value={receiptClearingLedgerAccountId}
+              disabled={accountsQ.isLoading || accountsQ.isError}
+              onChange={(e) => setReceiptClearingLedgerAccountId(e.target.value)}
+            >
               <option value="">Select receipt clearing / GRNI ledger</option>
               {postingAccounts.map((account) => (
                 <option key={account.id} value={account.id}>
@@ -356,7 +411,9 @@ export function PurchaseOrderReceiptsPage() {
                 <tbody>
                   {lineForms.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="muted">No receipt lines loaded yet.</td>
+                      <td colSpan={8} className="muted">
+                        No receipt lines loaded yet.
+                      </td>
                     </tr>
                   ) : (
                     lineForms.map((line, index) => {
@@ -365,7 +422,9 @@ export function PurchaseOrderReceiptsPage() {
                         selectedPurchaseOrder.lines?.find((po) => po.id === line.purchaseOrderLineId);
 
                       const item = line.inventoryItemId ? itemMap.get(line.inventoryItemId) : undefined;
-                      const outstanding = poLine ? Number(poLine.quantity || 0) - Number((poLine as any).receivedQuantity || 0) : 0;
+                      const outstanding = poLine
+                        ? Number(poLine.quantity || 0) - Number((poLine as any).receivedQuantity || 0)
+                        : 0;
 
                       return (
                         <tr key={`${line.purchaseOrderLineId}-${index}`}>
@@ -374,7 +433,9 @@ export function PurchaseOrderReceiptsPage() {
                               className="input"
                               value={line.purchaseOrderLineId}
                               onChange={(e) => {
-                                const selectedLine = selectedPurchaseOrder.lines?.find((po) => po.id === e.target.value);
+                                const selectedLine = selectedPurchaseOrder.lines?.find(
+                                  (po) => po.id === e.target.value
+                                );
                                 updateLine(index, {
                                   purchaseOrderLineId: e.target.value,
                                   inventoryItemId: selectedLine?.inventoryItemId || '',
@@ -392,12 +453,42 @@ export function PurchaseOrderReceiptsPage() {
                             </select>
                           </td>
                           <td>{item ? `${item.itemCode} - ${item.itemName}` : 'Service / non-stock'}</td>
-                          <td><input className="input" value={line.description} onChange={(e) => updateLine(index, { description: e.target.value })} /></td>
+                          <td>
+                            <input
+                              className="input"
+                              value={line.description}
+                              onChange={(e) => updateLine(index, { description: e.target.value })}
+                            />
+                          </td>
                           <td style={{ textAlign: 'right' }}>{formatAmount(outstanding)}</td>
-                          <td><input className="input" type="number" value={line.quantity} onChange={(e) => updateLine(index, { quantity: e.target.value })} /></td>
-                          <td><input className="input" type="number" value={line.unitCost} onChange={(e) => updateLine(index, { unitCost: e.target.value })} /></td>
-                          <td><input className="input" value={line.notes} onChange={(e) => updateLine(index, { notes: e.target.value })} /></td>
-                          <td><button className="button danger" type="button" onClick={() => removeLine(index)}>Remove</button></td>
+                          <td>
+                            <input
+                              className="input"
+                              type="number"
+                              value={line.quantity}
+                              onChange={(e) => updateLine(index, { quantity: e.target.value })}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              className="input"
+                              type="number"
+                              value={line.unitCost}
+                              onChange={(e) => updateLine(index, { unitCost: e.target.value })}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              className="input"
+                              value={line.notes}
+                              onChange={(e) => updateLine(index, { notes: e.target.value })}
+                            />
+                          </td>
+                          <td>
+                            <button className="button danger" type="button" onClick={() => removeLine(index)}>
+                              Remove
+                            </button>
+                          </td>
                         </tr>
                       );
                     })
@@ -433,7 +524,9 @@ export function PurchaseOrderReceiptsPage() {
             <tbody>
               {receipts.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="muted">No purchase order receipts yet.</td>
+                  <td colSpan={7} className="muted">
+                    No purchase order receipts yet.
+                  </td>
                 </tr>
               ) : (
                 receipts.map((receipt) => (

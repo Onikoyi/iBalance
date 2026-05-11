@@ -7,9 +7,9 @@ export function LandingPage() {
       <div className="public-container">
         <section className="hero">
           <div className="badge">Secure • Multi-tenant • Finance-ready</div>
-          <h1 className="hero-title">Modern accounting for growing organizations</h1>
+          <h1 className="hero-title">Modern ERP for growing organizations</h1>
           <p className="hero-subtitle">
-            iBalance Accounting Cloud helps organizations manage financial operations with clarity,
+            iBalance ERP Cloud helps organizations manage financial operations with clarity,
             control, and confidence. From setup to reporting, every experience is built for real business use.
           </p>
 

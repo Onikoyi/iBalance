@@ -1,3 +1,4 @@
+using iBalance.Api.Security;
 using iBalance.BuildingBlocks.Application.Security;
 using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Infrastructure.Email;
@@ -48,7 +49,7 @@ public sealed class CommercialController : ControllerBase
         });
     }
 
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin")]
+    [Authorize(Policy = AuthorizationPolicies.AdminSettingsManage)]
     [HttpGet("admin/subscription-packages")]
     public async Task<IActionResult> GetAdminSubscriptionPackages(
         [FromServices] ApplicationDbContext dbContext,
@@ -79,7 +80,7 @@ public sealed class CommercialController : ControllerBase
         });
     }
 
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin")]
+    [Authorize(Policy = AuthorizationPolicies.AdminSettingsManage)]
     [HttpPost("admin/subscription-packages")]
     public async Task<IActionResult> CreateSubscriptionPackage(
         [FromBody] UpsertSubscriptionPackageRequest request,
@@ -130,7 +131,7 @@ public sealed class CommercialController : ControllerBase
         });
     }
 
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin")]
+    [Authorize(Policy = AuthorizationPolicies.AdminSettingsManage)]
     [HttpPut("admin/subscription-packages/{packageId:guid}")]
     public async Task<IActionResult> UpdateSubscriptionPackage(
         Guid packageId,
@@ -198,7 +199,7 @@ public sealed class CommercialController : ControllerBase
         });
     }
 
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin")]
+    [Authorize(Policy = AuthorizationPolicies.AdminSettingsManage)]
     [HttpGet("admin/billing-settings")]
     public async Task<IActionResult> GetAdminBillingSettings(
         [FromServices] ApplicationDbContext dbContext,
@@ -219,7 +220,7 @@ public sealed class CommercialController : ControllerBase
         });
     }
 
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin")]
+    [Authorize(Policy = AuthorizationPolicies.AdminSettingsManage)]
     [HttpPut("admin/billing-settings")]
     public async Task<IActionResult> SaveBillingSettings(
         [FromBody] SaveBillingSettingsRequest request,
@@ -401,7 +402,7 @@ public sealed class CommercialController : ControllerBase
         });
     }
 
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin")]
+    [Authorize(Policy = AuthorizationPolicies.AdminSettingsManage)]
     [HttpGet("admin/applications")]
     public async Task<IActionResult> GetSubscriptionApplications(
         [FromServices] ApplicationDbContext dbContext,
@@ -508,7 +509,7 @@ public sealed class CommercialController : ControllerBase
         });
     }
 
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin")]
+    [Authorize(Policy = AuthorizationPolicies.AdminSettingsManage)]
     [HttpPost("admin/applications/{applicationId:guid}/confirm-payment")]
     public async Task<IActionResult> ConfirmSubscriptionPayment(
         Guid applicationId,
@@ -633,7 +634,7 @@ public sealed class CommercialController : ControllerBase
         });
     }
 
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin")]
+    [Authorize(Policy = AuthorizationPolicies.AdminSettingsManage)]
     [HttpPost("admin/applications/{applicationId:guid}/reject")]
     public async Task<IActionResult> RejectSubscriptionApplication(
         Guid applicationId,

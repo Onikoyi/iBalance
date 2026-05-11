@@ -1,3 +1,4 @@
+using iBalance.Api.Security;
 using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
 using iBalance.Modules.Finance.Domain.Entities;
@@ -13,6 +14,7 @@ namespace iBalance.Api.Controllers;
 [Route("api/finance/inventory")]
 public sealed class InventoryController : ControllerBase
 {
+    [Authorize(Policy = AuthorizationPolicies.InventoryView)]
     [HttpGet("items")]
     public async Task<IActionResult> GetItems([FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
     {
@@ -46,7 +48,7 @@ public sealed class InventoryController : ControllerBase
     }
 
     [HttpPost("items")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.InventoryManage)]
     public async Task<IActionResult> CreateItem([FromBody] CreateInventoryItemRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -78,7 +80,7 @@ public sealed class InventoryController : ControllerBase
     }
 
     [HttpPut("items/{itemId:guid}")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.InventoryManage)]
     public async Task<IActionResult> UpdateItem(Guid itemId, [FromBody] UpdateInventoryItemRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -104,7 +106,7 @@ public sealed class InventoryController : ControllerBase
     }
 
     [HttpPost("items/{itemId:guid}/activate")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.InventoryManage)]
     public async Task<IActionResult> ActivateItem(Guid itemId, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -117,7 +119,7 @@ public sealed class InventoryController : ControllerBase
     }
 
     [HttpPost("items/{itemId:guid}/deactivate")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.InventoryManage)]
     public async Task<IActionResult> DeactivateItem(Guid itemId, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -129,6 +131,7 @@ public sealed class InventoryController : ControllerBase
         return Ok(new { Message = "Inventory item deactivated successfully." });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.InventoryView)]
     [HttpGet("warehouses")]
     public async Task<IActionResult> GetWarehouses([FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
     {
@@ -157,7 +160,7 @@ public sealed class InventoryController : ControllerBase
     }
 
     [HttpPost("warehouses")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.InventoryManage)]
     public async Task<IActionResult> CreateWarehouse([FromBody] CreateWarehouseRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -185,7 +188,7 @@ public sealed class InventoryController : ControllerBase
     }
 
     [HttpPut("warehouses/{warehouseId:guid}")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.InventoryManage)]
     public async Task<IActionResult> UpdateWarehouse(Guid warehouseId, [FromBody] UpdateWarehouseRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -209,7 +212,7 @@ public sealed class InventoryController : ControllerBase
     }
 
     [HttpPost("warehouses/{warehouseId:guid}/activate")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.InventoryManage)]
     public async Task<IActionResult> ActivateWarehouse(Guid warehouseId, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -222,7 +225,7 @@ public sealed class InventoryController : ControllerBase
     }
 
     [HttpPost("warehouses/{warehouseId:guid}/deactivate")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.InventoryManage)]
     public async Task<IActionResult> DeactivateWarehouse(Guid warehouseId, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -234,6 +237,7 @@ public sealed class InventoryController : ControllerBase
         return Ok(new { Message = "Warehouse deactivated successfully." });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.InventoryView)]
     [HttpGet("stock-position")]
     public async Task<IActionResult> GetStockPosition([FromQuery] Guid? inventoryItemId, [FromQuery] Guid? itemId, [FromQuery] Guid? warehouseId, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
     {
@@ -279,6 +283,7 @@ public sealed class InventoryController : ControllerBase
         return Ok(new { TenantContextAvailable = true, tenantContext.TenantId, tenantContext.TenantKey, Count = rows.Count, TotalQuantityOnHand = rows.Sum(x => x.QuantityOnHand), TotalInventoryValue = rows.Sum(x => x.InventoryValue), Items = rows });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.InventoryView)]
     [HttpGet("stock-ledger")]
     public async Task<IActionResult> GetStockLedger([FromQuery] Guid? inventoryItemId, [FromQuery] Guid? itemId, [FromQuery] Guid? warehouseId, [FromQuery] DateTime? fromUtc, [FromQuery] DateTime? toUtc, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
     {
@@ -325,6 +330,7 @@ public sealed class InventoryController : ControllerBase
         return Ok(new { TenantContextAvailable = true, tenantContext.TenantId, tenantContext.TenantKey, Count = rows.Count, Items = rows });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.InventoryView)]
     [HttpGet("transactions")]
     public async Task<IActionResult> GetTransactions([FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
     {
@@ -353,7 +359,7 @@ public sealed class InventoryController : ControllerBase
     }
 
     [HttpPost("stock-in")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.InventoryManage)]
     public async Task<IActionResult> PostStockIn([FromBody] PostStockInRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
     {
         return await PostStockInAsync(dbContext, tenantContextAccessor, request, cancellationToken);
@@ -361,7 +367,7 @@ public sealed class InventoryController : ControllerBase
 
     [HttpPost("adjust")]
     [HttpPost("adjustments")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.InventoryManage)]
     public async Task<IActionResult> PostAdjustment([FromBody] PostStockAdjustmentRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;

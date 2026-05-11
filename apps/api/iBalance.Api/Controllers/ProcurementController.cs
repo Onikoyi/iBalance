@@ -1,4 +1,5 @@
 using iBalance.Api.Services;
+using iBalance.Api.Security;
 using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
 using iBalance.Modules.Finance.Domain.Entities;
@@ -14,6 +15,7 @@ namespace iBalance.Api.Controllers;
 [Route("api/finance/procurement")]
 public sealed class ProcurementController : ControllerBase
 {
+    [Authorize(Policy = AuthorizationPolicies.ProcurementView)]
     [HttpGet("requisitions")]
     public async Task<IActionResult> GetPurchaseRequisitions(
         [FromServices] ApplicationDbContext dbContext,
@@ -56,6 +58,7 @@ public sealed class ProcurementController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.ProcurementView)]
     [HttpGet("requisitions/rejected")]
     public async Task<IActionResult> GetRejectedPurchaseRequisitions(
         [FromServices] ApplicationDbContext dbContext,
@@ -108,7 +111,7 @@ public sealed class ProcurementController : ControllerBase
     }
 
     [HttpPost("requisitions")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.ProcurementRequisitionCreate)]
     public async Task<IActionResult> CreatePurchaseRequisition(
         [FromBody] CreatePurchaseRequisitionRequest request,
         [FromServices] ApplicationDbContext dbContext,
@@ -164,7 +167,7 @@ public sealed class ProcurementController : ControllerBase
     }
 
     [HttpPut("requisitions/{requisitionId:guid}")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.ProcurementRequisitionCreate)]
     public async Task<IActionResult> UpdatePurchaseRequisition(
         Guid requisitionId,
         [FromBody] UpdatePurchaseRequisitionRequest request,
@@ -220,7 +223,7 @@ public sealed class ProcurementController : ControllerBase
     }
 
     [HttpPost("requisitions/{requisitionId:guid}/submit")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.ProcurementRequisitionSubmit)]
     public async Task<IActionResult> SubmitPurchaseRequisition(
         Guid requisitionId,
         [FromServices] ApplicationDbContext dbContext,
@@ -245,7 +248,7 @@ public sealed class ProcurementController : ControllerBase
     }
 
     [HttpPost("requisitions/{requisitionId:guid}/approve")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
+    [Authorize(Policy = AuthorizationPolicies.ProcurementRequisitionApprove)]
     public async Task<IActionResult> ApprovePurchaseRequisition(
         Guid requisitionId,
         [FromServices] ApplicationDbContext dbContext,
@@ -268,7 +271,7 @@ public sealed class ProcurementController : ControllerBase
     }
 
     [HttpPost("requisitions/{requisitionId:guid}/reject")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
+    [Authorize(Policy = AuthorizationPolicies.ProcurementRequisitionReject)]
     public async Task<IActionResult> RejectPurchaseRequisition(
         Guid requisitionId,
         [FromBody] RejectProcurementDocumentRequest request,
@@ -295,7 +298,7 @@ public sealed class ProcurementController : ControllerBase
     }
 
     [HttpDelete("requisitions/{requisitionId:guid}")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.ProcurementRequisitionCreate)]
     public async Task<IActionResult> DeletePurchaseRequisition(
         Guid requisitionId,
         [FromServices] ApplicationDbContext dbContext,
@@ -319,6 +322,7 @@ public sealed class ProcurementController : ControllerBase
         return Ok(new { Message = "Purchase requisition deleted successfully.", requisition.Id, requisition.RequisitionNumber });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.ProcurementView)]
     [HttpGet("purchase-orders")]
     public async Task<IActionResult> GetPurchaseOrders(
         [FromServices] ApplicationDbContext dbContext,
@@ -363,6 +367,7 @@ public sealed class ProcurementController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.ProcurementView)]
     [HttpGet("purchase-orders/rejected")]
     public async Task<IActionResult> GetRejectedPurchaseOrders(
         [FromServices] ApplicationDbContext dbContext,
@@ -418,7 +423,7 @@ public sealed class ProcurementController : ControllerBase
     }
 
     [HttpPost("purchase-orders/from-requisition/{requisitionId:guid}")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.ProcurementPoCreate)]
     public async Task<IActionResult> CreatePurchaseOrderFromApprovedRequisition(
         Guid requisitionId,
         [FromBody] CreatePurchaseOrderFromRequisitionRequest request,
@@ -478,7 +483,7 @@ public sealed class ProcurementController : ControllerBase
     }
 
     [HttpPut("purchase-orders/{purchaseOrderId:guid}")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.ProcurementPoCreate)]
     public async Task<IActionResult> UpdatePurchaseOrder(
         Guid purchaseOrderId,
         [FromBody] UpdatePurchaseOrderRequest request,
@@ -527,7 +532,7 @@ public sealed class ProcurementController : ControllerBase
     }
 
     [HttpPost("purchase-orders/{purchaseOrderId:guid}/submit")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.ProcurementPoCreate)]
     public async Task<IActionResult> SubmitPurchaseOrder(
         Guid purchaseOrderId,
         [FromServices] ApplicationDbContext dbContext,
@@ -552,7 +557,7 @@ public sealed class ProcurementController : ControllerBase
     }
 
     [HttpPost("purchase-orders/{purchaseOrderId:guid}/approve")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
+    [Authorize(Policy = AuthorizationPolicies.ProcurementPoApprove)]
     public async Task<IActionResult> ApprovePurchaseOrder(
         Guid purchaseOrderId,
         [FromServices] ApplicationDbContext dbContext,
@@ -576,7 +581,7 @@ public sealed class ProcurementController : ControllerBase
     }
 
     [HttpPost("purchase-orders/{purchaseOrderId:guid}/reject")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
+    [Authorize(Policy = AuthorizationPolicies.ProcurementPoApprove)]
     public async Task<IActionResult> RejectPurchaseOrder(
         Guid purchaseOrderId,
         [FromBody] RejectProcurementDocumentRequest request,
@@ -603,7 +608,7 @@ public sealed class ProcurementController : ControllerBase
     }
 
     [HttpDelete("purchase-orders/{purchaseOrderId:guid}")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.ProcurementPoCreate)]
     public async Task<IActionResult> DeletePurchaseOrder(
         Guid purchaseOrderId,
         [FromServices] ApplicationDbContext dbContext,
@@ -628,6 +633,7 @@ public sealed class ProcurementController : ControllerBase
     }
 
 
+    [Authorize(Policy = AuthorizationPolicies.ProcurementView)]
     [HttpGet("purchase-order-receipts")]
     public async Task<IActionResult> GetPurchaseOrderReceipts(
         [FromServices] ApplicationDbContext dbContext,
@@ -683,7 +689,7 @@ public sealed class ProcurementController : ControllerBase
     }
 
     [HttpPost("purchase-order-receipts")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.ProcurementReceiptCreate)]
     public async Task<IActionResult> CreatePurchaseOrderReceipt(
         [FromBody] CreatePurchaseOrderReceiptRequest request,
         [FromServices] ApplicationDbContext dbContext,

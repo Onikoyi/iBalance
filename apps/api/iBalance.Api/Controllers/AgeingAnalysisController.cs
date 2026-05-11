@@ -1,3 +1,4 @@
+using iBalance.Api.Security;
 using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
 using iBalance.Modules.Finance.Domain.Enums;
@@ -12,6 +13,7 @@ namespace iBalance.Api.Controllers;
 [Route("api/finance/ageing-analysis")]
 public sealed class AgeingAnalysisController : ControllerBase
 {
+    [Authorize(Policy = AuthorizationPolicies.ArView)]
     [HttpGet("ar")]
     public async Task<IActionResult> GetAccountsReceivableAgeing(
         [FromQuery] DateTime? asOfUtc,
@@ -164,6 +166,7 @@ public sealed class AgeingAnalysisController : ControllerBase
             detailRows));
     }
 
+    [Authorize(Policy = AuthorizationPolicies.ApView)]
     [HttpGet("ap")]
     public async Task<IActionResult> GetAccountsPayableAgeing(
         [FromQuery] DateTime? asOfUtc,

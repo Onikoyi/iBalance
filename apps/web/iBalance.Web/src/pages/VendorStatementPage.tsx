@@ -7,6 +7,7 @@ import {
   getTenantLogoDataUrl,
   getVendorStatement,
 } from '../lib/api';
+import { canViewAccountsPayable } from '../lib/auth';
 
 function formatAmount(value: number) {
   return new Intl.NumberFormat('en-NG', {
@@ -97,6 +98,7 @@ function LogoBlock({
 
 export function VendorStatementPage() {
   const { vendorId } = useParams<{ vendorId: string }>();
+  const canView = canViewAccountsPayable();
 
   const today = new Date();
   const defaultToDate = today.toISOString().slice(0, 10);
@@ -121,7 +123,7 @@ export function VendorStatementPage() {
   const statementQ = useQuery({
     queryKey: ['ap-vendor-statement', vendorId, fromUtc ?? null, toUtc ?? null],
     queryFn: () => getVendorStatement(vendorId || '', fromUtc, toUtc),
-    enabled: !!vendorId && isRangeValid,
+    enabled: canView && !!vendorId && isRangeValid,
   });
 
   const totals = useMemo(() => {
@@ -135,6 +137,10 @@ export function VendorStatementPage() {
       netPayable: items.reduce((sum, x) => sum + Number(x.netPayableAmount || 0), 0),
     };
   }, [statementQ.data?.items]);
+
+  if (!canView) {
+    return <div className="panel error-panel">You do not have access to view vendor statements.</div>;
+  }
 
   if (!vendorId) {
     return <div className="panel error-panel">Vendor identifier is required.</div>;

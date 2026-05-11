@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { getAdminTenantOverview, getPlatformAdminTenants } from '../../lib/api';
+import { getAdminTenantOverview, getPlatformAdminTenants, getTenantReadableError } from '../../lib/api';
 import {
   canManageEnterpriseAccessControl,
   canManagePlatformCommercials,
@@ -45,6 +45,26 @@ function formatMoney(amount?: number | null, currencyCode?: string | null) {
   }).format(amount);
 }
 
+type ExtendedByRole = {
+  platformAdmin?: number;
+  tenantAdmin?: number;
+  financeController?: number;
+  accountant?: number;
+  approver?: number;
+  viewer?: number;
+  auditor?: number;
+  budgetOfficer?: number;
+  budgetOwner?: number;
+  payrollOfficer?: number;
+  hrOfficer?: number;
+  procurementOfficer?: number;
+  treasuryOfficer?: number;
+  inventoryOfficer?: number;
+  apOfficer?: number;
+  arOfficer?: number;
+  fixedAssetOfficer?: number;
+};
+
 export function AdminDashboardPage() {
   const platformAdmin = isPlatformAdmin();
   const canManageUsers = canManageTenantUsers();
@@ -82,7 +102,11 @@ export function AdminDashboardPage() {
     }
 
     if (platformTenantsQ.isError || !platformTenantsQ.data) {
-      return <div className="panel error-panel">We could not load the platform administration overview at this time.</div>;
+      return (
+        <div className="panel error-panel">
+          {getTenantReadableError(platformTenantsQ.error, 'We could not load the platform administration overview at this time.')}
+        </div>
+      );
     }
 
     return (
@@ -166,10 +190,15 @@ export function AdminDashboardPage() {
   }
 
   if (tenantOverviewQ.isError || !tenantOverviewQ.data) {
-    return <div className="panel error-panel">We could not load the tenant administration overview at this time.</div>;
+    return (
+      <div className="panel error-panel">
+        {getTenantReadableError(tenantOverviewQ.error, 'We could not load the tenant administration overview at this time.')}
+      </div>
+    );
   }
 
   const overview = tenantOverviewQ.data;
+  const byRole = overview.users.byRole as ExtendedByRole;
 
   return (
     <div className="page-grid">
@@ -208,10 +237,23 @@ export function AdminDashboardPage() {
           <div className="kv-row"><span>Total Users</span><span>{overview.users.total}</span></div>
           <div className="kv-row"><span>Active Users</span><span>{overview.users.active}</span></div>
           <div className="kv-row"><span>Inactive Users</span><span>{overview.users.inactive}</span></div>
-          <div className="kv-row"><span>Tenant Administrators</span><span>{overview.users.byRole.tenantAdmin}</span></div>
-          <div className="kv-row"><span>Accountants</span><span>{overview.users.byRole.accountant}</span></div>
-          <div className="kv-row"><span>Approvers</span><span>{overview.users.byRole.approver}</span></div>
-          <div className="kv-row"><span>Viewers</span><span>{overview.users.byRole.viewer}</span></div>
+          <div className="kv-row"><span>Platform Administrators</span><span>{byRole.platformAdmin ?? 0}</span></div>
+          <div className="kv-row"><span>Tenant Administrators</span><span>{byRole.tenantAdmin ?? 0}</span></div>
+          <div className="kv-row"><span>Finance Controllers</span><span>{byRole.financeController ?? 0}</span></div>
+          <div className="kv-row"><span>Accountants</span><span>{byRole.accountant ?? 0}</span></div>
+          <div className="kv-row"><span>Approvers</span><span>{byRole.approver ?? 0}</span></div>
+          <div className="kv-row"><span>Viewers</span><span>{byRole.viewer ?? 0}</span></div>
+          <div className="kv-row"><span>Auditors</span><span>{byRole.auditor ?? 0}</span></div>
+          <div className="kv-row"><span>Budget Officers</span><span>{byRole.budgetOfficer ?? 0}</span></div>
+          <div className="kv-row"><span>Budget Owners</span><span>{byRole.budgetOwner ?? 0}</span></div>
+          <div className="kv-row"><span>Payroll Officers</span><span>{byRole.payrollOfficer ?? 0}</span></div>
+          <div className="kv-row"><span>HR Officers</span><span>{byRole.hrOfficer ?? 0}</span></div>
+          <div className="kv-row"><span>Procurement Officers</span><span>{byRole.procurementOfficer ?? 0}</span></div>
+          <div className="kv-row"><span>Treasury Officers</span><span>{byRole.treasuryOfficer ?? 0}</span></div>
+          <div className="kv-row"><span>Inventory Officers</span><span>{byRole.inventoryOfficer ?? 0}</span></div>
+          <div className="kv-row"><span>AP Officers</span><span>{byRole.apOfficer ?? 0}</span></div>
+          <div className="kv-row"><span>AR Officers</span><span>{byRole.arOfficer ?? 0}</span></div>
+          <div className="kv-row"><span>Fixed Asset Officers</span><span>{byRole.fixedAssetOfficer ?? 0}</span></div>
         </div>
 
         <div className="hero-actions" style={{ marginTop: 16 }}>

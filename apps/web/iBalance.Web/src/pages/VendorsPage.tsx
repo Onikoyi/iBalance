@@ -7,7 +7,11 @@ import {
   getVendors,
   type CreateVendorRequest,
 } from '../lib/api';
-import { canManageFinanceSetup, canViewFinance } from '../lib/auth';
+import {
+  canCreatePurchaseInvoices,
+  canCreateVendorPayments,
+  canViewAccountsPayable,
+} from '../lib/auth';
 
 const emptyForm: CreateVendorRequest = {
   vendorCode: '',
@@ -27,8 +31,8 @@ function formatDateTime(value?: string | null) {
 
 export function VendorsPage() {
   const qc = useQueryClient();
-  const canView = canViewFinance();
-  const canManage = canManageFinanceSetup();
+  const canView = canViewAccountsPayable();
+  const canManage = canCreatePurchaseInvoices() || canCreateVendorPayments();
 
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<CreateVendorRequest>(emptyForm);

@@ -2,15 +2,15 @@ using iBalance.BuildingBlocks.Application.Security;
 
 namespace iBalance.BuildingBlocks.Infrastructure.Persistence.DesignTime;
 
-public sealed class DesignTimeCurrentUserService : ICurrentUserService
+internal sealed class DesignTimeCurrentUserService : ICurrentUserService
 {
-    public string? UserId => "design-time-user";
+    public string? UserId => null;
 
     public string? UserName => "design-time-user";
 
-    public string? Email => "design-time@local";
+    public string? Email => null;
 
-    public string? Role => "PlatformAdmin";
+    public string? Role => null;
 
     public string? TenantId => null;
 
@@ -18,13 +18,17 @@ public sealed class DesignTimeCurrentUserService : ICurrentUserService
 
     public bool IsAuthenticated => false;
 
-    public bool IsInRole(string role)
-    {
-        if (string.IsNullOrWhiteSpace(role))
-        {
-            return false;
-        }
+    public IReadOnlyCollection<string> Roles => Array.Empty<string>();
 
-        return string.Equals(Role, role.Trim(), StringComparison.OrdinalIgnoreCase);
-    }
+    public IReadOnlyCollection<string> Permissions => Array.Empty<string>();
+
+    public IReadOnlyCollection<CurrentUserScope> Scopes => Array.Empty<CurrentUserScope>();
+
+    public bool IsInRole(string role) => false;
+
+    public bool HasAnyRole(params string[] roles) => false;
+
+    public bool HasPermission(string permission) => false;
+
+    public bool HasScope(string scopeType, string scopeEntityId) => false;
 }

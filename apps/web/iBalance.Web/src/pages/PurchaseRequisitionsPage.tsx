@@ -12,7 +12,13 @@ import {
   type InventoryItemDto,
   type PurchaseRequisitionDto,
 } from '../lib/api';
-import { canApproveWorkflows, canManageFinanceSetup, canViewFinance } from '../lib/auth';
+import {
+  canApprovePurchaseRequisitions,
+  canCreatePurchaseRequisitions,
+  canRejectPurchaseRequisitions,
+  canSubmitPurchaseRequisitions,
+  canViewProcurement,
+} from '../lib/auth';
 
 const emptyLine = {
   inventoryItemId: '',
@@ -60,9 +66,11 @@ function dateInputToUtc(value: string) {
 
 export function PurchaseRequisitionsPage() {
   const qc = useQueryClient();
-  const canView = canViewFinance();
-  const canManage = canManageFinanceSetup();
-  const canApprove = canApproveWorkflows();
+  const canView = canViewProcurement();
+  const canManage = canCreatePurchaseRequisitions();
+  const canSubmitApproval = canSubmitPurchaseRequisitions();
+  const canApprove = canApprovePurchaseRequisitions();
+  const canReject = canRejectPurchaseRequisitions();
 
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<CreatePurchaseRequisitionRequest>(emptyForm);
@@ -271,7 +279,7 @@ export function PurchaseRequisitionsPage() {
                   <td>
                     <div className="inline-actions">
                       <button className="button" type="button" onClick={() => setSelectedRequisitionId(item.id)}>View</button>
-                      <button className="button secondary" type="button" disabled={!canManage || item.status !== 1 || submitMut.isPending} onClick={() => submitMut.mutate(item.id)}>Submit</button>
+                      <button className="button secondary" type="button" disabled={!canSubmitApproval || item.status !== 1 || submitMut.isPending} onClick={() => submitMut.mutate(item.id)}>Submit</button>
                       <button className="button secondary" type="button" disabled={!canApprove || item.status !== 2 || approveMut.isPending} onClick={() => approveMut.mutate(item.id)}>Approve</button>
                     </div>
                   </td>
@@ -300,7 +308,7 @@ export function PurchaseRequisitionsPage() {
 
           <div className="form-grid two" style={{ marginTop: 12 }}>
             <div className="form-row"><label>Reject Reason</label><input className="input" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} /></div>
-            <div className="form-row"><label>Reject</label><button className="button danger" type="button" disabled={!canApprove || selectedRequisition.status !== 2 || !rejectReason.trim()} onClick={() => rejectMut.mutate({ requisitionId: selectedRequisition.id, reason: rejectReason })}>Reject Requisition</button></div>
+            <div className="form-row"><label>Reject</label><button className="button danger" type="button" disabled={!canReject || selectedRequisition.status !== 2 || !rejectReason.trim()} onClick={() => rejectMut.mutate({ requisitionId: selectedRequisition.id, reason: rejectReason })}>Reject Requisition</button></div>
           </div>
         </section>
       ) : null}

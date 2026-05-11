@@ -1,3 +1,4 @@
+using iBalance.Api.Security;
 using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
 using iBalance.Modules.Platform.Domain.Enums;
@@ -8,10 +9,11 @@ using Microsoft.EntityFrameworkCore;
 namespace iBalance.Api.Controllers;
 
 [ApiController]
-[Authorize(Roles = "PlatformAdmin,TenantAdmin")]
+[Authorize]
 [Route("api/admin/tenant-overview")]
 public sealed class AdminTenantOverviewController : ControllerBase
 {
+    [Authorize(Policy = AuthorizationPolicies.AdminAccess)]
     [HttpGet]
     public async Task<IActionResult> GetTenantOverview(
         [FromServices] ApplicationDbContext dbContext,
@@ -60,11 +62,23 @@ public sealed class AdminTenantOverviewController : ControllerBase
         var activeUserCount = users.Count(x => x.IsActive);
         var inactiveUserCount = users.Count(x => !x.IsActive);
 
+        var platformAdminCount = users.Count(x => x.Role == "PlatformAdmin");
         var tenantAdminCount = users.Count(x => x.Role == "TenantAdmin");
+        var financeControllerCount = users.Count(x => x.Role == "FinanceController");
         var accountantCount = users.Count(x => x.Role == "Accountant");
         var approverCount = users.Count(x => x.Role == "Approver");
         var viewerCount = users.Count(x => x.Role == "Viewer");
-        var platformAdminCount = users.Count(x => x.Role == "PlatformAdmin");
+        var auditorCount = users.Count(x => x.Role == "Auditor");
+        var budgetOfficerCount = users.Count(x => x.Role == "BudgetOfficer");
+        var budgetOwnerCount = users.Count(x => x.Role == "BudgetOwner");
+        var payrollOfficerCount = users.Count(x => x.Role == "PayrollOfficer");
+        var hrOfficerCount = users.Count(x => x.Role == "HrOfficer");
+        var procurementOfficerCount = users.Count(x => x.Role == "ProcurementOfficer");
+        var treasuryOfficerCount = users.Count(x => x.Role == "TreasuryOfficer");
+        var inventoryOfficerCount = users.Count(x => x.Role == "InventoryOfficer");
+        var apOfficerCount = users.Count(x => x.Role == "ApOfficer");
+        var arOfficerCount = users.Count(x => x.Role == "ArOfficer");
+        var fixedAssetOfficerCount = users.Count(x => x.Role == "FixedAssetOfficer");
 
         TenantLicenseStatus computedLicenseStatus;
         int? daysRemaining = null;
@@ -118,9 +132,21 @@ public sealed class AdminTenantOverviewController : ControllerBase
                 {
                     PlatformAdmin = platformAdminCount,
                     TenantAdmin = tenantAdminCount,
+                    FinanceController = financeControllerCount,
                     Accountant = accountantCount,
                     Approver = approverCount,
-                    Viewer = viewerCount
+                    Viewer = viewerCount,
+                    Auditor = auditorCount,
+                    BudgetOfficer = budgetOfficerCount,
+                    BudgetOwner = budgetOwnerCount,
+                    PayrollOfficer = payrollOfficerCount,
+                    HrOfficer = hrOfficerCount,
+                    ProcurementOfficer = procurementOfficerCount,
+                    TreasuryOfficer = treasuryOfficerCount,
+                    InventoryOfficer = inventoryOfficerCount,
+                    ApOfficer = apOfficerCount,
+                    ArOfficer = arOfficerCount,
+                    FixedAssetOfficer = fixedAssetOfficerCount
                 }
             }
         });

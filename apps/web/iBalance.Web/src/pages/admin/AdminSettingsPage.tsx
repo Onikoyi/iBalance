@@ -64,6 +64,26 @@ function formatDate(value?: string | null) {
   return parsed.toLocaleDateString();
 }
 
+type ExtendedByRole = {
+  platformAdmin?: number;
+  tenantAdmin?: number;
+  financeController?: number;
+  accountant?: number;
+  approver?: number;
+  viewer?: number;
+  auditor?: number;
+  budgetOfficer?: number;
+  budgetOwner?: number;
+  payrollOfficer?: number;
+  hrOfficer?: number;
+  procurementOfficer?: number;
+  treasuryOfficer?: number;
+  inventoryOfficer?: number;
+  apOfficer?: number;
+  arOfficer?: number;
+  fixedAssetOfficer?: number;
+};
+
 export function AdminSettingsPage() {
   const qc = useQueryClient();
   const canManageCommercials = canManagePlatformCommercials();
@@ -72,6 +92,7 @@ export function AdminSettingsPage() {
   const [tenantLogo, setTenantLogo] = useState(getTenantLogoDataUrl());
   const [companyLogo, setCompanyLogo] = useState(getCompanyLogoDataUrl());
   const [message, setMessage] = useState('');
+  const [errorText, setErrorText] = useState('');
 
   const [billingForm, setBillingForm] = useState({
     accountName: '',
@@ -142,8 +163,12 @@ export function AdminSettingsPage() {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['admin-billing-settings'] });
       setMessage('Billing settings saved successfully.');
+      setErrorText('');
     },
-    onError: (e) => setMessage(getTenantReadableError(e, 'Unable to save billing settings.')),
+    onError: (e) => {
+      setErrorText(getTenantReadableError(e, 'Unable to save billing settings.'));
+      setMessage('');
+    },
   });
 
   const savePackageMut = useMutation({
@@ -157,33 +182,50 @@ export function AdminSettingsPage() {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['admin-subscription-packages'] });
       setMessage(selectedPackageId ? 'Package updated successfully.' : 'Package created successfully.');
+      setErrorText('');
       if (!selectedPackageId) {
         setPackageForm(emptyPackageForm);
       }
     },
-    onError: (e) => setMessage(getTenantReadableError(e, 'Unable to save package.')),
+    onError: (e) => {
+      setErrorText(getTenantReadableError(e, 'Unable to save package.'));
+      setMessage('');
+    },
   });
 
   function saveTenantKeyNow() {
     setTenantKey(tenantKeyInput);
     setMessage('Tenant key saved.');
+    setErrorText('');
     qc.invalidateQueries({ queryKey: ['admin-tenant-overview'] });
   }
 
   async function onTenantLogoChange(file: File | null) {
     if (!file) return;
-    const dataUrl = await fileToDataUrl(file);
-    setTenantLogo(dataUrl);
-    setTenantLogoDataUrl(dataUrl);
-    setMessage('Tenant logo updated.');
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      setTenantLogo(dataUrl);
+      setTenantLogoDataUrl(dataUrl);
+      setMessage('Tenant logo updated.');
+      setErrorText('');
+    } catch (error) {
+      setErrorText(getTenantReadableError(error, 'Unable to update tenant logo.'));
+      setMessage('');
+    }
   }
 
   async function onCompanyLogoChange(file: File | null) {
     if (!file) return;
-    const dataUrl = await fileToDataUrl(file);
-    setCompanyLogo(dataUrl);
-    setCompanyLogoDataUrl(dataUrl);
-    setMessage('Company logo updated.');
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      setCompanyLogo(dataUrl);
+      setCompanyLogoDataUrl(dataUrl);
+      setMessage('Company logo updated.');
+      setErrorText('');
+    } catch (error) {
+      setErrorText(getTenantReadableError(error, 'Unable to update company logo.'));
+      setMessage('');
+    }
   }
 
   if (!canManageCommercials) {
@@ -202,6 +244,8 @@ export function AdminSettingsPage() {
     );
   }
 
+  const byRole = (tenantOverviewQ.data?.users.byRole ?? {}) as ExtendedByRole;
+
   return (
     <div className="page-grid">
       <section className="panel">
@@ -213,7 +257,7 @@ export function AdminSettingsPage() {
         {tenantOverviewQ.isLoading ? (
           <div className="muted">Loading tenant operational overview...</div>
         ) : tenantOverviewQ.isError ? (
-          <div className="muted">Unable to load tenant operational overview.</div>
+          <div className="error-panel">{getTenantReadableError(tenantOverviewQ.error, 'Unable to load tenant operational overview.')}</div>
         ) : tenantOverviewQ.data ? (
           <div className="kv">
             <div className="kv-row"><span>Tenant Name</span><span>{tenantOverviewQ.data.tenantName}</span></div>
@@ -228,10 +272,23 @@ export function AdminSettingsPage() {
             <div className="kv-row"><span>Total Users</span><span>{tenantOverviewQ.data.users.total}</span></div>
             <div className="kv-row"><span>Active Users</span><span>{tenantOverviewQ.data.users.active}</span></div>
             <div className="kv-row"><span>Inactive Users</span><span>{tenantOverviewQ.data.users.inactive}</span></div>
-            <div className="kv-row"><span>Tenant Admins</span><span>{tenantOverviewQ.data.users.byRole.tenantAdmin}</span></div>
-            <div className="kv-row"><span>Accountants</span><span>{tenantOverviewQ.data.users.byRole.accountant}</span></div>
-            <div className="kv-row"><span>Approvers</span><span>{tenantOverviewQ.data.users.byRole.approver}</span></div>
-            <div className="kv-row"><span>Viewers</span><span>{tenantOverviewQ.data.users.byRole.viewer}</span></div>
+            <div className="kv-row"><span>Platform Admins</span><span>{byRole.platformAdmin ?? 0}</span></div>
+            <div className="kv-row"><span>Tenant Admins</span><span>{byRole.tenantAdmin ?? 0}</span></div>
+            <div className="kv-row"><span>Finance Controllers</span><span>{byRole.financeController ?? 0}</span></div>
+            <div className="kv-row"><span>Accountants</span><span>{byRole.accountant ?? 0}</span></div>
+            <div className="kv-row"><span>Approvers</span><span>{byRole.approver ?? 0}</span></div>
+            <div className="kv-row"><span>Viewers</span><span>{byRole.viewer ?? 0}</span></div>
+            <div className="kv-row"><span>Auditors</span><span>{byRole.auditor ?? 0}</span></div>
+            <div className="kv-row"><span>Budget Officers</span><span>{byRole.budgetOfficer ?? 0}</span></div>
+            <div className="kv-row"><span>Budget Owners</span><span>{byRole.budgetOwner ?? 0}</span></div>
+            <div className="kv-row"><span>Payroll Officers</span><span>{byRole.payrollOfficer ?? 0}</span></div>
+            <div className="kv-row"><span>HR Officers</span><span>{byRole.hrOfficer ?? 0}</span></div>
+            <div className="kv-row"><span>Procurement Officers</span><span>{byRole.procurementOfficer ?? 0}</span></div>
+            <div className="kv-row"><span>Treasury Officers</span><span>{byRole.treasuryOfficer ?? 0}</span></div>
+            <div className="kv-row"><span>Inventory Officers</span><span>{byRole.inventoryOfficer ?? 0}</span></div>
+            <div className="kv-row"><span>AP Officers</span><span>{byRole.apOfficer ?? 0}</span></div>
+            <div className="kv-row"><span>AR Officers</span><span>{byRole.arOfficer ?? 0}</span></div>
+            <div className="kv-row"><span>Fixed Asset Officers</span><span>{byRole.fixedAssetOfficer ?? 0}</span></div>
             <div className="kv-row"><span>Support Warning</span><span>{tenantOverviewQ.data.renewalWarning}</span></div>
           </div>
         ) : null}
@@ -243,7 +300,8 @@ export function AdminSettingsPage() {
           <span className="muted">Tenant, branding, billing, and package settings</span>
         </div>
 
-        {message ? <div className="kv"><div className="muted">{message}</div></div> : null}
+        {message ? <div className="success-panel">{message}</div> : null}
+        {errorText ? <div className="error-panel">{errorText}</div> : null}
 
         <div className="form-grid two">
           <div className="form-row">
@@ -257,13 +315,13 @@ export function AdminSettingsPage() {
 
           <div className="form-row">
             <label>Company Logo (optional)</label>
-            <input className="input" type="file" accept="image/*" onChange={(e) => onCompanyLogoChange(e.target.files?.[0] || null)} />
+            <input className="input" type="file" accept="image/*" onChange={(e) => void onCompanyLogoChange(e.target.files?.[0] || null)} />
             <div className="muted">{companyLogo ? 'Set' : 'Not set'}</div>
           </div>
 
           <div className="form-row">
             <label>Tenant Logo (optional)</label>
-            <input className="input" type="file" accept="image/*" onChange={(e) => onTenantLogoChange(e.target.files?.[0] || null)} />
+            <input className="input" type="file" accept="image/*" onChange={(e) => void onTenantLogoChange(e.target.files?.[0] || null)} />
             <div className="muted">{tenantLogo ? 'Set' : 'Not set'}</div>
           </div>
         </div>
@@ -321,7 +379,11 @@ export function AdminSettingsPage() {
             <select
               className="select"
               value={selectedPackageId || ''}
-              onChange={(e) => setSelectedPackageId(e.target.value || null)}
+              onChange={(e) => {
+                setSelectedPackageId(e.target.value || null);
+                setMessage('');
+                setErrorText('');
+              }}
             >
               <option value="">— Create New Package —</option>
               {(packagesQ.data?.items || []).map((pkg) => (
@@ -396,7 +458,15 @@ export function AdminSettingsPage() {
         </div>
 
         <div className="inline-actions" style={{ justifyContent: 'space-between', marginTop: 12 }}>
-          <button className="button" onClick={() => { setSelectedPackageId(null); setPackageForm(emptyPackageForm); }}>
+          <button
+            className="button"
+            onClick={() => {
+              setSelectedPackageId(null);
+              setPackageForm(emptyPackageForm);
+              setMessage('');
+              setErrorText('');
+            }}
+          >
             New Package
           </button>
 

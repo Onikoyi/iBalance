@@ -60,6 +60,7 @@ export function AdminUsersPage() {
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [form, setForm] = useState<UserFormState>(emptyForm);
   const [message, setMessage] = useState('');
+  const [errorText, setErrorText] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [roleFilter, setRoleFilter] = useState<'all' | string>('all');
@@ -119,6 +120,7 @@ export function AdminUsersPage() {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['admin-users'] });
       setMessage('User created successfully.');
+      setErrorText('');
       setMode('create');
       setSelectedUserId('');
       setResetNotice(null);
@@ -128,7 +130,8 @@ export function AdminUsersPage() {
       });
     },
     onError: (error) => {
-      setMessage(getTenantReadableError(error, 'Unable to create user.'));
+      setErrorText(getTenantReadableError(error, 'Unable to create user.'));
+      setMessage('');
     },
   });
 
@@ -138,10 +141,12 @@ export function AdminUsersPage() {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['admin-users'] });
       setMessage('User updated successfully.');
+      setErrorText('');
       setResetNotice(null);
     },
     onError: (error) => {
-      setMessage(getTenantReadableError(error, 'Unable to update user.'));
+      setErrorText(getTenantReadableError(error, 'Unable to update user.'));
+      setMessage('');
     },
   });
 
@@ -150,10 +155,12 @@ export function AdminUsersPage() {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['admin-users'] });
       setMessage('User activated successfully.');
+      setErrorText('');
       setResetNotice(null);
     },
     onError: (error) => {
-      setMessage(getTenantReadableError(error, 'Unable to activate user.'));
+      setErrorText(getTenantReadableError(error, 'Unable to activate user.'));
+      setMessage('');
     },
   });
 
@@ -162,10 +169,12 @@ export function AdminUsersPage() {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['admin-users'] });
       setMessage('User deactivated successfully.');
+      setErrorText('');
       setResetNotice(null);
     },
     onError: (error) => {
-      setMessage(getTenantReadableError(error, 'Unable to deactivate user.'));
+      setErrorText(getTenantReadableError(error, 'Unable to deactivate user.'));
+      setMessage('');
     },
   });
 
@@ -173,13 +182,15 @@ export function AdminUsersPage() {
     mutationFn: (userId: string) => issueAdminUserPasswordReset(userId),
     onSuccess: (data) => {
       setMessage(data.message || 'Password reset instructions sent successfully.');
+      setErrorText('');
       setResetNotice({
         email: data.email,
         expiresAtUtc: data.expiresAtUtc || null,
       });
     },
     onError: (error) => {
-      setMessage(getTenantReadableError(error, 'Unable to send password reset instructions.'));
+      setErrorText(getTenantReadableError(error, 'Unable to send password reset instructions.'));
+      setMessage('');
       setResetNotice(null);
     },
   });
@@ -188,6 +199,8 @@ export function AdminUsersPage() {
     setMode('create');
     setSelectedUserId('');
     setResetNotice(null);
+    setMessage('');
+    setErrorText('');
     setForm({
       ...emptyForm,
       role: availableRoles[0] || 'Viewer',
@@ -196,13 +209,16 @@ export function AdminUsersPage() {
 
   function startEdit(user: AdminUserDto) {
     if (!canEditUserRole(user.role as any)) {
-      setMessage('You do not have permission to edit that user role.');
+      setErrorText('You do not have permission to edit that user role.');
+      setMessage('');
       return;
     }
 
     setMode('edit');
     setSelectedUserId(user.id);
     setResetNotice(null);
+    setMessage('');
+    setErrorText('');
     setForm({
       email: user.email,
       firstName: user.firstName,
@@ -215,10 +231,11 @@ export function AdminUsersPage() {
 
   function submitForm() {
     setMessage('');
+    setErrorText('');
     setResetNotice(null);
 
     if (!canEditUserRole(form.role as any)) {
-      setMessage('You do not have permission to assign the selected role.');
+      setErrorText('You do not have permission to assign the selected role.');
       return;
     }
 
@@ -235,7 +252,7 @@ export function AdminUsersPage() {
     }
 
     if (!selectedUserId) {
-      setMessage('Select a user to update.');
+      setErrorText('Select a user to update.');
       return;
     }
 
@@ -267,6 +284,18 @@ export function AdminUsersPage() {
     );
   }
 
+  if (usersQ.isLoading || rolesQ.isLoading) {
+    return <div className="panel">Loading user management...</div>;
+  }
+
+  if (usersQ.isError || rolesQ.isError) {
+    return (
+      <div className="panel error-panel">
+        {getTenantReadableError(usersQ.error || rolesQ.error, 'Unable to load user management at this time.')}
+      </div>
+    );
+  }
+
   return (
     <div className="page-grid">
       <section className="panel">
@@ -276,8 +305,14 @@ export function AdminUsersPage() {
         </div>
 
         {message ? (
-          <div className="kv" style={{ marginBottom: 16 }}>
-            <div className="muted">{message}</div>
+          <div className="success-panel" style={{ marginBottom: 16 }}>
+            {message}
+          </div>
+        ) : null}
+
+        {errorText ? (
+          <div className="panel error-panel" style={{ marginBottom: 16 }}>
+            {errorText}
           </div>
         ) : null}
 
@@ -347,6 +382,8 @@ export function AdminUsersPage() {
               const user = (usersQ.data?.items || []).find((x) => x.id === id);
               if (user) {
                 startEdit(user);
+              } else if (!id) {
+                startCreate();
               }
             }}>
               <option value="">— Select User —</option>
@@ -432,9 +469,9 @@ export function AdminUsersPage() {
                   {canEditUserRole(user.role as any) ? (<button className="button" onClick={() => startEdit(user)}>Edit</button>) : null}
                   {canEditUserRole(user.role as any) ? (
                     user.isActive ? (
-                      <button className="button danger" onClick={() => deactivateMut.mutate(user.id)} disabled={deactivateMut.isPending}>Deactivate</button>
+                      <button className="button danger" onClick={() => deactivateMut.mutate(user.id)} disabled={activateMut.isPending || deactivateMut.isPending}>Deactivate</button>
                     ) : (
-                      <button className="button" onClick={() => activateMut.mutate(user.id)} disabled={activateMut.isPending}>Activate</button>
+                      <button className="button" onClick={() => activateMut.mutate(user.id)} disabled={activateMut.isPending || deactivateMut.isPending}>Activate</button>
                     )
                   ) : null}
                   {canEditUserRole(user.role as any) ? (

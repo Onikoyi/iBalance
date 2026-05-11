@@ -17,7 +17,14 @@ import {
   getBudgetAwareReadableError,
   type BudgetAwareApiResponse,
 } from '../lib/api';
-import { canApproveWorkflows, canManageFinanceSetup, canViewFinance } from '../lib/auth';
+import {
+  canApproveVendorPayments,
+  canCreateVendorPayments,
+  canPostVendorPayments,
+  canRejectVendorPayments,
+  canSubmitVendorPayments,
+  canViewAccountsPayable,
+} from '../lib/auth';
 
 const emptyForm: CreateVendorPaymentRequest = {
   vendorId: '',
@@ -81,9 +88,12 @@ function purchaseInvoiceStatusLabel(value: number) {
 
 export function VendorPaymentsPage() {
   const qc = useQueryClient();
-  const canView = canViewFinance();
-  const canManage = canManageFinanceSetup();
-  const canApprove = canApproveWorkflows();
+  const canView = canViewAccountsPayable();
+  const canManage = canCreateVendorPayments();
+  const canSubmitApproval = canSubmitVendorPayments();
+  const canApprove = canApproveVendorPayments();
+  const canReject = canRejectVendorPayments();
+  const canPost = canPostVendorPayments();
 
   const [showCreate, setShowCreate] = useState(false);
   const [showPost, setShowPost] = useState(false);
@@ -284,7 +294,7 @@ export function VendorPaymentsPage() {
   }
 
   function openPostModal(paymentId: string) {
-    if (!canApprove) {
+    if (!canPost) {
       setErrorText('You do not have permission to post approved vendor payments.');
       setInfoText('');
       return;
@@ -309,7 +319,7 @@ export function VendorPaymentsPage() {
   }
 
   function openRejectModal(paymentId: string) {
-    if (!canApprove) {
+    if (!canReject) {
       setErrorText('You do not have permission to reject vendor payments.');
       setInfoText('');
       return;
@@ -336,7 +346,7 @@ export function VendorPaymentsPage() {
     setInfoText('');
     setSelectedPaymentId(paymentId);
 
-    if (!canManage) {
+    if (!canSubmitApproval) {
       setErrorText('You do not have permission to submit vendor payments for approval.');
       return;
     }
@@ -415,7 +425,7 @@ export function VendorPaymentsPage() {
     setErrorText('');
     setInfoText('');
 
-    if (!canApprove) {
+    if (!canReject) {
       setErrorText('You do not have permission to reject vendor payments.');
       return;
     }
@@ -437,7 +447,7 @@ export function VendorPaymentsPage() {
     setErrorText('');
     setInfoText('');
 
-    if (!canApprove) {
+    if (!canPost) {
       setErrorText('You do not have permission to post approved vendor payments.');
       return;
     }
@@ -464,7 +474,7 @@ export function VendorPaymentsPage() {
     return <div className="panel error-panel">You do not have access to view vendor payments.</div>;
   }
 
-  if (paymentsQ.isLoading || vendorsQ.isLoading || purchaseInvoicesQ.isLoading || accountsQ.isLoading) {
+  if (paymentsQ.isLoading || vendorsQ.isLoading || purchaseInvoicesQ.isLoading) {
     return <div className="panel">Loading vendor payments...</div>;
   }
 
@@ -472,11 +482,9 @@ export function VendorPaymentsPage() {
     paymentsQ.isError ||
     vendorsQ.isError ||
     purchaseInvoicesQ.isError ||
-    accountsQ.isError ||
     !paymentsQ.data ||
     !vendorsQ.data ||
-    !purchaseInvoicesQ.data ||
-    !accountsQ.data
+    !purchaseInvoicesQ.data
   ) {
     return <div className="panel error-panel">We could not load vendor payments at this time.</div>;
   }
@@ -520,6 +528,14 @@ export function VendorPaymentsPage() {
         {errorText ? (
           <div className="panel error-panel" style={{ marginTop: 16 }}>
             {errorText}
+          </div>
+        ) : null}
+
+        {accountsQ.isError ? (
+          <div className="panel" style={{ marginTop: 16 }}>
+            <div className="muted">
+              Ledger accounts could not be loaded. You can still view and manage vendor payments, but posting is temporarily unavailable until ledger accounts load successfully.
+            </div>
           </div>
         ) : null}
       </section>
@@ -578,17 +594,17 @@ export function VendorPaymentsPage() {
                     <td style={{ textAlign: 'right' }}>{formatAmount(item.amount)}</td>
                     <td>
                       <div className="inline-actions">
-                      {item.status === 1 && canManage ? (
+                      {item.status === 1 && canSubmitApproval ? (
                           <button
                             className="button"
                             onClick={() => handleSubmitForApproval(item.id)}
-                            disabled={submitMut.isPending}
+                            disabled={submitMut.isPending || !canSubmitApproval}
                           >
                             {submitMut.isPending && selectedPaymentId === item.id ? 'Submitting…' : 'Submit'}
                           </button>
                         ) : null}
 
-                        {item.status === 2 && canApprove ? (
+                        {item.status === 2 && (canApprove || canReject) ? (
                           <>
                             <button
                               className="button"
@@ -608,7 +624,7 @@ export function VendorPaymentsPage() {
                           </>
                         ) : null}
 
-                        {item.status === 3 && canApprove ? (
+                        {item.status === 3 && canPost ? (
                           <button className="button" onClick={() => openPostModal(item.id)} disabled={postMut.isPending}>
                             Post
                           </button>

@@ -14,7 +14,11 @@ import {
   type TaxCodeDto,
   type UpdateSalesInvoiceRequest,
 } from '../lib/api';
-import { canManageFinanceSetup, canViewFinance } from '../lib/auth';
+import {
+  canCreateSalesInvoices,
+  canSubmitSalesInvoices,
+  canViewAccountsReceivable,
+} from '../lib/auth';
 
 const emptyLine: SalesInvoiceLineDto = {
   description: '',
@@ -89,8 +93,9 @@ function taxApplicationModeLabel(value: number) {
 
 export function RejectedSalesInvoicesPage() {
   const qc = useQueryClient();
-  const canView = canViewFinance();
-  const canManage = canManageFinanceSetup();
+  const canView = canViewAccountsReceivable();
+  const canManage = canCreateSalesInvoices();
+  const canSubmitApproval = canSubmitSalesInvoices();
 
   const [selectedInvoice, setSelectedInvoice] = useState<RejectedSalesInvoiceDto | null>(null);
   const [form, setForm] = useState<UpdateSalesInvoiceRequest>(emptyForm);
@@ -370,7 +375,7 @@ export function RejectedSalesInvoicesPage() {
     setErrorText('');
     setInfoText('');
 
-    if (!canManage) {
+    if (!canSubmitApproval) {
       setErrorText('You do not have permission to submit rejected sales invoices for approval.');
       return;
     }
@@ -400,17 +405,15 @@ export function RejectedSalesInvoicesPage() {
     return <div className="panel error-panel">You do not have access to view rejected sales invoices.</div>;
   }
 
-  if (rejectedInvoicesQ.isLoading || customersQ.isLoading || taxCodesQ.isLoading) {
+  if (rejectedInvoicesQ.isLoading || customersQ.isLoading) {
     return <div className="panel">Loading rejected sales invoices...</div>;
   }
 
   if (
     rejectedInvoicesQ.isError ||
     customersQ.isError ||
-    taxCodesQ.isError ||
     !rejectedInvoicesQ.data ||
-    !customersQ.data ||
-    !taxCodesQ.data
+    !customersQ.data
   ) {
     return <div className="panel error-panel">We could not load rejected sales invoices at this time.</div>;
   }
@@ -496,7 +499,7 @@ export function RejectedSalesInvoicesPage() {
                         <button
                           className="button"
                           onClick={() => submitForApproval(invoice)}
-                          disabled={submitMut.isPending}
+                          disabled={submitMut.isPending || !canSubmitApproval}
                         >
                           {submitMut.isPending ? 'Submitting…' : 'Resubmit'}
                         </button>
@@ -650,7 +653,13 @@ export function RejectedSalesInvoicesPage() {
             </div>
 
             <div className="panel" style={{ marginBottom: 16 }}>
-              {taxCodesQ.data.items.length === 0 ? (
+              {taxCodesQ.isLoading ? (
+                <div className="muted">Loading tax codes...</div>
+              ) : taxCodesQ.isError ? (
+                <div className="muted">
+                  Tax codes could not be loaded. You can still review and edit the rejected invoice, but tax-code adjustment is unavailable right now.
+                </div>
+              ) : !taxCodesQ.data || taxCodesQ.data.items.length === 0 ? (
                 <div className="muted">No active sales tax codes have been configured.</div>
               ) : (
                 <div className="detail-stack">

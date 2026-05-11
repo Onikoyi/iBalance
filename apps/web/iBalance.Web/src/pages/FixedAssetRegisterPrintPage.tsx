@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getFixedAssetRegister, type FixedAssetRegisterResponse, type FixedAssetRegisterItemDto } from '../lib/api';
+import { canViewFixedAssets } from '../lib/auth';
 
 function formatDate(value?: string | null) {
   if (!value) return '—';
@@ -31,6 +32,7 @@ function statusLabel(value: number) {
 
 export function FixedAssetRegisterPrintPage() {
   const [searchParams] = useSearchParams();
+  const canView = canViewFixedAssets();
 
   const fixedAssetClassId = searchParams.get('fixedAssetClassId') || undefined;
   const status = searchParams.get('status') ? Number(searchParams.get('status')) : undefined;
@@ -38,6 +40,7 @@ export function FixedAssetRegisterPrintPage() {
   const reportQ = useQuery({
     queryKey: ['fixed-asset-register-print', fixedAssetClassId, status],
     queryFn: () => getFixedAssetRegister(status, fixedAssetClassId),
+    enabled: canView,
   });
 
   const summary = useMemo(() => {
@@ -53,6 +56,10 @@ export function FixedAssetRegisterPrintPage() {
       totalNetBookValue: items.reduce((sum: number, item: FixedAssetRegisterItemDto) => sum + Number(item.netBookValue ?? 0), 0),
     };
   }, [reportQ.data]);
+
+  if (!canView) {
+    return <div className="panel error-panel">You do not have access to view the fixed asset register report.</div>;
+  }
 
   if (reportQ.isLoading) {
     return <div className="panel">Loading fixed asset register report...</div>;

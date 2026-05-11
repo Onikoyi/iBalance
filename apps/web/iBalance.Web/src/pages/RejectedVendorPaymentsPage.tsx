@@ -11,7 +11,11 @@ import {
   type RejectedVendorPaymentDto,
   type UpdateVendorPaymentRequest,
 } from '../lib/api';
-import { canManageFinanceSetup, canViewFinance } from '../lib/auth';
+import {
+  canCreateVendorPayments,
+  canSubmitVendorPayments,
+  canViewAccountsPayable,
+} from '../lib/auth';
 
 const emptyForm: UpdateVendorPaymentRequest = {
   vendorId: '',
@@ -75,8 +79,9 @@ function purchaseInvoiceStatusLabel(value: number) {
 
 export function RejectedVendorPaymentsPage() {
   const qc = useQueryClient();
-  const canView = canViewFinance();
-  const canManage = canManageFinanceSetup();
+  const canView = canViewAccountsPayable();
+  const canManage = canCreateVendorPayments();
+  const canSubmitApproval = canSubmitVendorPayments();
 
   const [selectedPayment, setSelectedPayment] = useState<RejectedVendorPaymentDto | null>(null);
   const [form, setForm] = useState<UpdateVendorPaymentRequest>(emptyForm);
@@ -288,7 +293,7 @@ export function RejectedVendorPaymentsPage() {
     setErrorText('');
     setInfoText('');
 
-    if (!canManage) {
+    if (!canSubmitApproval) {
       setErrorText('You do not have permission to submit rejected vendor payments for approval.');
       return;
     }
@@ -418,7 +423,7 @@ export function RejectedVendorPaymentsPage() {
                         <button
                           className="button"
                           onClick={() => submitForApproval(payment)}
-                          disabled={submitMut.isPending}
+                          disabled={submitMut.isPending || !canSubmitApproval}
                         >
                           {submitMut.isPending ? 'Submitting…' : 'Resubmit'}
                         </button>

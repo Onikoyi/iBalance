@@ -7,6 +7,7 @@ import {
   getTenantLogoDataUrl,
   getVendorPaymentDetail,
 } from '../lib/api';
+import { canViewAccountsPayable } from '../lib/auth';
 
 function formatAmount(value: number) {
   return new Intl.NumberFormat('en-NG', {
@@ -351,6 +352,7 @@ function buildVoucherPrintHtml(args: {
 
 export function VendorPaymentVoucherPrintPage() {
   const { vendorPaymentId } = useParams<{ vendorPaymentId: string }>();
+  const canView = canViewAccountsPayable();
 
   const tenantLogo = getTenantLogoDataUrl();
   const companyLogo = getCompanyLogoDataUrl();
@@ -359,7 +361,7 @@ export function VendorPaymentVoucherPrintPage() {
   const paymentQ = useQuery({
     queryKey: ['ap-vendor-payment-detail', vendorPaymentId],
     queryFn: () => getVendorPaymentDetail(vendorPaymentId || ''),
-    enabled: !!vendorPaymentId,
+    enabled: canView && !!vendorPaymentId,
   });
 
   const totals = useMemo(() => {
@@ -391,6 +393,10 @@ export function VendorPaymentVoucherPrintPage() {
       printWindow.focus();
       printWindow.print();
     };
+  }
+
+  if (!canView) {
+    return <div className="panel error-panel">You do not have access to view vendor payment vouchers.</div>;
   }
 
   if (!vendorPaymentId) {

@@ -1,3 +1,4 @@
+using iBalance.Api.Security;
 using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
@@ -11,6 +12,7 @@ namespace iBalance.Api.Controllers;
 [Route("api/finance/inventory/reports")]
 public sealed class InventoryReportsController : ControllerBase
 {
+    [Authorize(Policy = AuthorizationPolicies.InventoryView)]
     [HttpGet("valuation")]
     public async Task<IActionResult> GetInventoryValuationReport(
         [FromQuery] DateTime? asOfUtc,
@@ -100,6 +102,7 @@ public sealed class InventoryReportsController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.InventoryView)]
     [HttpGet("stock-gl-reconciliation")]
     public async Task<IActionResult> GetStockGlReconciliation(
         [FromQuery] Guid inventoryLedgerAccountId,
@@ -180,6 +183,7 @@ public sealed class InventoryReportsController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.InventoryView)]
     [HttpGet("audit-trace")]
     public async Task<IActionResult> GetInventoryAuditTrace(
         [FromQuery] Guid? inventoryTransactionId,

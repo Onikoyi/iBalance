@@ -879,10 +879,10 @@ export function PayrollSetupPage() {
   }
 
   if (!canView) return <div className="panel error-panel">You do not have access to Payroll Setup.</div>;
-  if (employeesQ.isLoading || payGroupsQ.isLoading || payElementsQ.isLoading || salaryQ.isLoading || accountsQ.isLoading) {
+  if (employeesQ.isLoading || payGroupsQ.isLoading || payElementsQ.isLoading || salaryQ.isLoading) {
     return <div className="panel">Loading Payroll setup...</div>;
   }
-  if (employeesQ.isError || payGroupsQ.isError || payElementsQ.isError || salaryQ.isError || accountsQ.isError) {
+  if (employeesQ.isError || payGroupsQ.isError || payElementsQ.isError || salaryQ.isError) {
     return <div className="panel error-panel">Unable to load Payroll setup.</div>;
   }
 
@@ -893,6 +893,7 @@ export function PayrollSetupPage() {
         <div className="muted">Configure pay groups, pay elements, salary structures, pay-group composition, salary overrides, and GL mapping.</div>
         {message ? <div className="success-panel">{message}</div> : null}
         {errorText ? <div className="error-panel">{errorText}</div> : null}
+        {accountsQ.isError ? <div className="panel" style={{ marginTop: 12 }}><div className="muted">Ledger accounts could not be loaded. Payroll setup remains available, but GL-linked pay-element configuration is temporarily limited until accounts load successfully.</div></div> : null}
       </section>
 
       {canManage ? (

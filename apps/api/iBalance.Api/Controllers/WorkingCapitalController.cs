@@ -1,3 +1,4 @@
+using iBalance.Api.Security;
 using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
 using iBalance.Modules.Finance.Domain.Enums;
@@ -12,6 +13,7 @@ namespace iBalance.Api.Controllers;
 [Route("api/finance/working-capital")]
 public sealed class WorkingCapitalController : ControllerBase
 {
+    [Authorize(Policy = AuthorizationPolicies.ReportsView)]
     [HttpGet("dashboard")]
     public async Task<IActionResult> GetDashboard(
         [FromQuery] DateTime? asOfUtc,
@@ -261,6 +263,8 @@ public sealed class WorkingCapitalController : ControllerBase
 
         return "Healthy";
     }
+
+    [Authorize(Policy = AuthorizationPolicies.ReportsView)]
     [HttpGet("receivables-health")]
     public async Task<IActionResult> GetReceivablesHealth(
         [FromQuery] DateTime? asOfUtc,
@@ -344,6 +348,7 @@ public sealed class WorkingCapitalController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.ReportsView)]
     [HttpGet("payables-strategy")]
     public async Task<IActionResult> GetPayablesStrategy(
         [FromQuery] DateTime? asOfUtc,
@@ -425,6 +430,7 @@ public sealed class WorkingCapitalController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.ReportsView)]
     [HttpGet("actions")]
     public async Task<IActionResult> GetWorkingCapitalActions(
         [FromQuery] DateTime? asOfUtc,
@@ -620,7 +626,7 @@ public sealed class WorkingCapitalController : ControllerBase
         return "Keep under normal payable cycle.";
     }
 
-
+    [Authorize(Policy = AuthorizationPolicies.ReportsView)]
     [HttpGet("cashflow-forecast")]
     public async Task<IActionResult> GetCashflowForecast(
         [FromQuery] DateTime? asOfUtc,
@@ -922,113 +928,111 @@ public sealed class WorkingCapitalController : ControllerBase
         return "Healthy";
     }
 
-
+    [Authorize(Policy = AuthorizationPolicies.ReportsView)]
     [HttpGet("optimization")]
-public async Task<IActionResult> GetWorkingCapitalOptimization(
-    [FromQuery] DateTime? asOfUtc,
-    [FromServices] ApplicationDbContext dbContext,
-    [FromServices] ITenantContextAccessor tenantContextAccessor,
-    CancellationToken cancellationToken)
-{
-    var tenantContext = tenantContextAccessor.Current;
-
-    if (!tenantContext.IsAvailable)
+    public async Task<IActionResult> GetWorkingCapitalOptimization(
+        [FromQuery] DateTime? asOfUtc,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
     {
-        return BadRequest(new { Message = "Tenant context is required." });
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new { Message = "Tenant context is required." });
+        }
+
+        var effectiveAsOfUtc = asOfUtc ?? DateTime.UtcNow;
+
+        var receivables = await dbContext.SalesInvoices
+            .AsNoTracking()
+            .Where(x => x.BalanceAmount > 0m)
+            .Select(x => new
+            {
+                x.Id,
+                x.InvoiceNumber,
+                x.InvoiceDateUtc,
+                x.BalanceAmount
+            })
+            .ToListAsync(cancellationToken);
+
+        var payables = await dbContext.PurchaseInvoices
+            .AsNoTracking()
+            .Where(x => x.BalanceAmount > 0m)
+            .Select(x => new
+            {
+                x.Id,
+                x.InvoiceNumber,
+                x.InvoiceDateUtc,
+                x.BalanceAmount
+            })
+            .ToListAsync(cancellationToken);
+
+        var collectionPlan = receivables
+            .Select(x =>
+            {
+                var days = Math.Max(0, (int)(effectiveAsOfUtc.Date - x.InvoiceDateUtc.Date).TotalDays);
+
+                return new
+                {
+                    x.Id,
+                    x.InvoiceNumber,
+                    x.BalanceAmount,
+                    DaysOutstanding = days,
+                    Priority =
+                        days > 120 ? "Critical" :
+                        days > 90 ? "High" :
+                        days > 60 ? "Moderate" : "Normal",
+                    RecommendedAction =
+                        days > 120 ? "Escalate immediately" :
+                        days > 90 ? "Legal / recovery follow-up" :
+                        days > 60 ? "Aggressive follow-up" :
+                        "Standard reminder"
+                };
+            })
+            .OrderByDescending(x => x.Priority == "Critical")
+            .ThenByDescending(x => x.Priority == "High")
+            .ThenByDescending(x => x.BalanceAmount)
+            .Take(20)
+            .ToList();
+
+        var paymentPlan = payables
+            .Select(x =>
+            {
+                var days = Math.Max(0, (int)(effectiveAsOfUtc.Date - x.InvoiceDateUtc.Date).TotalDays);
+
+                return new
+                {
+                    x.Id,
+                    x.InvoiceNumber,
+                    x.BalanceAmount,
+                    DaysOutstanding = days,
+                    Priority =
+                        days > 120 ? "Immediate" :
+                        days > 90 ? "High" :
+                        days > 60 ? "Moderate" : "Normal",
+                    RecommendedAction =
+                        days > 120 ? "Pay immediately (supplier risk)" :
+                        days > 90 ? "Schedule payment urgently" :
+                        days > 60 ? "Plan payment" :
+                        "Defer strategically"
+                };
+            })
+            .OrderByDescending(x => x.Priority == "Immediate")
+            .ThenByDescending(x => x.Priority == "High")
+            .ThenByDescending(x => x.BalanceAmount)
+            .Take(20)
+            .ToList();
+
+        return Ok(new
+        {
+            TenantContextAvailable = true,
+            TenantId = tenantContext.TenantId,
+            TenantKey = tenantContext.TenantKey,
+            AsOfUtc = effectiveAsOfUtc,
+            CollectionPlan = collectionPlan,
+            PaymentPlan = paymentPlan
+        });
     }
-
-    var effectiveAsOfUtc = asOfUtc ?? DateTime.UtcNow;
-
-    var receivables = await dbContext.SalesInvoices
-        .AsNoTracking()
-        .Where(x => x.BalanceAmount > 0m)
-        .Select(x => new
-        {
-            x.Id,
-            x.InvoiceNumber,
-            x.InvoiceDateUtc,
-            x.BalanceAmount
-        })
-        .ToListAsync(cancellationToken);
-
-    var payables = await dbContext.PurchaseInvoices
-        .AsNoTracking()
-        .Where(x => x.BalanceAmount > 0m)
-        .Select(x => new
-        {
-            x.Id,
-            x.InvoiceNumber,
-            x.InvoiceDateUtc,
-            x.BalanceAmount
-        })
-        .ToListAsync(cancellationToken);
-
-    var collectionPlan = receivables
-        .Select(x =>
-        {
-            var days = Math.Max(0, (int)(effectiveAsOfUtc.Date - x.InvoiceDateUtc.Date).TotalDays);
-
-            return new
-            {
-                x.Id,
-                x.InvoiceNumber,
-                x.BalanceAmount,
-                DaysOutstanding = days,
-                Priority =
-                    days > 120 ? "Critical" :
-                    days > 90 ? "High" :
-                    days > 60 ? "Moderate" : "Normal",
-                RecommendedAction =
-                    days > 120 ? "Escalate immediately" :
-                    days > 90 ? "Legal / recovery follow-up" :
-                    days > 60 ? "Aggressive follow-up" :
-                    "Standard reminder"
-            };
-        })
-        .OrderByDescending(x => x.Priority == "Critical")
-        .ThenByDescending(x => x.Priority == "High")
-        .ThenByDescending(x => x.BalanceAmount)
-        .Take(20)
-        .ToList();
-
-    var paymentPlan = payables
-        .Select(x =>
-        {
-            var days = Math.Max(0, (int)(effectiveAsOfUtc.Date - x.InvoiceDateUtc.Date).TotalDays);
-
-            return new
-            {
-                x.Id,
-                x.InvoiceNumber,
-                x.BalanceAmount,
-                DaysOutstanding = days,
-                Priority =
-                    days > 120 ? "Immediate" :
-                    days > 90 ? "High" :
-                    days > 60 ? "Moderate" : "Normal",
-                RecommendedAction =
-                    days > 120 ? "Pay immediately (supplier risk)" :
-                    days > 90 ? "Schedule payment urgently" :
-                    days > 60 ? "Plan payment" :
-                    "Defer strategically"
-            };
-        })
-        .OrderByDescending(x => x.Priority == "Immediate")
-        .ThenByDescending(x => x.Priority == "High")
-        .ThenByDescending(x => x.BalanceAmount)
-        .Take(20)
-        .ToList();
-
-    return Ok(new
-    {
-        TenantContextAvailable = true,
-        TenantId = tenantContext.TenantId,
-        TenantKey = tenantContext.TenantKey,
-        AsOfUtc = effectiveAsOfUtc,
-        CollectionPlan = collectionPlan,
-        PaymentPlan = paymentPlan
-    });
-}
-
-
 }

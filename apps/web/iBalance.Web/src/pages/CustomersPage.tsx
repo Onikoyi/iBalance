@@ -6,7 +6,7 @@ import {
   getTenantReadableError,
   type CreateCustomerRequest,
 } from '../lib/api';
-import { canManageFinanceSetup, canViewFinance } from '../lib/auth';
+import { canManageCustomers, canViewAccountsReceivable } from '../lib/auth';
 
 type CustomerFormState = {
   customerCode: string;
@@ -35,8 +35,8 @@ function formatUtcDate(value?: string | null) {
 
 export function CustomersPage() {
   const qc = useQueryClient();
-  const canView = canViewFinance();
-  const canManage = canManageFinanceSetup();
+  const canView = canViewAccountsReceivable();
+  const canManage = canManageCustomers();
 
   const [form, setForm] = useState<CustomerFormState>(emptyForm);
   const [message, setMessage] = useState('');

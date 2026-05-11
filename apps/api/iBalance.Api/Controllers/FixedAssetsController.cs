@@ -1,3 +1,4 @@
+using iBalance.Api.Security;
 using iBalance.Api.Services;
 using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
@@ -14,6 +15,7 @@ namespace iBalance.Api.Controllers;
 [Route("api/finance/fixed-assets")]
 public sealed class FixedAssetsController : ControllerBase
 {
+    [Authorize(Policy = AuthorizationPolicies.FixedAssetsView)]
     [HttpGet("classes")]
     public async Task<IActionResult> GetFixedAssetClasses(
         [FromServices] ApplicationDbContext dbContext,
@@ -59,7 +61,7 @@ public sealed class FixedAssetsController : ControllerBase
     }
 
     [HttpPost("classes")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.FixedAssetsManage)]
     public async Task<IActionResult> CreateFixedAssetClass(
         [FromBody] CreateFixedAssetClassRequest request,
         [FromServices] ApplicationDbContext dbContext,
@@ -123,6 +125,7 @@ public sealed class FixedAssetsController : ControllerBase
         }
     }
 
+    [Authorize(Policy = AuthorizationPolicies.FixedAssetsView)]
     [HttpGet]
     public async Task<IActionResult> GetFixedAssets(
         [FromServices] ApplicationDbContext dbContext,
@@ -183,6 +186,7 @@ public sealed class FixedAssetsController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.FixedAssetsView)]
     [HttpGet("reports/register")]
     public async Task<IActionResult> GetFixedAssetRegister(
         [FromQuery] FixedAssetStatus? status,
@@ -277,7 +281,7 @@ public sealed class FixedAssetsController : ControllerBase
     }
 
     [HttpPost("capitalize-from-purchase-invoice")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.FixedAssetsManage)]
     public async Task<IActionResult> CapitalizeFromPurchaseInvoice(
         [FromBody] CapitalizePurchaseInvoiceToFixedAssetRequest request,
         [FromServices] ApplicationDbContext dbContext,
@@ -451,7 +455,7 @@ public sealed class FixedAssetsController : ControllerBase
 
 
     [HttpPost]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.FixedAssetsManage)]
     public async Task<IActionResult> CreateFixedAsset(
         [FromBody] CreateFixedAssetRequest request,
         [FromServices] ApplicationDbContext dbContext,
@@ -532,6 +536,7 @@ public sealed class FixedAssetsController : ControllerBase
         }
     }
 
+    [Authorize(Policy = AuthorizationPolicies.FixedAssetsView)]
     [HttpGet("{fixedAssetId:guid}")]
     public async Task<IActionResult> GetFixedAssetDetail(
         Guid fixedAssetId,
@@ -578,7 +583,7 @@ public sealed class FixedAssetsController : ControllerBase
     }
 
     [HttpPost("{fixedAssetId:guid}/capitalize")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.FixedAssetsManage)]
     public async Task<IActionResult> CapitalizeFixedAsset(
         Guid fixedAssetId,
         [FromBody] CapitalizeFixedAssetRequest request,
@@ -672,7 +677,7 @@ public sealed class FixedAssetsController : ControllerBase
     }
 
     [HttpPost("depreciation/preview")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant,Approver")]
+    [Authorize(Policy = AuthorizationPolicies.FixedAssetsManage)]
     public async Task<IActionResult> PreviewDepreciation(
         [FromBody] FixedAssetDepreciationPeriodRequest request,
         [FromServices] ApplicationDbContext dbContext,
@@ -716,6 +721,7 @@ public sealed class FixedAssetsController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.FixedAssetsView)]
     [HttpGet("depreciation-runs")]
     public async Task<IActionResult> GetDepreciationRuns(
         [FromServices] ApplicationDbContext dbContext,
@@ -757,7 +763,7 @@ public sealed class FixedAssetsController : ControllerBase
     }
 
     [HttpPost("depreciation-runs")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.FixedAssetsManage)]
     public async Task<IActionResult> RunDepreciation(
         [FromBody] RunFixedAssetDepreciationRequest request,
         [FromServices] ApplicationDbContext dbContext,
@@ -962,7 +968,7 @@ public sealed class FixedAssetsController : ControllerBase
     }
 
     [HttpPost("{fixedAssetId:guid}/improvements")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.FixedAssetsManage)]
     public async Task<IActionResult> RecordImprovement(
         Guid fixedAssetId,
         [FromBody] FixedAssetImprovementRequest request,
@@ -1051,7 +1057,7 @@ public sealed class FixedAssetsController : ControllerBase
     }
 
     [HttpPost("{fixedAssetId:guid}/transfer")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.FixedAssetsManage)]
     public async Task<IActionResult> TransferFixedAsset(
         Guid fixedAssetId,
         [FromBody] TransferFixedAssetRequest request,
@@ -1092,7 +1098,7 @@ public sealed class FixedAssetsController : ControllerBase
     }
 
     [HttpPost("{fixedAssetId:guid}/reclassify")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.FixedAssetsManage)]
     public async Task<IActionResult> ReclassifyFixedAsset(
         Guid fixedAssetId,
         [FromBody] ReclassifyFixedAssetRequest request,
@@ -1137,7 +1143,7 @@ public sealed class FixedAssetsController : ControllerBase
     }
 
     [HttpPost("{fixedAssetId:guid}/impair")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.FixedAssetsManage)]
     public async Task<IActionResult> ImpairFixedAsset(
         Guid fixedAssetId,
         [FromBody] ImpairFixedAssetRequest request,
@@ -1224,7 +1230,7 @@ public sealed class FixedAssetsController : ControllerBase
     }
 
     [HttpPost("{fixedAssetId:guid}/dispose")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.FixedAssetsManage)]
     public async Task<IActionResult> DisposeFixedAsset(
         Guid fixedAssetId,
         [FromBody] DisposeFixedAssetRequest request,

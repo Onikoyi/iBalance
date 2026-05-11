@@ -169,23 +169,24 @@ function buildPrintHtml(sectionHtml: string, title: string) {
   <meta charset="utf-8" />
   <title>${escapeHtml(title)}</title>
   <style>
-    @page { size: A4 landscape; margin: 10mm; }
+    @page { size: A4 landscape; margin: 12mm; }
     * { box-sizing: border-box; }
-    body { margin: 0; padding: 0; background: #ffffff; color: #111827; font-family: Arial, Helvetica, sans-serif; }
+    body { margin: 0; padding: 0; background: #ffffff; color: #111827; font-family: Arial, Helvetica, sans-serif; line-height: 1.35; }
     .no-print, button, a { display: none !important; }
-    .print-header { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; border-bottom: 2px solid #111827; padding-bottom: 14px; margin-bottom: 16px; }
+    .print-header { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; border-bottom: 2px solid #111827; padding-bottom: 14px; margin-bottom: 18px; }
     .print-logo-fallback { min-width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: rgba(75, 29, 115, 0.12); font-weight: 700; }
     .muted { color: #4b5563; font-size: 12px; }
     h2 { margin: 0 0 6px; }
     h3 { margin: 18px 0 8px; }
-    .kv { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 12px 0 16px; }
+    .kv { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0 18px; }
     .kv-row { border: 1px solid #d1d5db; border-radius: 8px; padding: 8px 10px; display: grid; gap: 4px; }
     .kv-row span:first-child { color: #4b5563; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
     table { width: 100%; border-collapse: collapse; font-size: 11px; }
     th, td { border: 1px solid #d1d5db; padding: 6px 7px; text-align: left; vertical-align: top; }
-    th { background: #f3f4f6; font-weight: 700; }
+    th { background: #f3f4f6; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; font-size: 10.5px; }
     .right { text-align: right; }
     tr { break-inside: avoid; }
+    .report-footer { margin-top: 12px; display: flex; justify-content: space-between; color: #6b7280; font-size: 11px; }
   </style>
 </head>
 <body>${sectionHtml}</body>
@@ -363,20 +364,7 @@ export function ReportsPage() {
     return <div className="panel error-panel">You do not have access to view reports.</div>;
   }
 
-  if (
-    trialBalanceQ.isLoading ||
-    balanceSheetQ.isLoading ||
-    incomeStatementQ.isLoading ||
-    taxReportQ.isLoading ||
-    salesInvoicesQ.isLoading ||
-    customerReceiptsQ.isLoading ||
-    purchaseInvoicesQ.isLoading ||
-    vendorPaymentsQ.isLoading
-  ) {
-    return <div className="panel">Loading financial reports...</div>;
-  }
-
-  if (
+  const hasAnyReportError =
     trialBalanceQ.isError ||
     balanceSheetQ.isError ||
     incomeStatementQ.isError ||
@@ -384,13 +372,31 @@ export function ReportsPage() {
     salesInvoicesQ.isError ||
     customerReceiptsQ.isError ||
     purchaseInvoicesQ.isError ||
-    vendorPaymentsQ.isError
-  ) {
-    return <div className="panel error-panel">We could not load the financial reports at this time.</div>;
+    vendorPaymentsQ.isError;
+
+  const isInitialLoading =
+    trialBalanceQ.isLoading &&
+    balanceSheetQ.isLoading &&
+    incomeStatementQ.isLoading &&
+    taxReportQ.isLoading &&
+    salesInvoicesQ.isLoading &&
+    customerReceiptsQ.isLoading &&
+    purchaseInvoicesQ.isLoading &&
+    vendorPaymentsQ.isLoading;
+
+  if (isInitialLoading) {
+    return <div className="panel">Loading financial reports...</div>;
   }
 
   return (
     <div className="reports-grid">
+      {hasAnyReportError ? (
+        <section className="panel">
+          <div className="muted">
+            Some report datasets could not be loaded for the current role or selected filters. Available report sections remain usable below.
+          </div>
+        </section>
+      ) : null}
       <section className="panel no-print">
         <div className="section-heading">
           <div>

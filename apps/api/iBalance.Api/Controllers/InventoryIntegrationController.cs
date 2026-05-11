@@ -1,3 +1,4 @@
+using iBalance.Api.Security;
 using iBalance.Api.Services;
 using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
@@ -15,7 +16,7 @@ namespace iBalance.Api.Controllers;
 public sealed class InventoryIntegrationController : ControllerBase
 {
     [HttpPost("purchase-invoice-receipts")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.InventoryManage)]
     public async Task<IActionResult> ReceivePurchaseInvoiceIntoInventory(
         [FromBody] ReceivePurchaseInvoiceIntoInventoryRequest request,
         [FromServices] ApplicationDbContext dbContext,
@@ -51,18 +52,18 @@ public sealed class InventoryIntegrationController : ControllerBase
 
         var transactionDateUtc = request.TransactionDateUtc == default ? DateTime.UtcNow : request.TransactionDateUtc;
 
-       var postingGuard = await FiscalPeriodPostingGuard.EnsureOpenPeriodAsync(
-                dbContext,
-                transactionDateUtc,
-                "Inventory Receipt",
-                cancellationToken);
+        var postingGuard = await FiscalPeriodPostingGuard.EnsureOpenPeriodAsync(
+            dbContext,
+            transactionDateUtc,
+            "Inventory Receipt",
+            cancellationToken);
 
-            if (!postingGuard.Allowed)
-            {
-                return Conflict(postingGuard.ToProblem());
-            }
+        if (!postingGuard.Allowed)
+        {
+            return Conflict(postingGuard.ToProblem());
+        }
 
-            var postingPeriod = postingGuard.FiscalPeriod!;
+        var postingPeriod = postingGuard.FiscalPeriod!;
 
         var ledgerValidation = await ValidatePostingLedgerAccountsAsync(dbContext, new[] { request.InventoryLedgerAccountId, request.CreditLedgerAccountId }, cancellationToken);
         if (ledgerValidation is not null) return ledgerValidation;
@@ -170,7 +171,7 @@ public sealed class InventoryIntegrationController : ControllerBase
     }
 
     [HttpPost("sales-invoice-issues")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.InventoryManage)]
     public async Task<IActionResult> IssueInventoryForSalesInvoice(
         [FromBody] IssueInventoryForSalesInvoiceRequest request,
         [FromServices] ApplicationDbContext dbContext,
@@ -206,18 +207,18 @@ public sealed class InventoryIntegrationController : ControllerBase
 
         var transactionDateUtc = request.TransactionDateUtc == default ? DateTime.UtcNow : request.TransactionDateUtc;
 
-       var postingGuard = await FiscalPeriodPostingGuard.EnsureOpenPeriodAsync(
-                dbContext,
-                transactionDateUtc,
-                "Inventory Receipt",
-                cancellationToken);
+        var postingGuard = await FiscalPeriodPostingGuard.EnsureOpenPeriodAsync(
+            dbContext,
+            transactionDateUtc,
+            "Inventory Receipt",
+            cancellationToken);
 
-            if (!postingGuard.Allowed)
-            {
-                return Conflict(postingGuard.ToProblem());
-            }
+        if (!postingGuard.Allowed)
+        {
+            return Conflict(postingGuard.ToProblem());
+        }
 
-            var postingPeriod = postingGuard.FiscalPeriod!;
+        var postingPeriod = postingGuard.FiscalPeriod!;
 
         var ledgerValidation = await ValidatePostingLedgerAccountsAsync(dbContext, new[] { request.InventoryLedgerAccountId, request.CogsLedgerAccountId }, cancellationToken);
         if (ledgerValidation is not null) return ledgerValidation;

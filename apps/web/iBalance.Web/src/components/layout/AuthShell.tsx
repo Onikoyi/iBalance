@@ -56,7 +56,7 @@ export function AuthShell({ children, wide = false }: AuthShellProps) {
       </main>
 
       <footer className="auth-footer">
-        <span>© Nikosoft Technologies — iBalance Accounting Cloud</span>
+        <span>© Nikosoft Technologies — iBalance ERP Cloud</span>
         <span>Secure sign-in • Tenant-ready</span>
       </footer>
     </div>

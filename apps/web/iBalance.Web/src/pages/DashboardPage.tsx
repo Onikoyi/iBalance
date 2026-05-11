@@ -9,6 +9,13 @@ import {
   getBudgets,
 } from '../lib/api';
 import { StatCard } from '../components/common/StatCard';
+import {
+  canViewAccountsReceivable,
+  canViewBudget,
+  canViewFinance,
+  canViewFixedAssets,
+  canViewReports,
+} from '../lib/auth';
 
 function licenseLabel(value?: number) {
   switch (value) {
@@ -49,47 +56,66 @@ function salesInvoiceStatusLabel(value?: number) {
 }
 
 export function DashboardPage() {
+  const canView = canViewReports();
+  const canViewFinanceModule = canViewFinance();
+  const canViewBudgetModule = canViewBudget();
+  const canViewFixedAssetsModule = canViewFixedAssets();
+  const canViewArModule = canViewAccountsReceivable();
+
   const { data, isLoading, error } = useQuery({
     queryKey: ['dashboard-summary'],
     queryFn: getDashboardSummary,
+    enabled: canView,
   });
 
   const licenseQ = useQuery({
     queryKey: ['current-tenant-license'],
     queryFn: getCurrentTenantLicense,
     staleTime: 60_000,
+    enabled: canView,
   });
 
   const invoicesQ = useQuery({
     queryKey: ['ar-sales-invoices'],
     queryFn: getSalesInvoices,
     staleTime: 60_000,
+    enabled: canViewArModule,
   });
 
   const receiptsQ = useQuery({
     queryKey: ['ar-customer-receipts'],
     queryFn: getCustomerReceipts,
     staleTime: 60_000,
+    enabled: canViewArModule,
   });
 
   const taxReportQ = useQuery({
     queryKey: ['dashboard-tax-report'],
     queryFn: () => getTaxReport(undefined, undefined, null, null),
     staleTime: 60_000,
+    enabled: canView,
   });
 
   const budgetsQ = useQuery({
     queryKey: ['dashboard-budgets'],
     queryFn: getBudgets,
     staleTime: 60_000,
+    enabled: canViewBudgetModule,
   });
 
-  if (isLoading) {
-    return <div className="panel">Loading dashboard...</div>;
+  if (!canView) {
+    return <div className="panel error-panel">You do not have access to view the dashboard.</div>;
   }
 
-  if (error || !data) {
-    return <div className="panel error-panel">We could not load the dashboard at this time.</div>;
+  if (
+    isLoading &&
+    !taxReportQ.data &&
+    !budgetsQ.data &&
+    !licenseQ.data &&
+    !invoicesQ.data &&
+    !receiptsQ.data
+  ) {
+    return <div className="panel">Loading dashboard...</div>;
   }
 
   const invoices = invoicesQ.data?.items || [];
@@ -153,6 +179,14 @@ const budgetSummary = {
 
   return (
     <div className="page-grid">
+      {error ? (
+        <section className="panel">
+          <div className="muted">
+            Some finance-wide dashboard metrics are not available for the current role or tenant context. Available overview sections are still shown below.
+          </div>
+        </section>
+      ) : null}
+      {canViewFinanceModule ? (
       <section className="panel">
         <div className="section-heading">
           <div>
@@ -162,15 +196,16 @@ const budgetSummary = {
         </div>
 
         <div className="stats-grid">
-          <StatCard label="Accounts" value={data.totalAccounts} />
-          <StatCard label="Posted Journals" value={data.totalPostedJournals} />
-          <StatCard label="Draft Journals" value={data.totalDraftJournals} />
-          <StatCard label="Opening Journals" value={data.totalOpeningBalanceJournals} />
-          <StatCard label="Ledger Movements" value={data.totalLedgerMovements} />
-          <StatCard label="Total Debit" value={formatAmount(data.totalDebit)} />
-          <StatCard label="Total Credit" value={formatAmount(data.totalCredit)} />
+          <StatCard label="Accounts" value={data?.totalAccounts ?? 0} />
+          <StatCard label="Posted Journals" value={data?.totalPostedJournals ?? 0} />
+          <StatCard label="Draft Journals" value={data?.totalDraftJournals ?? 0} />
+          <StatCard label="Opening Journals" value={data?.totalOpeningBalanceJournals ?? 0} />
+          <StatCard label="Ledger Movements" value={data?.totalLedgerMovements ?? 0} />
+          <StatCard label="Total Debit" value={formatAmount(data?.totalDebit ?? 0)} />
+          <StatCard label="Total Credit" value={formatAmount(data?.totalCredit ?? 0)} />
         </div>
       </section>
+      ) : null}
 
       <section className="panel">
         <div className="section-heading">
@@ -202,7 +237,8 @@ const budgetSummary = {
         )}
       </section>
 
-      <section className="panel">
+      {canViewBudgetModule ? (
+<section className="panel">
   <div className="section-heading">
     <h2>Budget overview</h2>
     <span className="muted">Budget control, approval, and utilization readiness</span>
@@ -234,9 +270,13 @@ const budgetSummary = {
     </>
   )}
 </section>
+      ) : null}
+
+      
 
 
-      <section className="panel">
+      {canViewFixedAssetsModule ? (
+<section className="panel">
         <div className="section-heading">
           <h2>Fixed assets</h2>
           <span className="muted">Asset register, capitalization, and depreciation operations</span>
@@ -253,8 +293,12 @@ const budgetSummary = {
           <Link to="/fixed-assets/register/print" className="button">Asset Register Print</Link>
         </div>
       </section>
+      ) : null}
 
-      <section className="panel">
+      
+
+      {canViewArModule ? (
+<section className="panel">
         <div className="section-heading">
           <h2>Accounts receivable overview</h2>
           <span className="muted">Current invoice and collection activity</span>
@@ -283,6 +327,9 @@ const budgetSummary = {
           <Link to="/customer-receipts" className="button">Customer Receipts</Link>
         </div>
       </section>
+      ) : null}
+
+      
 
       <section className="panel">
         <div className="section-heading">
@@ -325,25 +372,26 @@ const budgetSummary = {
         </div>
       </section>
 
-      <section className="panel">
+      {canViewFinanceModule ? (
+<section className="panel">
         <div className="section-heading">
           <h2>Current fiscal period</h2>
           <span className="muted">Today’s operational period</span>
         </div>
 
-        {data.openFiscalPeriod ? (
+        {data?.openFiscalPeriod ? (
           <div className="kv">
             <div className="kv-row">
               <span>Period Name</span>
-              <span>{data.openFiscalPeriod.name}</span>
+              <span>{data?.openFiscalPeriod?.name}</span>
             </div>
             <div className="kv-row">
               <span>Start Date</span>
-              <span>{data.openFiscalPeriod.startDate}</span>
+              <span>{data?.openFiscalPeriod?.startDate}</span>
             </div>
             <div className="kv-row">
               <span>End Date</span>
-              <span>{data.openFiscalPeriod.endDate}</span>
+              <span>{data?.openFiscalPeriod?.endDate}</span>
             </div>
           </div>
         ) : (
@@ -352,8 +400,12 @@ const budgetSummary = {
           </div>
         )}
       </section>
+      ) : null}
 
-      <section className="panel">
+      
+
+      {canViewArModule ? (
+<section className="panel">
         <div className="section-heading">
           <h2>Recent invoice activity</h2>
           <span className="muted">Latest active sales invoice records</span>
@@ -392,6 +444,9 @@ const budgetSummary = {
           </div>
         )}
       </section>
+      ) : null}
+
+      
     </div>
   );
 }

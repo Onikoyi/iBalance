@@ -8,6 +8,10 @@ import {
   type FixedAssetDepreciationRunDto,
   type FixedAssetDepreciationPreviewResponse,
 } from '../lib/api';
+import {
+  canRunFixedAssetDepreciation,
+  canViewFixedAssets,
+} from '../lib/auth';
 
 function formatDate(value?: string | null) {
   if (!value) return '—';
@@ -25,6 +29,8 @@ function formatAmount(value?: number | null) {
 
 export function FixedAssetDepreciationRunsPage() {
   const qc = useQueryClient();
+  const canView = canViewFixedAssets();
+  const canRunDepreciation = canRunFixedAssetDepreciation();
   const [periodStartUtc, setPeriodStartUtc] = useState('');
   const [periodEndUtc, setPeriodEndUtc] = useState('');
   const [runDateUtc, setRunDateUtc] = useState('');
@@ -35,6 +41,7 @@ export function FixedAssetDepreciationRunsPage() {
   const runsQ = useQuery({
     queryKey: ['fixed-asset-depreciation-runs'],
     queryFn: getFixedAssetDepreciationRuns,
+    enabled: canView,
   });
 
   const previewMut = useMutation({
@@ -92,6 +99,18 @@ export function FixedAssetDepreciationRunsPage() {
     await runMut.mutateAsync({ periodStartUtc, periodEndUtc, runDateUtc });
   };
 
+  if (!canView) {
+    return <div className="panel error-panel">You do not have access to view fixed asset depreciation runs.</div>;
+  }
+
+  if (runsQ.isLoading) {
+    return <div className="panel">Loading fixed asset depreciation runs...</div>;
+  }
+
+  if (runsQ.isError) {
+    return <div className="panel error-panel">Unable to load fixed asset depreciation runs.</div>;
+  }
+
   return (
     <div className="page-grid">
       <section className="panel">
@@ -117,7 +136,7 @@ export function FixedAssetDepreciationRunsPage() {
 
         <div className="hero-actions" style={{ marginTop: 16 }}>
           <button className="button" onClick={submitPreview} disabled={previewMut.isPending}>Preview</button>
-          <button className="button primary" onClick={submitRun} disabled={runMut.isPending}>Post Run</button>
+          <button className="button primary" onClick={submitRun} disabled={runMut.isPending || !canRunDepreciation}>Post Run</button>
         </div>
 
         {infoText ? <div className="panel" style={{ marginTop: 16 }}><div className="muted">{infoText}</div></div> : null}

@@ -19,7 +19,13 @@ import {
   getBudgetAwareReadableError,
   type BudgetAwareApiResponse,
 } from '../lib/api';
-import { canCreateJournals, canViewFinance } from '../lib/auth';
+import {
+  canApproveSalesInvoices,
+  canCreateSalesInvoices,
+  canPostSalesInvoices,
+  canSubmitSalesInvoices,
+  canViewAccountsReceivable,
+} from '../lib/auth';
 
 type LineForm = {
   description: string;
@@ -120,8 +126,11 @@ function parseDecimal(value: string) {
 
 export function SalesInvoicesPage() {
   const qc = useQueryClient();
-  const canView = canViewFinance();
-  const canCreate = canCreateJournals();
+  const canView = canViewAccountsReceivable();
+  const canCreate = canCreateSalesInvoices();
+  const canSubmitApproval = canSubmitSalesInvoices();
+  const canApprove = canApproveSalesInvoices();
+  const canPost = canPostSalesInvoices();
 
   const [form, setForm] = useState<InvoiceFormState>(emptyForm);
   const [message, setMessage] = useState('');
@@ -348,8 +357,8 @@ const taxPreviewQ = useQuery({
   function submit() {
     setMessage('');
 
-    if (!canCreate) {
-      setMessage('You do not have permission to create sales invoices.');
+    if (!canSubmitApproval) {
+      setMessage('You do not have permission to submit sales invoices for approval.');
       return;
     }
 
@@ -425,11 +434,22 @@ const taxPreviewQ = useQuery({
   
   function approveInvoice(salesInvoiceId: string) {
     setMessage('');
+  
+    if (!canApprove) {
+      setMessage('You do not have permission to approve sales invoices.');
+      return;
+    }
+  
     approveMut.mutate(salesInvoiceId);
   }
   
   function rejectInvoice(salesInvoiceId: string) {
     setMessage('');
+  
+    if (!canApprove) {
+      setMessage('You do not have permission to reject sales invoices.');
+      return;
+    }
   
     if (!rejectReason.trim()) {
       setMessage('Please enter a rejection reason before rejecting the invoice.');
@@ -443,7 +463,7 @@ const taxPreviewQ = useQuery({
   function submitPosting(salesInvoiceId: string) {
     setMessage('');
 
-    if (!canCreate) {
+    if (!canPost) {
       setMessage('You do not have permission to post sales invoices.');
       return;
     }

@@ -101,11 +101,23 @@ export function AdminTenantDetailPage() {
       total: users.length,
       active: users.filter((x) => x.isActive).length,
       inactive: users.filter((x) => !x.isActive).length,
+      platformAdmins: users.filter((x) => x.role === 'PlatformAdmin').length,
       tenantAdmins: users.filter((x) => x.role === 'TenantAdmin').length,
+      financeControllers: users.filter((x) => x.role === 'FinanceController').length,
       accountants: users.filter((x) => x.role === 'Accountant').length,
       approvers: users.filter((x) => x.role === 'Approver').length,
       viewers: users.filter((x) => x.role === 'Viewer').length,
-      platformAdmins: users.filter((x) => x.role === 'PlatformAdmin').length,
+      auditors: users.filter((x) => x.role === 'Auditor').length,
+      budgetOfficers: users.filter((x) => x.role === 'BudgetOfficer').length,
+      budgetOwners: users.filter((x) => x.role === 'BudgetOwner').length,
+      payrollOfficers: users.filter((x) => x.role === 'PayrollOfficer').length,
+      hrOfficers: users.filter((x) => x.role === 'HrOfficer').length,
+      procurementOfficers: users.filter((x) => x.role === 'ProcurementOfficer').length,
+      treasuryOfficers: users.filter((x) => x.role === 'TreasuryOfficer').length,
+      inventoryOfficers: users.filter((x) => x.role === 'InventoryOfficer').length,
+      apOfficers: users.filter((x) => x.role === 'ApOfficer').length,
+      arOfficers: users.filter((x) => x.role === 'ArOfficer').length,
+      fixedAssetOfficers: users.filter((x) => x.role === 'FixedAssetOfficer').length,
     };
   }, [users]);
 
@@ -214,7 +226,11 @@ export function AdminTenantDetailPage() {
   }
 
   if (tenantQ.isError || !tenantQ.data || !tenant) {
-    return <div className="panel error-panel">We could not load the selected tenant at this time.</div>;
+    return (
+      <div className="panel error-panel">
+        {getTenantReadableError(tenantQ.error, 'We could not load the selected tenant at this time.')}
+      </div>
+    );
   }
 
   return (
@@ -232,8 +248,8 @@ export function AdminTenantDetailPage() {
         </div>
 
         {infoText ? (
-          <div className="panel" style={{ marginBottom: 16 }}>
-            <div className="muted">{infoText}</div>
+          <div className="success-panel" style={{ marginBottom: 16 }}>
+            {infoText}
           </div>
         ) : null}
 
@@ -287,7 +303,7 @@ export function AdminTenantDetailPage() {
             <button
               className="button primary"
               onClick={() => reactivateMut.mutate()}
-              disabled={reactivateMut.isPending}
+              disabled={reactivateMut.isPending || suspendMut.isPending}
             >
               {reactivateMut.isPending ? 'Processing…' : 'Reactivate Tenant'}
             </button>
@@ -295,7 +311,7 @@ export function AdminTenantDetailPage() {
             <button
               className="button danger"
               onClick={() => suspendMut.mutate()}
-              disabled={suspendMut.isPending}
+              disabled={reactivateMut.isPending || suspendMut.isPending}
             >
               {suspendMut.isPending ? 'Processing…' : 'Suspend Tenant'}
             </button>
@@ -370,7 +386,11 @@ export function AdminTenantDetailPage() {
           <select
             className="select"
             value={selectedPackageId}
-            onChange={(e) => setSelectedPackageId(e.target.value)}
+            onChange={(e) => {
+              setSelectedPackageId(e.target.value);
+              setInfoText('');
+              setErrorText('');
+            }}
           >
             <option value="">— Select Package —</option>
             {(packagesQ.data?.items || []).map((pkg) => (
@@ -412,8 +432,16 @@ export function AdminTenantDetailPage() {
             <span>{roleSummary.inactive}</span>
           </div>
           <div className="kv-row">
+            <span>Platform Administrators</span>
+            <span>{roleSummary.platformAdmins}</span>
+          </div>
+          <div className="kv-row">
             <span>Tenant Administrators</span>
             <span>{roleSummary.tenantAdmins}</span>
+          </div>
+          <div className="kv-row">
+            <span>Finance Controllers</span>
+            <span>{roleSummary.financeControllers}</span>
           </div>
           <div className="kv-row">
             <span>Accountants</span>
@@ -428,8 +456,48 @@ export function AdminTenantDetailPage() {
             <span>{roleSummary.viewers}</span>
           </div>
           <div className="kv-row">
-            <span>Platform Administrators</span>
-            <span>{roleSummary.platformAdmins}</span>
+            <span>Auditors</span>
+            <span>{roleSummary.auditors}</span>
+          </div>
+          <div className="kv-row">
+            <span>Budget Officers</span>
+            <span>{roleSummary.budgetOfficers}</span>
+          </div>
+          <div className="kv-row">
+            <span>Budget Owners</span>
+            <span>{roleSummary.budgetOwners}</span>
+          </div>
+          <div className="kv-row">
+            <span>Payroll Officers</span>
+            <span>{roleSummary.payrollOfficers}</span>
+          </div>
+          <div className="kv-row">
+            <span>HR Officers</span>
+            <span>{roleSummary.hrOfficers}</span>
+          </div>
+          <div className="kv-row">
+            <span>Procurement Officers</span>
+            <span>{roleSummary.procurementOfficers}</span>
+          </div>
+          <div className="kv-row">
+            <span>Treasury Officers</span>
+            <span>{roleSummary.treasuryOfficers}</span>
+          </div>
+          <div className="kv-row">
+            <span>Inventory Officers</span>
+            <span>{roleSummary.inventoryOfficers}</span>
+          </div>
+          <div className="kv-row">
+            <span>AP Officers</span>
+            <span>{roleSummary.apOfficers}</span>
+          </div>
+          <div className="kv-row">
+            <span>AR Officers</span>
+            <span>{roleSummary.arOfficers}</span>
+          </div>
+          <div className="kv-row">
+            <span>Fixed Asset Officers</span>
+            <span>{roleSummary.fixedAssetOfficers}</span>
           </div>
         </div>
       </section>

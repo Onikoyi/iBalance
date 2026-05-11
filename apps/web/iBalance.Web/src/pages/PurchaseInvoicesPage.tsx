@@ -26,7 +26,14 @@ import {
   getBudgetAwareReadableError,
   type BudgetAwareApiResponse,
 } from '../lib/api';
-import { canApproveWorkflows, canManageFinanceSetup, canViewFinance } from '../lib/auth';
+import {
+  canApprovePurchaseInvoices,
+  canCreatePurchaseInvoices,
+  canPostPurchaseInvoices,
+  canRejectPurchaseInvoices,
+  canSubmitPurchaseInvoices,
+  canViewAccountsPayable,
+} from '../lib/auth';
 
 const emptyLine: PurchaseInvoiceLineDto = {
   description: '',
@@ -160,9 +167,12 @@ const emptyCapitalizeForm: CapitalizeFormState = {
 
 export function PurchaseInvoicesPage() {
   const qc = useQueryClient();
-  const canView = canViewFinance();
-  const canManage = canManageFinanceSetup();
-  const canApprove = canApproveWorkflows();
+  const canView = canViewAccountsPayable();
+  const canManage = canCreatePurchaseInvoices();
+  const canSubmitApproval = canSubmitPurchaseInvoices();
+  const canApprove = canApprovePurchaseInvoices();
+  const canReject = canRejectPurchaseInvoices();
+  const canPost = canPostPurchaseInvoices();
 
   const [showCreate, setShowCreate] = useState(false);
   const [showPost, setShowPost] = useState(false);
@@ -468,7 +478,7 @@ export function PurchaseInvoicesPage() {
   }
 
   function openPostModal(invoiceId: string) {
-    if (!canApprove) {
+    if (!canPost) {
       setErrorText('You do not have permission to post approved purchase invoices.');
       setInfoText('');
       return;
@@ -678,7 +688,7 @@ export function PurchaseInvoicesPage() {
     setErrorText('');
     setInfoText('');
 
-    if (!canManage) {
+    if (!canSubmitApproval) {
       setErrorText('You do not have permission to submit purchase invoices for approval.');
       return;
     }
@@ -702,7 +712,7 @@ export function PurchaseInvoicesPage() {
     setErrorText('');
     setInfoText('');
 
-    if (!canApprove) {
+    if (!canReject) {
       setErrorText('You do not have permission to reject purchase invoices.');
       return;
     }
@@ -719,7 +729,7 @@ export function PurchaseInvoicesPage() {
     setErrorText('');
     setInfoText('');
 
-    if (!canApprove) {
+    if (!canPost) {
       setErrorText('You do not have permission to post approved purchase invoices.');
       return;
     }
@@ -741,23 +751,15 @@ export function PurchaseInvoicesPage() {
     return <div className="panel error-panel">You do not have access to view purchase invoices.</div>;
   }
 
-  if (invoicesQ.isLoading || vendorsQ.isLoading || accountsQ.isLoading || taxCodesQ.isLoading || fixedAssetClassesQ.isLoading || fixedAssetsQ.isLoading) {
+  if (invoicesQ.isLoading || vendorsQ.isLoading) {
     return <div className="panel">Loading purchase invoices...</div>;
   }
 
   if (
     invoicesQ.isError ||
     vendorsQ.isError ||
-    accountsQ.isError ||
-    taxCodesQ.isError ||
-    fixedAssetClassesQ.isError ||
-    fixedAssetsQ.isError ||
     !invoicesQ.data ||
-    !vendorsQ.data ||
-    !accountsQ.data ||
-    !taxCodesQ.data ||
-    !fixedAssetClassesQ.data ||
-    !fixedAssetsQ.data
+    !vendorsQ.data
   ) {
     return <div className="panel error-panel">We could not load purchase invoices at this time.</div>;
   }
@@ -806,6 +808,14 @@ export function PurchaseInvoicesPage() {
         {errorText ? (
           <div className="panel error-panel" style={{ marginTop: 16 }}>
             {errorText}
+          </div>
+        ) : null}
+
+        {accountsQ.isError ? (
+          <div className="panel" style={{ marginTop: 16 }}>
+            <div className="muted">
+              Ledger accounts could not be loaded. You can still view and manage purchase invoices, but posting is temporarily unavailable until ledger accounts load successfully.
+            </div>
           </div>
         ) : null}
       </section>
@@ -876,12 +886,12 @@ export function PurchaseInvoicesPage() {
                     <td>{formatDateTime(item.postedOnUtc)}</td>
                     <td>
                       <div className="inline-actions" style={{ flexWrap: 'wrap' }}>
-                        {item.status === 1 && canManage ? (
+                        {item.status === 1 && canSubmitApproval ? (
                           <button className="button" onClick={() => submitForApproval(item.id)} disabled={submitApprovalMut.isPending}>
                             {submitApprovalMut.isPending ? 'Submitting…' : 'Submit'}
                           </button>
                         ) : null}
-                        {item.status === 2 && canApprove ? (
+                        {item.status === 2 && (canApprove || canReject) ? (
                           <>
                             <button className="button" onClick={() => approveInvoice(item.id)} disabled={approveMut.isPending}>
                               {approveMut.isPending ? 'Approving…' : 'Approve'}
@@ -891,7 +901,7 @@ export function PurchaseInvoicesPage() {
                             </button>
                           </>
                         ) : null}
-                        {item.status === 3 && canApprove ? (
+                        {item.status === 3 && canPost ? (
                           <button className="button primary" onClick={() => openPostModal(item.id)} disabled={postMut.isPending}>Post Invoice</button>
                         ) : null}
                         {[4, 5, 6].includes(item.status) && canManage && item.journalEntryId && item.postedOnUtc && !capitalizedPurchaseInvoiceIds.has(item.id) ? (
@@ -1089,7 +1099,11 @@ export function PurchaseInvoicesPage() {
             </div>
 
             <div className="panel" style={{ marginBottom: 16 }}>
-              {taxCodesQ.data.items.length === 0 ? (
+              {taxCodesQ.isLoading ? (
+                <div className="muted">Loading tax codes...</div>
+              ) : taxCodesQ.isError ? (
+                <div className="muted">Tax codes could not be loaded. You can still work on the purchase invoice, but tax-code selection is unavailable right now.</div>
+              ) : !taxCodesQ.data || taxCodesQ.data.items.length === 0 ? (
                 <div className="muted">No active purchase tax codes have been configured.</div>
               ) : (
                 <div className="detail-stack">
@@ -1252,7 +1266,7 @@ export function PurchaseInvoicesPage() {
               <div className="muted" style={{ marginTop: 8 }}>This creates the fixed asset register record only. The backend skips duplicate GL posting because the AP invoice is already posted.</div>
             </div>
             <div className="form-grid two">
-              <div className="form-row"><label>Fixed Asset Class</label><select className="select" value={capitalizeForm.fixedAssetClassId} onChange={(e) => applyCapitalizationClassDefaults(e.target.value)}><option value="">— Select Fixed Asset Class —</option>{fixedAssetClassesQ.data.items.filter((assetClass) => assetClass.status === 1).map((assetClass) => <option key={assetClass.id} value={assetClass.id}>{assetClass.code} - {assetClass.name}</option>)}</select></div>
+              <div className="form-row"><label>Fixed Asset Class</label><select className="select" value={capitalizeForm.fixedAssetClassId} onChange={(e) => applyCapitalizationClassDefaults(e.target.value)}><option value="">— Select Fixed Asset Class —</option>{(fixedAssetClassesQ.data?.items ?? []).filter((assetClass) => assetClass.status === 1).map((assetClass) => <option key={assetClass.id} value={assetClass.id}>{assetClass.code} - {assetClass.name}</option>)}</select></div>
               <div className="form-row"><label>Asset Number</label><input className="input" value={capitalizeForm.assetNumber} onChange={(e) => setCapitalizeForm((state) => ({ ...state, assetNumber: e.target.value }))} /></div>
               <div className="form-row"><label>Asset Name</label><input className="input" value={capitalizeForm.assetName} onChange={(e) => setCapitalizeForm((state) => ({ ...state, assetName: e.target.value }))} /></div>
               <div className="form-row"><label>Capitalization Date</label><input className="input" type="date" value={capitalizeForm.capitalizationDateUtc} onChange={(e) => setCapitalizeForm((state) => ({ ...state, capitalizationDateUtc: e.target.value }))} /></div>

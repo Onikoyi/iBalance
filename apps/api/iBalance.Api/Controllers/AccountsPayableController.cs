@@ -1,3 +1,4 @@
+using iBalance.Api.Security;
 using iBalance.Api.Services;
 using iBalance.BuildingBlocks.Application.Security;
 using iBalance.BuildingBlocks.Application.Tenancy;
@@ -15,6 +16,7 @@ namespace iBalance.Api.Controllers;
 [Route("api/finance/ap")]
 public sealed class AccountsPayableController : ControllerBase
 {
+    [Authorize(Policy = AuthorizationPolicies.ApView)]
     [HttpGet("vendors")]
     public async Task<IActionResult> GetVendors(
         [FromServices] ApplicationDbContext dbContext,
@@ -59,6 +61,7 @@ public sealed class AccountsPayableController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.ApView)]
     [HttpGet("vendors/{vendorId:guid}/statement")]
     public async Task<IActionResult> GetVendorStatement(
         Guid vendorId,
@@ -231,7 +234,7 @@ public sealed class AccountsPayableController : ControllerBase
     }
 
     [HttpPost("vendors")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.ApVendorManage)]
     public async Task<IActionResult> CreateVendor(
         [FromBody] CreateVendorRequest request,
         [FromServices] ApplicationDbContext dbContext,
@@ -302,6 +305,7 @@ public sealed class AccountsPayableController : ControllerBase
     }
 
     
+    [Authorize(Policy = AuthorizationPolicies.ApView)]
     [HttpGet("purchase-order-receipts/matching")]
     public async Task<IActionResult> GetPurchaseOrderReceiptsForInvoiceMatching(
         [FromQuery] Guid? vendorId,
@@ -427,6 +431,7 @@ public sealed class AccountsPayableController : ControllerBase
     }
 
 
+    [Authorize(Policy = AuthorizationPolicies.ApView)]
     [HttpGet("purchase-invoices")]
     public async Task<IActionResult> GetPurchaseInvoices(
         [FromServices] ApplicationDbContext dbContext,
@@ -501,7 +506,8 @@ public sealed class AccountsPayableController : ControllerBase
 
 
 
-    [HttpGet("purchase-invoices/rejected")]
+    [Authorize(Policy = AuthorizationPolicies.ApView)]
+[HttpGet("purchase-invoices/rejected")]
 public async Task<IActionResult> GetRejectedPurchaseInvoices(
     [FromServices] ApplicationDbContext dbContext,
     [FromServices] ITenantContextAccessor tenantContextAccessor,
@@ -643,7 +649,7 @@ public async Task<IActionResult> GetRejectedPurchaseInvoices(
 
 
 [HttpPut("purchase-invoices/{purchaseInvoiceId:guid}")]
-[Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+[Authorize(Policy = AuthorizationPolicies.ApInvoiceCreate)]
 public async Task<IActionResult> UpdateRejectedPurchaseInvoice(
     Guid purchaseInvoiceId,
     [FromBody] UpdatePurchaseInvoiceRequest request,
@@ -969,7 +975,7 @@ catch (DbUpdateException ex)
 
 
 [HttpDelete("purchase-invoices/{purchaseInvoiceId:guid}")]
-[Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+[Authorize(Policy = AuthorizationPolicies.ApInvoiceCreate)]
 public async Task<IActionResult> DeleteRejectedPurchaseInvoice(
     Guid purchaseInvoiceId,
     [FromServices] ApplicationDbContext dbContext,
@@ -1044,7 +1050,7 @@ public async Task<IActionResult> DeleteRejectedPurchaseInvoice(
 
 
         [HttpPost("purchase-invoices/{purchaseInvoiceId:guid}/submit")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.ApInvoiceSubmit)]
     public async Task<IActionResult> SubmitPurchaseInvoiceForApproval(
         Guid purchaseInvoiceId,
         [FromServices] ApplicationDbContext dbContext,
@@ -1136,7 +1142,7 @@ public async Task<IActionResult> DeleteRejectedPurchaseInvoice(
     }
 
     [HttpPost("purchase-invoices/{purchaseInvoiceId:guid}/approve")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
+    [Authorize(Policy = AuthorizationPolicies.ApInvoiceApprove)]
     public async Task<IActionResult> ApprovePurchaseInvoice(
         Guid purchaseInvoiceId,
         [FromServices] ApplicationDbContext dbContext,
@@ -1205,7 +1211,7 @@ public async Task<IActionResult> DeleteRejectedPurchaseInvoice(
     }
 
     [HttpPost("purchase-invoices/{purchaseInvoiceId:guid}/reject")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
+    [Authorize(Policy = AuthorizationPolicies.ApInvoiceReject)]
     public async Task<IActionResult> RejectPurchaseInvoice(
         Guid purchaseInvoiceId,
         [FromBody] RejectPurchaseInvoiceRequest request,
@@ -1424,7 +1430,7 @@ public async Task<IActionResult> DeleteRejectedPurchaseInvoice(
 
 
     [HttpPost("purchase-invoices")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.ApInvoiceCreate)]
     public async Task<IActionResult> CreatePurchaseInvoice(
         [FromBody] CreatePurchaseInvoiceRequest request,
         [FromServices] ApplicationDbContext dbContext,
@@ -1673,7 +1679,7 @@ public async Task<IActionResult> DeleteRejectedPurchaseInvoice(
     }
 
       [HttpPost("purchase-invoices/{purchaseInvoiceId:guid}/post")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.ApInvoicePost)]
     public async Task<IActionResult> PostPurchaseInvoice(
         Guid purchaseInvoiceId,
         [FromBody] PostPurchaseInvoiceRequest request,
@@ -2039,7 +2045,8 @@ if (BudgetEvaluationSupport.IsBudgetConsumableAccountCategory(expenseLedgerAccou
         });
     }
 
-    [HttpGet("vendor-payments")]
+    [Authorize(Policy = AuthorizationPolicies.ApView)]
+[HttpGet("vendor-payments")]
     public async Task<IActionResult> GetVendorPayments(
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
@@ -2121,7 +2128,8 @@ if (BudgetEvaluationSupport.IsBudgetConsumableAccountCategory(expenseLedgerAccou
         });
     }
 
-    [HttpGet("vendor-payments/{vendorPaymentId:guid}")]
+    [Authorize(Policy = AuthorizationPolicies.ApView)]
+[HttpGet("vendor-payments/{vendorPaymentId:guid}")]
     public async Task<IActionResult> GetVendorPaymentDetail(
         Guid vendorPaymentId,
         [FromServices] ApplicationDbContext dbContext,
@@ -2261,7 +2269,8 @@ if (BudgetEvaluationSupport.IsBudgetConsumableAccountCategory(expenseLedgerAccou
         });
     }
 
-    [HttpGet("vendor-payments/rejected")]
+    [Authorize(Policy = AuthorizationPolicies.ApView)]
+[HttpGet("vendor-payments/rejected")]
 public async Task<IActionResult> GetRejectedVendorPayments(
     [FromServices] ApplicationDbContext dbContext,
     [FromServices] ITenantContextAccessor tenantContextAccessor,
@@ -2356,7 +2365,7 @@ public async Task<IActionResult> GetRejectedVendorPayments(
 
 
 [HttpPut("vendor-payments/{vendorPaymentId:guid}")]
-[Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+[Authorize(Policy = AuthorizationPolicies.ApPaymentCreate)]
 public async Task<IActionResult> UpdateRejectedVendorPayment(
     Guid vendorPaymentId,
     [FromBody] UpdateVendorPaymentRequest request,
@@ -2544,7 +2553,7 @@ public async Task<IActionResult> UpdateRejectedVendorPayment(
 
 
 [HttpDelete("vendor-payments/{vendorPaymentId:guid}")]
-[Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+[Authorize(Policy = AuthorizationPolicies.ApPaymentCreate)]
 public async Task<IActionResult> DeleteRejectedVendorPayment(
     Guid vendorPaymentId,
     [FromServices] ApplicationDbContext dbContext,
@@ -2607,7 +2616,7 @@ public async Task<IActionResult> DeleteRejectedVendorPayment(
 
 
     [HttpPost("vendor-payments")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.ApPaymentCreate)]
     public async Task<IActionResult> CreateVendorPayment(
         [FromBody] CreateVendorPaymentRequest request,
         [FromServices] ApplicationDbContext dbContext,
@@ -2738,7 +2747,7 @@ public async Task<IActionResult> DeleteRejectedVendorPayment(
     }
 
     [HttpPost("vendor-payments/{vendorPaymentId:guid}/submit")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.ApPaymentSubmit)]
     public async Task<IActionResult> SubmitVendorPaymentForApproval(
         Guid vendorPaymentId,
         [FromServices] ApplicationDbContext dbContext,
@@ -2803,7 +2812,7 @@ public async Task<IActionResult> DeleteRejectedVendorPayment(
     }
 
     [HttpPost("vendor-payments/{vendorPaymentId:guid}/approve")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
+    [Authorize(Policy = AuthorizationPolicies.ApPaymentApprove)]
     public async Task<IActionResult> ApproveVendorPayment(
         Guid vendorPaymentId,
         [FromServices] ApplicationDbContext dbContext,
@@ -2867,7 +2876,7 @@ public async Task<IActionResult> DeleteRejectedVendorPayment(
     }
 
     [HttpPost("vendor-payments/{vendorPaymentId:guid}/reject")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
+    [Authorize(Policy = AuthorizationPolicies.ApPaymentReject)]
     public async Task<IActionResult> RejectVendorPayment(
         Guid vendorPaymentId,
         [FromBody] RejectVendorPaymentRequest request,
@@ -2942,7 +2951,7 @@ public async Task<IActionResult> DeleteRejectedVendorPayment(
     }
 
     [HttpPost("vendor-payments/{vendorPaymentId:guid}/post")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Approver")]
+    [Authorize(Policy = AuthorizationPolicies.ApPaymentPost)]
     public async Task<IActionResult> PostVendorPayment(
         Guid vendorPaymentId,
         [FromBody] PostVendorPaymentRequest request,

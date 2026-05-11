@@ -1,3 +1,4 @@
+using iBalance.Api.Security;
 using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
 using iBalance.Modules.Finance.Domain.Entities;
@@ -12,6 +13,7 @@ namespace iBalance.Api.Controllers;
 [Route("api/finance/bank-accounts")]
 public sealed class BankAccountsController : ControllerBase
 {
+    [Authorize(Policy = AuthorizationPolicies.TreasuryView)]
     [HttpGet]
     public async Task<IActionResult> GetBankAccounts(
         [FromServices] ApplicationDbContext dbContext,
@@ -71,7 +73,7 @@ public sealed class BankAccountsController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.TreasuryManage)]
     public async Task<IActionResult> CreateBankAccount(
         [FromBody] CreateBankAccountRequest request,
         [FromServices] ApplicationDbContext dbContext,
@@ -142,7 +144,7 @@ public sealed class BankAccountsController : ControllerBase
     }
 
     [HttpPut("{bankAccountId:guid}")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.TreasuryManage)]
     public async Task<IActionResult> UpdateBankAccount(
         Guid bankAccountId,
         [FromBody] UpdateBankAccountRequest request,
@@ -232,7 +234,7 @@ public sealed class BankAccountsController : ControllerBase
     }
 
     [HttpPost("{bankAccountId:guid}/activate")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.TreasuryManage)]
     public async Task<IActionResult> ActivateBankAccount(
         Guid bankAccountId,
         [FromServices] ApplicationDbContext dbContext,
@@ -260,7 +262,7 @@ public sealed class BankAccountsController : ControllerBase
     }
 
     [HttpPost("{bankAccountId:guid}/deactivate")]
-    [Authorize(Roles = "PlatformAdmin,TenantAdmin,Accountant")]
+    [Authorize(Policy = AuthorizationPolicies.TreasuryManage)]
     public async Task<IActionResult> DeactivateBankAccount(
         Guid bankAccountId,
         [FromServices] ApplicationDbContext dbContext,

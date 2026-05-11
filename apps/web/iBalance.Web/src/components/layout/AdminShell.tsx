@@ -136,7 +136,7 @@ export function AdminShell({ children }: PropsWithChildren) {
         </div>
 
         <footer className="app-footer">
-          <div>© Nikosoft Technologies — iBalance Accounting Cloud</div>
+          <div>© Nikosoft Technologies — iBalance ERP Cloud</div>
           <div>{tenantKey || 'Organization Workspace'}</div>
         </footer>
       </main>

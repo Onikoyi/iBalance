@@ -4,15 +4,22 @@ import { NavLink, useLocation } from 'react-router-dom';
 import {
   canAccessAdmin,
   canCreateJournals,
+  canManageEnterpriseAccessControl,
   canManageFinanceSetup,
   canManagePlatformCommercials,
   canManageTenantUsers,
+  canViewAccountsPayable,
+  canViewAccountsReceivable,
+  canViewBudget,
   canViewFinance,
+  canViewFixedAssets,
+  canViewInventory,
   canViewPayroll,
   canViewPlatformTenantConsole,
-  canManageEnterpriseAccessControl,
+  canViewProcurement,
+  canViewReports,
+  canViewTreasury,
 } from '../../lib/auth';
-
 
 function linkClassName(isActive: boolean) {
   return isActive ? 'sidebar-link active' : 'sidebar-link';
@@ -59,8 +66,18 @@ function SidebarSection({ title, sectionKey, defaultOpen, children }: SidebarSec
 
 export function Sidebar() {
   const location = useLocation();
-  const canView = canViewFinance();
+
+  const canViewFinanceModule = canViewFinance();
+  const canViewBudgetModule = canViewBudget();
   const canViewPayrollModule = canViewPayroll();
+  const canViewProcurementModule = canViewProcurement();
+  const canViewApModule = canViewAccountsPayable();
+  const canViewArModule = canViewAccountsReceivable();
+  const canViewTreasuryModule = canViewTreasury();
+  const canViewInventoryModule = canViewInventory();
+  const canViewFixedAssetsModule = canViewFixedAssets();
+  const canViewReportsModule = canViewReports();
+
   const canManageSetup = canManageFinanceSetup();
   const canCreate = canCreateJournals();
   const canAdmin = canAccessAdmin();
@@ -68,7 +85,6 @@ export function Sidebar() {
   const canManageCommercials = canManagePlatformCommercials();
   const canViewTenantConsole = canViewPlatformTenantConsole();
   const canManageAccessControl = canManageEnterpriseAccessControl();
-
 
   const activeSection = useMemo(() => {
     const path = location.pathname;
@@ -84,7 +100,6 @@ export function Sidebar() {
     if (path.startsWith('/admin')) return 'admin';
     if (path.startsWith('/working-capital')) return 'working-capital';
     if (path.startsWith('/payroll')) return 'payroll';
-
     return 'overview';
   }, [location.pathname]);
 
@@ -93,202 +108,232 @@ export function Sidebar() {
       <div className="sidebar-brand">
         <div className="sidebar-brand-title">iBalance</div>
         <div className="muted sidebar-brand-subtitle">
-          Accounting Cloud
+          ERP Cloud
         </div>
       </div>
 
       <nav className="sidebar-nav">
-        {canView ? (
+        {(canViewFinanceModule || canViewBudgetModule || canViewPayrollModule || canViewProcurementModule || canViewApModule || canViewArModule || canViewTreasuryModule || canViewInventoryModule || canViewFixedAssetsModule) ? (
           <>
-            <SidebarSection title="Overview" sectionKey="overview" defaultOpen={activeSection === 'overview'}>
-              <NavLink to="/dashboard" className={({ isActive }) => linkClassName(isActive)}>
-                Dashboard
-              </NavLink>
-
-              <NavLink to="/reports" className={({ isActive }) => linkClassName(isActive)}>
-                Reports
-              </NavLink>
-
-              <NavLink to="/ageing-analysis" className={({ isActive }) => linkClassName(isActive)}>
-                Ageing Analysis
-              </NavLink>
-            </SidebarSection>
-
-            <SidebarSection title="General Ledger" sectionKey="gl" defaultOpen={activeSection === 'gl'}>
-              <NavLink to="/accounts" className={({ isActive }) => linkClassName(isActive)}>
-                Chart of Accounts
-              </NavLink>
-
-              <NavLink to="/journals" className={({ isActive }) => linkClassName(isActive)}>
-                Journals
-              </NavLink>
-
-              <NavLink to="/journals/rejected" className={({ isActive }) => linkClassName(isActive)}>
-                Rejected Journals
-              </NavLink>
-
-              {canManageSetup ? (
-                <NavLink to="/fiscal-periods" className={({ isActive }) => linkClassName(isActive)}>
-                  Fiscal Periods
+            {canViewReportsModule ? (
+              <SidebarSection title="Overview" sectionKey="overview" defaultOpen={activeSection === 'overview'}>
+                <NavLink to="/dashboard" className={({ isActive }) => linkClassName(isActive)}>
+                  Dashboard
                 </NavLink>
-              ) : null}
-            </SidebarSection>
 
-            <SidebarSection title="Budget Control" sectionKey="budget" defaultOpen={activeSection === 'budget'}>
-              <NavLink to="/budgets" className={({ isActive }) => linkClassName(isActive)}>
-                Budgets
-              </NavLink>
+                <NavLink to="/reports" className={({ isActive }) => linkClassName(isActive)}>
+                  Reports
+                </NavLink>
 
-              <NavLink to="/budgets/rejected" className={({ isActive }) => linkClassName(isActive)}>
-                Rejected Budgets
-              </NavLink>
+                <NavLink to="/ageing-analysis" className={({ isActive }) => linkClassName(isActive)}>
+                  Ageing Analysis
+                </NavLink>
+              </SidebarSection>
+            ) : null}
 
-              <NavLink to="/budget-vs-actual" className={({ isActive }) => linkClassName(isActive)}>
-                Budget vs Actual
-              </NavLink>
-            </SidebarSection>
+            {canViewFinanceModule ? (
+              <SidebarSection title="General Ledger" sectionKey="gl" defaultOpen={activeSection === 'gl'}>
+                <NavLink to="/accounts" className={({ isActive }) => linkClassName(isActive)}>
+                  Chart of Accounts
+                </NavLink>
 
-            <SidebarSection title="Fixed Assets" sectionKey="fixed-assets" defaultOpen={activeSection === 'fixed-assets'}>
-              <NavLink to="/fixed-assets" className={({ isActive }) => linkClassName(isActive)}>
-                Fixed Assets
-              </NavLink>
+                <NavLink to="/journals" className={({ isActive }) => linkClassName(isActive)}>
+                  Journals
+                </NavLink>
 
-              <NavLink to="/fixed-assets/depreciation-runs" className={({ isActive }) => linkClassName(isActive)}>
-                Depreciation Runs
-              </NavLink>
+                <NavLink to="/journals/rejected" className={({ isActive }) => linkClassName(isActive)}>
+                  Rejected Journals
+                </NavLink>
 
-              <NavLink to="/fixed-assets/register/print" className={({ isActive }) => linkClassName(isActive)}>
-                Asset Register Print
-              </NavLink>
-            </SidebarSection>
-            <SidebarSection title="Treasury & Banking" sectionKey="treasury" defaultOpen={activeSection === 'treasury'}>
-              <NavLink to="/bank-accounts" className={({ isActive }) => linkClassName(isActive)}>
-                Bank Accounts
-              </NavLink>
-            </SidebarSection>
+                {canManageSetup ? (
+                  <NavLink to="/fiscal-periods" className={({ isActive }) => linkClassName(isActive)}>
+                    Fiscal Periods
+                  </NavLink>
+                ) : null}
+              </SidebarSection>
+            ) : null}
+
+            {canViewBudgetModule ? (
+              <SidebarSection title="Budget Control" sectionKey="budget" defaultOpen={activeSection === 'budget'}>
+                <NavLink to="/budgets" className={({ isActive }) => linkClassName(isActive)}>
+                  Budgets
+                </NavLink>
+
+                <NavLink to="/budgets/rejected" className={({ isActive }) => linkClassName(isActive)}>
+                  Rejected Budgets
+                </NavLink>
+
+                <NavLink to="/budget-vs-actual" className={({ isActive }) => linkClassName(isActive)}>
+                  Budget vs Actual
+                </NavLink>
+              </SidebarSection>
+            ) : null}
+
+            {canViewFixedAssetsModule ? (
+              <SidebarSection title="Fixed Assets" sectionKey="fixed-assets" defaultOpen={activeSection === 'fixed-assets'}>
+                <NavLink to="/fixed-assets" className={({ isActive }) => linkClassName(isActive)}>
+                  Fixed Assets
+                </NavLink>
+
+                <NavLink to="/fixed-assets/depreciation-runs" className={({ isActive }) => linkClassName(isActive)}>
+                  Depreciation Runs
+                </NavLink>
+
+                <NavLink to="/fixed-assets/register/print" className={({ isActive }) => linkClassName(isActive)}>
+                  Asset Register Print
+                </NavLink>
+              </SidebarSection>
+            ) : null}
+
+            {canViewTreasuryModule ? (
+              <>
+                <SidebarSection title="Treasury & Banking" sectionKey="treasury" defaultOpen={activeSection === 'treasury'}>
+                  <NavLink to="/bank-accounts" className={({ isActive }) => linkClassName(isActive)}>
+                    Bank Accounts
+                  </NavLink>
+                </SidebarSection>
+
+                <SidebarSection title="Reconciliation" sectionKey="reconciliation" defaultOpen={activeSection === 'reconciliation'}>
+                  <NavLink to="/reconciliation" className={({ isActive }) => linkClassName(isActive)}>
+                    Reconciliation
+                  </NavLink>
+                </SidebarSection>
+              </>
+            ) : null}
 
             {canViewPayrollModule ? (
-            <SidebarSection title="Payroll" sectionKey="payroll" defaultOpen={activeSection === 'payroll'}>
-              <NavLink to="/payroll" className={({ isActive }) => linkClassName(isActive)}>
-                Payroll Dashboard
-              </NavLink>
+              <SidebarSection title="Payroll" sectionKey="payroll" defaultOpen={activeSection === 'payroll'}>
+                <NavLink to="/payroll" className={({ isActive }) => linkClassName(isActive)}>
+                  Payroll Dashboard
+                </NavLink>
 
-              <NavLink to="/payroll/employees" className={({ isActive }) => linkClassName(isActive)}>
-                Employees
-              </NavLink>
+                <NavLink to="/payroll/employees" className={({ isActive }) => linkClassName(isActive)}>
+                  Employees
+                </NavLink>
 
-              <NavLink to="/payroll/setup" className={({ isActive }) => linkClassName(isActive)}>
-                Payroll Setup
-              </NavLink>
+                <NavLink to="/payroll/setup" className={({ isActive }) => linkClassName(isActive)}>
+                  Payroll Setup
+                </NavLink>
 
-              <NavLink to="/payroll/runs" className={({ isActive }) => linkClassName(isActive)}>
-                Payroll Runs
-              </NavLink>
+                <NavLink to="/payroll/runs" className={({ isActive }) => linkClassName(isActive)}>
+                  Payroll Runs
+                </NavLink>
 
-              <NavLink to="/payroll/runs/rejected" className={({ isActive }) => linkClassName(isActive)}>
-                Rejected Payroll Runs
-              </NavLink>
+                <NavLink to="/payroll/runs/rejected" className={({ isActive }) => linkClassName(isActive)}>
+                  Rejected Payroll Runs
+                </NavLink>
 
-              <NavLink to="/payroll/payslips" className={({ isActive }) => linkClassName(isActive)}>
-                Payslips
-              </NavLink>
+                <NavLink to="/payroll/payslips" className={({ isActive }) => linkClassName(isActive)}>
+                  Payslips
+                </NavLink>
 
-              <NavLink to="/payroll/reports" className={({ isActive }) => linkClassName(isActive)}>
-                Statutory Reports
-              </NavLink>
-            </SidebarSection>
-          ) : null}
-          
+                <NavLink to="/payroll/reports" className={({ isActive }) => linkClassName(isActive)}>
+                  Statutory Reports
+                </NavLink>
+              </SidebarSection>
+            ) : null}
 
-            <SidebarSection title="Working Capital" sectionKey="working-capital" defaultOpen={activeSection === 'working-capital'}>
+            {(canViewFinanceModule || canViewBudgetModule || canViewPayrollModule || canViewProcurementModule || canViewApModule || canViewArModule || canViewTreasuryModule || canViewInventoryModule || canViewFixedAssetsModule) ? (
+              <SidebarSection title="Working Capital" sectionKey="working-capital" defaultOpen={activeSection === 'working-capital'}>
                 <NavLink to="/working-capital" className={({ isActive }) => linkClassName(isActive)}>
                   Working Capital Management Dashboard
                 </NavLink>
               </SidebarSection>
+            ) : null}
 
-            <SidebarSection title="Reconciliation" sectionKey="reconciliation" defaultOpen={activeSection === 'reconciliation'}>
-              <NavLink to="/reconciliation" className={({ isActive }) => linkClassName(isActive)}>
-                Reconciliation
-              </NavLink>
-            </SidebarSection>
+            {canViewInventoryModule ? (
+              <SidebarSection title="Inventory" sectionKey="inventory" defaultOpen={activeSection === 'inventory'}>
+                <NavLink to="/inventory" className={({ isActive }) => linkClassName(isActive)}>
+                  Inventory Management
+                </NavLink>
+              </SidebarSection>
+            ) : null}
 
-            <SidebarSection title="Inventory" sectionKey="inventory" defaultOpen={activeSection === 'inventory'}>
-              <NavLink to="/inventory" className={({ isActive }) => linkClassName(isActive)}>
-                Inventory Management
-              </NavLink>
-            </SidebarSection>
+            {canViewArModule ? (
+              <SidebarSection title="Accounts Receivable" sectionKey="ar" defaultOpen={activeSection === 'ar'}>
+                <NavLink to="/customers" className={({ isActive }) => linkClassName(isActive)}>
+                  Customers
+                </NavLink>
 
-            <SidebarSection title="Accounts Receivable" sectionKey="ar" defaultOpen={activeSection === 'ar'}>
-              <NavLink to="/customers" className={({ isActive }) => linkClassName(isActive)}>
-                Customers
-              </NavLink>
+                <NavLink to="/sales-invoices" className={({ isActive }) => linkClassName(isActive)}>
+                  Sales Invoices
+                </NavLink>
 
-              <NavLink to="/sales-invoices" className={({ isActive }) => linkClassName(isActive)}>
-                Sales Invoices
-              </NavLink>
+                <NavLink to="/sales-invoices/rejected" className={({ isActive }) => linkClassName(isActive)}>
+                  Rejected Sales Invoices
+                </NavLink>
 
-              <NavLink to="/sales-invoices/rejected" className={({ isActive }) => linkClassName(isActive)}>
-                Rejected Sales Invoices
-              </NavLink>
+                <NavLink to="/customer-receipts" className={({ isActive }) => linkClassName(isActive)}>
+                  Customer Receipts
+                </NavLink>
 
-              <NavLink to="/customer-receipts" className={({ isActive }) => linkClassName(isActive)}>
-                Customer Receipts
-              </NavLink>
+                <NavLink to="/customer-receipts/rejected" className={({ isActive }) => linkClassName(isActive)}>
+                  Rejected Customer Receipts
+                </NavLink>
+              </SidebarSection>
+            ) : null}
 
-              <NavLink to="/customer-receipts/rejected" className={({ isActive }) => linkClassName(isActive)}>
-                Rejected Customer Receipts
-              </NavLink>
-            </SidebarSection>
+            {(canViewProcurementModule || canViewApModule) ? (
+              <SidebarSection title="Accounts Payable / Procurement" sectionKey="ap" defaultOpen={activeSection === 'ap'}>
+                {canViewApModule ? (
+                  <>
+                    <NavLink to="/vendors" className={({ isActive }) => linkClassName(isActive)}>
+                      Vendors
+                    </NavLink>
 
-            <SidebarSection title="Accounts Payable / Procurement" sectionKey="ap" defaultOpen={activeSection === 'ap'}>
-              <NavLink to="/vendors" className={({ isActive }) => linkClassName(isActive)}>
-                Vendors
-              </NavLink>
+                    <NavLink to="/purchase-invoices" className={({ isActive }) => linkClassName(isActive)}>
+                      Purchase Invoices
+                    </NavLink>
 
-              <NavLink to="/purchase-requisitions" className={({ isActive }) => linkClassName(isActive)}>
-                Purchase Requisitions
-              </NavLink>
+                    <NavLink to="/purchase-invoices/rejected" className={({ isActive }) => linkClassName(isActive)}>
+                      Rejected Purchase Invoices
+                    </NavLink>
 
-              <NavLink to="/purchase-requisitions/rejected" className={({ isActive }) => linkClassName(isActive)}>
-                Rejected Requisitions
-              </NavLink>
+                    <NavLink to="/vendor-payments" className={({ isActive }) => linkClassName(isActive)}>
+                      Vendor Payments
+                    </NavLink>
 
-              <NavLink to="/purchase-orders" className={({ isActive }) => linkClassName(isActive)}>
-                Purchase Orders
-              </NavLink>
+                    <NavLink to="/vendor-payments/rejected" className={({ isActive }) => linkClassName(isActive)}>
+                      Rejected Vendor Payments
+                    </NavLink>
+                  </>
+                ) : null}
 
-              <NavLink to="/purchase-order-receipts" className={({ isActive }) => linkClassName(isActive)}>
-                Purchase Order Receipts
-              </NavLink>
+                {canViewProcurementModule ? (
+                  <>
+                    <NavLink to="/purchase-requisitions" className={({ isActive }) => linkClassName(isActive)}>
+                      Purchase Requisitions
+                    </NavLink>
 
-              <NavLink to="/purchase-orders/rejected" className={({ isActive }) => linkClassName(isActive)}>
-                Rejected Purchase Orders
-              </NavLink>
+                    <NavLink to="/purchase-requisitions/rejected" className={({ isActive }) => linkClassName(isActive)}>
+                      Rejected Requisitions
+                    </NavLink>
 
-              <NavLink to="/purchase-invoices" className={({ isActive }) => linkClassName(isActive)}>
-                Purchase Invoices
-              </NavLink>
+                    <NavLink to="/purchase-orders" className={({ isActive }) => linkClassName(isActive)}>
+                      Purchase Orders
+                    </NavLink>
 
-              <NavLink to="/purchase-invoices/rejected" className={({ isActive }) => linkClassName(isActive)}>
-                Rejected Purchase Invoices
-              </NavLink>
+                    <NavLink to="/purchase-order-receipts" className={({ isActive }) => linkClassName(isActive)}>
+                      Purchase Order Receipts
+                    </NavLink>
 
-              <NavLink to="/vendor-payments" className={({ isActive }) => linkClassName(isActive)}>
-                Vendor Payments
-              </NavLink>
+                    <NavLink to="/purchase-orders/rejected" className={({ isActive }) => linkClassName(isActive)}>
+                      Rejected Purchase Orders
+                    </NavLink>
+                  </>
+                ) : null}
+              </SidebarSection>
+            ) : null}
 
-              <NavLink to="/vendor-payments/rejected" className={({ isActive }) => linkClassName(isActive)}>
-                Rejected Vendor Payments
-              </NavLink>
-            </SidebarSection>
-
-            <SidebarSection title="Workflow" sectionKey="workflow" defaultOpen={false}>
-              <div className="sidebar-note">
-                {canCreate
-                  ? 'You can create and manage accounting transactions in this workspace.'
-                  : 'You currently have read-only access to accounting information.'}
-              </div>
-            </SidebarSection>
+            {canViewFinanceModule ? (
+              <SidebarSection title="Workflow" sectionKey="workflow" defaultOpen={false}>
+                <div className="sidebar-note">
+                  {canCreate
+                    ? 'You can create and manage accounting transactions in this workspace.'
+                    : 'You currently have read-only access to accounting information.'}
+                </div>
+              </SidebarSection>
+            ) : null}
           </>
         ) : null}
 
@@ -303,7 +348,6 @@ export function Sidebar() {
                 Access Control
               </NavLink>
             ) : null}
-
 
             {canManageUsers ? (
               <NavLink to="/admin/users" className={({ isActive }) => linkClassName(isActive)}>
@@ -331,5 +375,3 @@ export function Sidebar() {
     </aside>
   );
 }
-
-
