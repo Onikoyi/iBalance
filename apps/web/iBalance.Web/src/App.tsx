@@ -65,6 +65,8 @@ import { AdminUsersPage } from './pages/admin/AdminUsersPage';
 import { AdminTenantDetailPage } from './pages/admin/AdminTenantDetailPage';
 import { AdminSubscriptionApplicationsPage } from './pages/admin/AdminSubscriptionApplicationsPage';
 import { AdminAccessControlPage } from './pages/admin/AdminAccessControlPage';
+import { AdminAuditTrailPage } from './pages/admin/AdminAuditTrailPage';
+
 
 export default function App() {
   return (
@@ -1182,6 +1184,20 @@ export default function App() {
           </RequireAuth>
         }
       />
+      <Route
+        path="/admin/audit-trail"
+        element={
+          <RequireAuth
+            allowedRoles={['PlatformAdmin', 'TenantAdmin']}
+            requiredPermissions={['admin.access']}
+          >
+            <AdminShell>
+              <AdminAuditTrailPage />
+            </AdminShell>
+          </RequireAuth>
+        }
+      />
+
 
       <Route path="/home" element={<Navigate to="/" replace />} />
       <Route path="*" element={<NotFoundPage />} />

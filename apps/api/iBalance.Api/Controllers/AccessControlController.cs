@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using iBalance.Api.Services.Audit;
 
 namespace iBalance.Api.Controllers;
 
@@ -27,6 +28,7 @@ public sealed class AccessControlController : ControllerBase
     public async Task<IActionResult> SeedDefaults(
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -420,6 +422,19 @@ public sealed class AccessControlController : ControllerBase
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "admin",
+            "AccessControl",
+            "SeedDefaults",
+            null,
+            "seed-defaults",
+            "Default access control data seeded/refreshed.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            null,
+            cancellationToken);
+
+
         return Ok(new { Message = "Default enterprise access roles and permissions seeded successfully." });
     }
 
@@ -463,7 +478,7 @@ public sealed class AccessControlController : ControllerBase
     }
 
     [HttpPost("roles")]
-    public async Task<IActionResult> CreateRole([FromBody] UpsertSecurityRoleRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
+    public async Task<IActionResult> CreateRole([FromBody] UpsertSecurityRoleRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, [FromServices] IAuditTrailWriter auditTrailWriter, CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
         if (!tenantContext.IsAvailable)
@@ -488,6 +503,25 @@ public sealed class AccessControlController : ControllerBase
         dbContext.Set<SecurityRole>().Add(role);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "admin",
+            "SecurityRole",
+            "RoleCreated",
+            role.Id,
+            role.Code,
+            $"Role '{role.Name}' created.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                role.Code,
+                role.Name,
+                role.Description,
+                role.IsActive,
+                role.IsSystemDefined
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Role created successfully.",
@@ -501,6 +535,7 @@ public sealed class AccessControlController : ControllerBase
         [FromBody] UpsertSecurityRoleRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -524,6 +559,24 @@ public sealed class AccessControlController : ControllerBase
 
         role.Update(request.Name, request.Description, request.IsActive);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "admin",
+            "SecurityRole",
+            "RoleUpdated",
+            role.Id,
+            role.Code,
+            $"Role '{role.Name}' updated.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                role.Code,
+                role.Name,
+                role.Description,
+                role.IsActive
+            },
+            cancellationToken);
 
         return Ok(new { Message = "Role updated successfully." });
     }
@@ -555,7 +608,7 @@ public sealed class AccessControlController : ControllerBase
     }
 
     [HttpPost("permissions")]
-    public async Task<IActionResult> CreatePermission([FromBody] UpsertSecurityPermissionRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
+    public async Task<IActionResult> CreatePermission([FromBody] UpsertSecurityPermissionRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, [FromServices] IAuditTrailWriter auditTrailWriter, CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
         if (!tenantContext.IsAvailable)
@@ -580,11 +633,31 @@ public sealed class AccessControlController : ControllerBase
         dbContext.Set<SecurityPermission>().Add(item);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "admin",
+            "SecurityPermission",
+            "PermissionCreated",
+            item.Id,
+            item.Code,
+            $"Permission '{item.Name}' created.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                item.Code,
+                item.Module,
+                item.Action,
+                item.Name,
+                item.Description,
+                item.IsActive
+            },
+            cancellationToken);
+
         return Ok(new { Message = "Permission created successfully." });
     }
 
     [HttpPut("roles/{roleId:guid}/permissions")]
-    public async Task<IActionResult> SetRolePermissions(Guid roleId, [FromBody] SetRolePermissionsRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
+    public async Task<IActionResult> SetRolePermissions(Guid roleId, [FromBody] SetRolePermissionsRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, [FromServices] IAuditTrailWriter auditTrailWriter, CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
         if (!tenantContext.IsAvailable)
@@ -625,6 +698,25 @@ public sealed class AccessControlController : ControllerBase
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "admin",
+            "SecurityRolePermission",
+            "RolePermissionsUpdated",
+            role.Id,
+            role.Code,
+            $"Permissions updated for role '{role.Name}'.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                RoleId = role.Id,
+                role.Code,
+                role.Name,
+                PermissionCount = request.PermissionIds?.Count ?? 0
+            },
+            cancellationToken);
+
         return Ok(new { Message = "Role permissions updated successfully." });
     }
 
@@ -654,7 +746,7 @@ public sealed class AccessControlController : ControllerBase
     }
 
     [HttpPost("departments")]
-    public async Task<IActionResult> CreateDepartment([FromBody] UpsertScopeMasterRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
+    public async Task<IActionResult> CreateDepartment([FromBody] UpsertScopeMasterRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, [FromServices] IAuditTrailWriter auditTrailWriter, CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
         if (!tenantContext.IsAvailable)
@@ -675,8 +767,28 @@ public sealed class AccessControlController : ControllerBase
             return Conflict(new { Message = "A department with the same code already exists." });
         }
 
-        dbContext.Set<OrganizationDepartment>().Add(new OrganizationDepartment(Guid.NewGuid(), tenantContext.TenantId, request.Code, request.Name, request.Description, request.IsActive));
+        var department = new OrganizationDepartment(Guid.NewGuid(), tenantContext.TenantId, request.Code, request.Name, request.Description, request.IsActive);
+        dbContext.Set<OrganizationDepartment>().Add(department);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "admin",
+            "OrganizationDepartment",
+            "ScopeCreated",
+            department.Id,
+            department.Code,
+            $"Department '{department.Name}' created.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                ScopeType = "Department",
+                department.Code,
+                department.Name,
+                department.Description,
+                department.IsActive
+            },
+            cancellationToken);
 
         return Ok(new { Message = "Department created successfully." });
     }
@@ -707,7 +819,7 @@ public sealed class AccessControlController : ControllerBase
     }
 
     [HttpPost("branches")]
-    public async Task<IActionResult> CreateBranch([FromBody] UpsertScopeMasterRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
+    public async Task<IActionResult> CreateBranch([FromBody] UpsertScopeMasterRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, [FromServices] IAuditTrailWriter auditTrailWriter, CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
         if (!tenantContext.IsAvailable)
@@ -728,8 +840,28 @@ public sealed class AccessControlController : ControllerBase
             return Conflict(new { Message = "A branch with the same code already exists." });
         }
 
-        dbContext.Set<OrganizationBranch>().Add(new OrganizationBranch(Guid.NewGuid(), tenantContext.TenantId, request.Code, request.Name, request.Description, request.IsActive));
+        var branch = new OrganizationBranch(Guid.NewGuid(), tenantContext.TenantId, request.Code, request.Name, request.Description, request.IsActive);
+        dbContext.Set<OrganizationBranch>().Add(branch);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "admin",
+            "OrganizationBranch",
+            "ScopeCreated",
+            branch.Id,
+            branch.Code,
+            $"Branch '{branch.Name}' created.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                ScopeType = "Branch",
+                branch.Code,
+                branch.Name,
+                branch.Description,
+                branch.IsActive
+            },
+            cancellationToken);
 
         return Ok(new { Message = "Branch created successfully." });
     }
@@ -760,7 +892,7 @@ public sealed class AccessControlController : ControllerBase
     }
 
     [HttpPost("cost-centers")]
-    public async Task<IActionResult> CreateCostCenter([FromBody] UpsertScopeMasterRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
+    public async Task<IActionResult> CreateCostCenter([FromBody] UpsertScopeMasterRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, [FromServices] IAuditTrailWriter auditTrailWriter, CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
         if (!tenantContext.IsAvailable)
@@ -781,8 +913,28 @@ public sealed class AccessControlController : ControllerBase
             return Conflict(new { Message = "A cost center with the same code already exists." });
         }
 
-        dbContext.Set<OrganizationCostCenter>().Add(new OrganizationCostCenter(Guid.NewGuid(), tenantContext.TenantId, request.Code, request.Name, request.Description, request.IsActive));
+        var costCenter = new OrganizationCostCenter(Guid.NewGuid(), tenantContext.TenantId, request.Code, request.Name, request.Description, request.IsActive);
+        dbContext.Set<OrganizationCostCenter>().Add(costCenter);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "admin",
+            "OrganizationCostCenter",
+            "ScopeCreated",
+            costCenter.Id,
+            costCenter.Code,
+            $"Cost center '{costCenter.Name}' created.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                ScopeType = "CostCenter",
+                costCenter.Code,
+                costCenter.Name,
+                costCenter.Description,
+                costCenter.IsActive
+            },
+            cancellationToken);
 
         return Ok(new { Message = "Cost center created successfully." });
     }
@@ -865,7 +1017,7 @@ public sealed class AccessControlController : ControllerBase
     }
 
     [HttpPut("users/{userId:guid}/access-assignments")]
-    public async Task<IActionResult> SetUserAccessAssignments(Guid userId, [FromBody] SetUserAccessAssignmentsRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
+    public async Task<IActionResult> SetUserAccessAssignments(Guid userId, [FromBody] SetUserAccessAssignmentsRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, [FromServices] IAuditTrailWriter auditTrailWriter, CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
         if (!tenantContext.IsAvailable)
@@ -932,6 +1084,24 @@ public sealed class AccessControlController : ControllerBase
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "admin",
+            "UserAccessAssignment",
+            "UserAccessAssignmentsUpdated",
+            userId,
+            userId.ToString(),
+            "User access assignments updated successfully.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                UserId = userId,
+                RoleCount = roleIds.Count,
+                ScopeCount = (request.Scopes ?? new List<UserScopeAssignmentRequest>()).Count
+            },
+            cancellationToken);
+
         return Ok(new { Message = "User access assignments updated successfully." });
     }
 
@@ -977,7 +1147,7 @@ public sealed class AccessControlController : ControllerBase
     }
 
     [HttpPost("workflow-policies")]
-    public async Task<IActionResult> CreateWorkflowPolicy([FromBody] UpsertDepartmentWorkflowPolicyRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
+    public async Task<IActionResult> CreateWorkflowPolicy([FromBody] UpsertDepartmentWorkflowPolicyRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, [FromServices] IAuditTrailWriter auditTrailWriter, CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
         if (!tenantContext.IsAvailable)
@@ -998,7 +1168,7 @@ public sealed class AccessControlController : ControllerBase
             return Conflict(new { Message = "A workflow policy already exists for this department and module." });
         }
 
-        dbContext.Set<DepartmentWorkflowPolicy>().Add(new DepartmentWorkflowPolicy(
+        var workflowPolicy = new DepartmentWorkflowPolicy(
             Guid.NewGuid(),
             tenantContext.TenantId,
             request.ModuleCode,
@@ -1007,9 +1177,32 @@ public sealed class AccessControlController : ControllerBase
             request.EnforceSegregationOfDuties,
             request.MinimumApproverCount,
             request.Notes,
-            request.IsActive));
+            request.IsActive);
+
+        dbContext.Set<DepartmentWorkflowPolicy>().Add(workflowPolicy);
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "admin",
+            "DepartmentWorkflowPolicy",
+            "WorkflowPolicyCreated",
+            workflowPolicy.Id,
+            request.ModuleCode,
+            "Department workflow policy created successfully.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                workflowPolicy.ModuleCode,
+                workflowPolicy.OrganizationDepartmentId,
+                workflowPolicy.MakerCheckerRequired,
+                workflowPolicy.EnforceSegregationOfDuties,
+                workflowPolicy.MinimumApproverCount,
+                workflowPolicy.IsActive
+            },
+            cancellationToken);
+
         return Ok(new { Message = "Department workflow policy created successfully." });
     }
 

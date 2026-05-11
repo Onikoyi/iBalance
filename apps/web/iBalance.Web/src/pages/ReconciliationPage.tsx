@@ -20,7 +20,7 @@ import {
   type LedgerAccountDto,
   type UploadBankStatementImportLineRequest,
 } from '../lib/api';
-import { canManageFinanceSetup, canViewFinance } from '../lib/auth';
+import { canViewTreasury, hasPermission } from '../lib/auth';
 
 function toUtcStart(date: string) {
   return date ? new Date(`${date}T00:00:00`).toISOString() : undefined;
@@ -400,8 +400,8 @@ function printSection(sectionId: string) {
 export function ReconciliationPage() {
   const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const canView = canViewFinance();
-  const canManage = canManageFinanceSetup();
+  const canView = canViewTreasury();
+  const canManage = hasPermission('treasury.manage') || hasPermission('treasury.reconciliation.manage');
 
   const [activeTab, setActiveTab] = useState<'cashbook' | 'reconciliations' | 'statements' | 'matching'>('reconciliations');
   const [fromDate, setFromDate] = useState(todayInputValue().slice(0, 8) + '01');

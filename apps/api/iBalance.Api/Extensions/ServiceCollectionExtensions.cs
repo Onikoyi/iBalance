@@ -4,6 +4,7 @@ using iBalance.Modules.Finance.DependencyInjection;
 using iBalance.Modules.OilAndGas.DependencyInjection;
 using iBalance.Modules.Platform.DependencyInjection;
 using iBalance.Modules.Universities.DependencyInjection;
+using iBalance.Api.Services.Audit;
 
 namespace iBalance.Api.Extensions;
 
@@ -21,6 +22,8 @@ public static class ServiceCollectionExtensions
         services.AddFinanceModule(configuration);
         services.AddUniversitiesModule(configuration);
         services.AddOilAndGasModule(configuration);
+        services.AddScoped<IAuditTrailWriter, AuditTrailWriter>();
+
 
         services.AddAuthorization(options =>
         {

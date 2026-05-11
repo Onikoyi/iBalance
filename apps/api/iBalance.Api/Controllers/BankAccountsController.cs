@@ -5,6 +5,7 @@ using iBalance.Modules.Finance.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using iBalance.Api.Services.Audit;
 
 namespace iBalance.Api.Controllers;
 
@@ -78,6 +79,7 @@ public sealed class BankAccountsController : ControllerBase
         [FromBody] CreateBankAccountRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -119,6 +121,27 @@ public sealed class BankAccountsController : ControllerBase
             dbContext.BankAccounts.Add(bankAccount);
             await dbContext.SaveChangesAsync(cancellationToken);
 
+            await auditTrailWriter.WriteAsync(
+            "treasury",
+            "BankAccount",
+            "Created",
+            bankAccount.Id,
+            bankAccount.AccountNumber,
+            $"Bank account '{bankAccount.Name}' created.",
+            null,
+            tenantContext.TenantId,
+            new
+            {
+                bankAccount.Name,
+                bankAccount.BankName,
+                bankAccount.AccountNumber,
+                bankAccount.CurrencyCode,
+                bankAccount.LedgerAccountId,
+                bankAccount.IsActive
+            },
+            cancellationToken);
+
+
             return Ok(new
             {
                 Message = "Bank account created successfully.",
@@ -150,6 +173,7 @@ public sealed class BankAccountsController : ControllerBase
         [FromBody] UpdateBankAccountRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -209,6 +233,27 @@ public sealed class BankAccountsController : ControllerBase
 
             await dbContext.SaveChangesAsync(cancellationToken);
 
+            await auditTrailWriter.WriteAsync(
+            "treasury",
+            "BankAccount",
+            "Updated",
+            bankAccount.Id,
+            bankAccount.AccountNumber,
+            $"Bank account '{bankAccount.Name}' updated.",
+            null,
+            tenantContext.TenantId,
+            new
+            {
+                bankAccount.Name,
+                bankAccount.BankName,
+                bankAccount.AccountNumber,
+                bankAccount.CurrencyCode,
+                bankAccount.LedgerAccountId,
+                bankAccount.IsActive
+            },
+            cancellationToken);
+
+
             return Ok(new
             {
                 Message = "Bank account updated successfully.",
@@ -239,6 +284,7 @@ public sealed class BankAccountsController : ControllerBase
         Guid bankAccountId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -257,6 +303,18 @@ public sealed class BankAccountsController : ControllerBase
 
         bankAccount.Activate();
         await dbContext.SaveChangesAsync(cancellationToken);
+        await auditTrailWriter.WriteAsync(
+            "treasury",
+            "BankAccount",
+            "Activated",
+            bankAccount.Id,
+            bankAccount.AccountNumber,
+            $"Bank account '{bankAccount.Name}' activated.",
+            null,
+            tenantContext.TenantId,
+            null,
+            cancellationToken);
+
 
         return Ok(new { Message = "Bank account activated successfully.", bankAccount.Id, bankAccount.IsActive });
     }
@@ -267,6 +325,7 @@ public sealed class BankAccountsController : ControllerBase
         Guid bankAccountId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -285,6 +344,19 @@ public sealed class BankAccountsController : ControllerBase
 
         bankAccount.Deactivate();
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "treasury",
+            "BankAccount",
+            "Deactivated",
+            bankAccount.Id,
+            bankAccount.AccountNumber,
+            $"Bank account '{bankAccount.Name}' deactivated.",
+            null,
+            tenantContext.TenantId,
+            null,
+            cancellationToken);
+
 
         return Ok(new { Message = "Bank account deactivated successfully.", bankAccount.Id, bankAccount.IsActive });
     }

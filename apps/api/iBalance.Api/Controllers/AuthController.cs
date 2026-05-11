@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using iBalance.Api.Services.Audit;
 
 namespace iBalance.Api.Controllers;
 
@@ -28,6 +29,7 @@ public sealed class AuthController : ControllerBase
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         [FromServices] PasswordHasher passwordHasher,
         [FromServices] IOptions<JwtOptions> jwtOptionsAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -118,6 +120,25 @@ public sealed class AuthController : ControllerBase
             jwtOptions,
             expiresAtUtc);
 
+        await auditTrailWriter.WriteAsync(
+            "admin",
+            "UserAccount",
+            "Registered",
+            user.Id,
+            user.Email,
+            $"User '{user.Email}' registered successfully.",
+            user.Email,
+            tenantContext.TenantId,
+            new
+            {
+                user.Email,
+                user.FirstName,
+                user.LastName,
+                PrimaryRole = authorizationProfile.PrimaryRole
+            },
+            cancellationToken);
+
+
         return Ok(new
         {
             Message = "Registration successful.",
@@ -156,6 +177,7 @@ public sealed class AuthController : ControllerBase
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         [FromServices] PasswordHasher passwordHasher,
         [FromServices] IOptions<JwtOptions> jwtOptionsAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -277,6 +299,24 @@ public sealed class AuthController : ControllerBase
             authorizationProfile,
             jwtOptions,
             expiresAtUtc);
+
+         await auditTrailWriter.WriteAsync(
+            "admin",
+            "UserAccount",
+            "LoggedIn",
+            user.Id,
+            user.Email,
+            $"User '{user.Email}' logged in successfully.",
+            user.Email,
+            tenantContext.TenantId,
+            new
+            {
+                user.Email,
+                PrimaryRole = authorizationProfile.PrimaryRole,
+                Roles = authorizationProfile.Roles
+            },
+            cancellationToken);
+
 
         return Ok(new
         {

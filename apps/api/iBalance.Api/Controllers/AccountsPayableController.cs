@@ -8,6 +8,8 @@ using iBalance.Modules.Finance.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using iBalance.Api.Services.Audit;
+
 
 namespace iBalance.Api.Controllers;
 
@@ -240,6 +242,7 @@ public sealed class AccountsPayableController : ControllerBase
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -287,6 +290,26 @@ public sealed class AccountsPayableController : ControllerBase
 
         dbContext.Vendors.Add(vendor);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "ap",
+            "Vendor",
+            "Created",
+            vendor.Id,
+            vendor.VendorCode,
+            $"Vendor '{vendor.VendorName}' created.",
+            currentUserService.UserId,
+            tenantContext.TenantId,
+            new
+            {
+                vendor.VendorCode,
+                vendor.VendorName,
+                vendor.Email,
+                vendor.PhoneNumber,
+                vendor.IsActive
+            },
+            cancellationToken);
+
 
         return Ok(new
         {
@@ -511,6 +534,7 @@ public sealed class AccountsPayableController : ControllerBase
 public async Task<IActionResult> GetRejectedPurchaseInvoices(
     [FromServices] ApplicationDbContext dbContext,
     [FromServices] ITenantContextAccessor tenantContextAccessor,
+    [FromServices] IAuditTrailWriter auditTrailWriter,
     CancellationToken cancellationToken)
 {
     var tenantContext = tenantContextAccessor.Current;
@@ -656,6 +680,7 @@ public async Task<IActionResult> UpdateRejectedPurchaseInvoice(
     [FromServices] ApplicationDbContext dbContext,
     [FromServices] ITenantContextAccessor tenantContextAccessor,
     [FromServices] ICurrentUserService currentUserService,
+    [FromServices] IAuditTrailWriter auditTrailWriter,
     CancellationToken cancellationToken)
 {
     var tenantContext = tenantContextAccessor.Current;
@@ -948,6 +973,27 @@ catch (DbUpdateException ex)
     });
 }
 
+    await auditTrailWriter.WriteAsync(
+        "ap",
+        "PurchaseInvoice",
+        "RejectedInvoiceUpdated",
+        invoice.Id,
+        invoice.InvoiceNumber,
+        $"Rejected purchase invoice '{invoice.InvoiceNumber}' updated.",
+        currentUserService.UserId,
+        tenantContext.TenantId,
+        new
+        {
+            invoice.InvoiceNumber,
+            invoice.VendorId,
+            invoice.InvoiceDateUtc,
+            invoice.TotalAmount,
+            invoice.GrossAmount,
+            invoice.NetPayableAmount,
+            TaxLineCount = purchaseInvoiceTaxLines.Count
+        },
+        cancellationToken);
+
     return Ok(new
     {
         Message = "Rejected purchase invoice updated successfully.",
@@ -980,6 +1026,7 @@ public async Task<IActionResult> DeleteRejectedPurchaseInvoice(
     Guid purchaseInvoiceId,
     [FromServices] ApplicationDbContext dbContext,
     [FromServices] ITenantContextAccessor tenantContextAccessor,
+    [FromServices] IAuditTrailWriter auditTrailWriter,
     CancellationToken cancellationToken)
 {
     var tenantContext = tenantContextAccessor.Current;
@@ -1036,10 +1083,31 @@ public async Task<IActionResult> DeleteRejectedPurchaseInvoice(
         dbContext.PurchaseInvoiceTaxLines.RemoveRange(taxLines);
     }
 
+    var deletedInvoiceId = invoice.Id;
+    var deletedInvoiceNumber = invoice.InvoiceNumber;
+    var deletedVendorId = invoice.VendorId;
+
     dbContext.PurchaseInvoiceLines.RemoveRange(invoice.Lines);
     dbContext.PurchaseInvoices.Remove(invoice);
 
     await dbContext.SaveChangesAsync(cancellationToken);
+
+    await auditTrailWriter.WriteAsync(
+        "ap",
+        "PurchaseInvoice",
+        "RejectedInvoiceDeleted",
+        deletedInvoiceId,
+        deletedInvoiceNumber,
+        $"Rejected purchase invoice '{deletedInvoiceNumber}' deleted.",
+        null,
+        tenantContext.TenantId,
+        new
+        {
+            InvoiceId = deletedInvoiceId,
+            InvoiceNumber = deletedInvoiceNumber,
+            VendorId = deletedVendorId
+        },
+        cancellationToken);
 
     return Ok(new
     {
@@ -1056,6 +1124,7 @@ public async Task<IActionResult> DeleteRejectedPurchaseInvoice(
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -1127,6 +1196,24 @@ public async Task<IActionResult> DeleteRejectedPurchaseInvoice(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "ap",
+            "PurchaseInvoice",
+            "SubmittedForApproval",
+            invoice.Id,
+            invoice.InvoiceNumber,
+            $"Purchase invoice '{invoice.InvoiceNumber}' submitted for approval.",
+            currentUserService.UserId,
+            tenantContext.TenantId,
+            new
+            {
+                invoice.InvoiceNumber,
+                invoice.Status,
+                invoice.SubmittedBy,
+                invoice.SubmittedOnUtc
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Purchase invoice submitted for approval successfully.",
@@ -1148,6 +1235,7 @@ public async Task<IActionResult> DeleteRejectedPurchaseInvoice(
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -1196,6 +1284,24 @@ public async Task<IActionResult> DeleteRejectedPurchaseInvoice(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "ap",
+            "PurchaseInvoice",
+            "Approved",
+            invoice.Id,
+            invoice.InvoiceNumber,
+            $"Purchase invoice '{invoice.InvoiceNumber}' approved.",
+            currentUserService.UserId,
+            tenantContext.TenantId,
+            new
+            {
+                invoice.InvoiceNumber,
+                invoice.Status,
+                invoice.ApprovedBy,
+                invoice.ApprovedOnUtc
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Purchase invoice approved successfully.",
@@ -1218,6 +1324,7 @@ public async Task<IActionResult> DeleteRejectedPurchaseInvoice(
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -1270,6 +1377,25 @@ public async Task<IActionResult> DeleteRejectedPurchaseInvoice(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "ap",
+            "PurchaseInvoice",
+            "Rejected",
+            invoice.Id,
+            invoice.InvoiceNumber,
+            $"Purchase invoice '{invoice.InvoiceNumber}' rejected.",
+            currentUserService.UserId,
+            tenantContext.TenantId,
+            new
+            {
+                invoice.InvoiceNumber,
+                invoice.Status,
+                invoice.RejectedBy,
+                invoice.RejectedOnUtc,
+                invoice.RejectionReason
+            },
+            cancellationToken);
 
         return Ok(new
         {
@@ -1436,6 +1562,7 @@ public async Task<IActionResult> DeleteRejectedPurchaseInvoice(
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -1656,6 +1783,28 @@ public async Task<IActionResult> DeleteRejectedPurchaseInvoice(
         //     .Where(x => x.ApplicationMode == TaxApplicationMode.DeductFromAmount)
         //     .Sum(x => x.TaxAmount);
 
+
+        await auditTrailWriter.WriteAsync(
+            "ap",
+            "PurchaseInvoice",
+            "Created",
+            invoice.Id,
+            invoice.InvoiceNumber,
+            $"Purchase invoice '{invoice.InvoiceNumber}' created.",
+            currentUserService.UserId,
+            tenantContext.TenantId,
+            new
+            {
+                invoice.InvoiceNumber,
+                invoice.VendorId,
+                invoice.InvoiceDateUtc,
+                invoice.TotalAmount,
+                invoice.GrossAmount,
+                invoice.NetPayableAmount
+            },
+            cancellationToken);
+
+
         return Ok(new
         {
             Message = "Purchase invoice created successfully.",
@@ -1685,6 +1834,7 @@ public async Task<IActionResult> DeleteRejectedPurchaseInvoice(
         [FromBody] PostPurchaseInvoiceRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -2010,6 +2160,26 @@ if (BudgetEvaluationSupport.IsBudgetConsumableAccountCategory(expenseLedgerAccou
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "ap",
+            "PurchaseInvoice",
+            "Posted",
+            invoice.Id,
+            invoice.InvoiceNumber,
+            $"Purchase invoice '{invoice.InvoiceNumber}' posted.",
+            null,
+            tenantContext.TenantId,
+            new
+            {
+                invoice.InvoiceNumber,
+                invoice.JournalEntryId,
+                invoice.PostedOnUtc,
+                invoice.TotalAmount,
+                GrossInvoiceAmount = grossInvoiceAmount,
+                NetPayableAmount = netPayableAmount
+            },
+            cancellationToken);
 
         return Ok(new
         {
@@ -2372,6 +2542,7 @@ public async Task<IActionResult> UpdateRejectedVendorPayment(
     [FromServices] ApplicationDbContext dbContext,
     [FromServices] ITenantContextAccessor tenantContextAccessor,
     [FromServices] ICurrentUserService currentUserService,
+    [FromServices] IAuditTrailWriter auditTrailWriter,
     CancellationToken cancellationToken)
 {
     var tenantContext = tenantContextAccessor.Current;
@@ -2533,6 +2704,26 @@ public async Task<IActionResult> UpdateRejectedVendorPayment(
 
     await dbContext.SaveChangesAsync(cancellationToken);
 
+    await auditTrailWriter.WriteAsync(
+        "ap",
+        "VendorPayment",
+        "RejectedPaymentUpdated",
+        payment.Id,
+        payment.PaymentNumber,
+        $"Rejected vendor payment '{payment.PaymentNumber}' updated.",
+        currentUserService.UserId,
+        tenantContext.TenantId,
+        new
+        {
+            payment.PaymentNumber,
+            payment.VendorId,
+            payment.PurchaseInvoiceId,
+            payment.PaymentDateUtc,
+            payment.Amount,
+            payment.Status
+        },
+        cancellationToken);
+
     return Ok(new
     {
         Message = "Rejected vendor payment updated successfully.",
@@ -2558,6 +2749,7 @@ public async Task<IActionResult> DeleteRejectedVendorPayment(
     Guid vendorPaymentId,
     [FromServices] ApplicationDbContext dbContext,
     [FromServices] ITenantContextAccessor tenantContextAccessor,
+    [FromServices] IAuditTrailWriter auditTrailWriter,
     CancellationToken cancellationToken)
 {
     var tenantContext = tenantContextAccessor.Current;
@@ -2604,8 +2796,31 @@ public async Task<IActionResult> DeleteRejectedVendorPayment(
         });
     }
 
+    var deletedPaymentId = payment.Id;
+    var deletedPaymentNumber = payment.PaymentNumber;
+    var deletedVendorId = payment.VendorId;
+    var deletedInvoiceId = payment.PurchaseInvoiceId;
+
     dbContext.VendorPayments.Remove(payment);
     await dbContext.SaveChangesAsync(cancellationToken);
+
+    await auditTrailWriter.WriteAsync(
+        "ap",
+        "VendorPayment",
+        "RejectedPaymentDeleted",
+        deletedPaymentId,
+        deletedPaymentNumber,
+        $"Rejected vendor payment '{deletedPaymentNumber}' deleted.",
+        null,
+        tenantContext.TenantId,
+        new
+        {
+            PaymentId = deletedPaymentId,
+            PaymentNumber = deletedPaymentNumber,
+            VendorId = deletedVendorId,
+            PurchaseInvoiceId = deletedInvoiceId
+        },
+        cancellationToken);
 
     return Ok(new
     {
@@ -2622,6 +2837,7 @@ public async Task<IActionResult> DeleteRejectedVendorPayment(
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -2730,6 +2946,26 @@ public async Task<IActionResult> DeleteRejectedVendorPayment(
         dbContext.VendorPayments.Add(payment);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "ap",
+            "VendorPayment",
+            "Created",
+            payment.Id,
+            payment.PaymentNumber,
+            $"Vendor payment '{payment.PaymentNumber}' created.",
+            currentUserService.UserId,
+            tenantContext.TenantId,
+            new
+            {
+                payment.PaymentNumber,
+                payment.VendorId,
+                payment.PurchaseInvoiceId,
+                payment.PaymentDateUtc,
+                payment.Amount,
+                payment.Status
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Vendor payment created successfully.",
@@ -2753,6 +2989,7 @@ public async Task<IActionResult> DeleteRejectedVendorPayment(
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -2796,6 +3033,24 @@ public async Task<IActionResult> DeleteRejectedVendorPayment(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "ap",
+            "VendorPayment",
+            "SubmittedForApproval",
+            payment.Id,
+            payment.PaymentNumber,
+            $"Vendor payment '{payment.PaymentNumber}' submitted for approval.",
+            currentUserService.UserId,
+            tenantContext.TenantId,
+            new
+            {
+                payment.PaymentNumber,
+                payment.Status,
+                payment.SubmittedBy,
+                payment.SubmittedOnUtc
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Vendor payment submitted for approval successfully.",
@@ -2818,6 +3073,7 @@ public async Task<IActionResult> DeleteRejectedVendorPayment(
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -2861,6 +3117,24 @@ public async Task<IActionResult> DeleteRejectedVendorPayment(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "ap",
+            "VendorPayment",
+            "Approved",
+            payment.Id,
+            payment.PaymentNumber,
+            $"Vendor payment '{payment.PaymentNumber}' approved.",
+            currentUserService.UserId,
+            tenantContext.TenantId,
+            new
+            {
+                payment.PaymentNumber,
+                payment.Status,
+                payment.ApprovedBy,
+                payment.ApprovedOnUtc
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Vendor payment approved successfully.",
@@ -2883,6 +3157,7 @@ public async Task<IActionResult> DeleteRejectedVendorPayment(
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -2935,6 +3210,25 @@ public async Task<IActionResult> DeleteRejectedVendorPayment(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "ap",
+            "VendorPayment",
+            "Rejected",
+            payment.Id,
+            payment.PaymentNumber,
+            $"Vendor payment '{payment.PaymentNumber}' rejected.",
+            currentUserService.UserId,
+            tenantContext.TenantId,
+            new
+            {
+                payment.PaymentNumber,
+                payment.Status,
+                payment.RejectedBy,
+                payment.RejectedOnUtc,
+                payment.RejectionReason
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Vendor payment rejected successfully.",
@@ -2957,6 +3251,7 @@ public async Task<IActionResult> DeleteRejectedVendorPayment(
         [FromBody] PostVendorPaymentRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -3172,6 +3467,24 @@ public async Task<IActionResult> DeleteRejectedVendorPayment(
         dbContext.LedgerMovements.AddRange(movements);
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "ap",
+            "VendorPayment",
+            "Posted",
+            payment.Id,
+            payment.PaymentNumber,
+            $"Vendor payment '{payment.PaymentNumber}' posted.",
+            null,
+            tenantContext.TenantId,
+            new
+            {
+                payment.PaymentNumber,
+                payment.JournalEntryId,
+                payment.PostedOnUtc,
+                payment.Amount
+            },
+            cancellationToken);
 
         return Ok(new
         {

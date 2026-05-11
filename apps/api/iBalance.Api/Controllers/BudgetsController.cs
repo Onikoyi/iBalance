@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using iBalance.Api.Security;
+using iBalance.Api.Services.Audit;
 
 namespace iBalance.Api.Controllers;
 
@@ -198,6 +199,7 @@ public async Task<IActionResult> GetBudgetDetail(
         [FromBody] CreateBudgetRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -239,6 +241,27 @@ public async Task<IActionResult> GetBudgetDetail(
         dbContext.Budgets.Add(budget);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "budget",
+            "Budget",
+            "Created",
+            budget.Id,
+            budget.BudgetNumber,
+            $"Budget '{budget.BudgetNumber}' created.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                budget.BudgetNumber,
+                budget.Name,
+                budget.Type,
+                budget.PeriodStartUtc,
+                budget.PeriodEndUtc,
+                budget.OverrunPolicy,
+                LineCount = budget.Lines.Count
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Budget created successfully.",
@@ -253,6 +276,7 @@ public async Task<IActionResult> GetBudgetDetail(
         [FromBody] CreateBudgetRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -393,6 +417,26 @@ catch (DbUpdateException ex)
     });
 }
 
+        await auditTrailWriter.WriteAsync(
+            "budget",
+            "Budget",
+            "Updated",
+            budget.Id,
+            budget.BudgetNumber,
+            $"Budget '{budget.BudgetNumber}' updated.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                budget.BudgetNumber,
+                budget.Name,
+                budget.Type,
+                budget.Status,
+                budget.OverrunPolicy,
+                LineCount = request.Lines.Count
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Budget updated successfully.",
@@ -406,6 +450,7 @@ catch (DbUpdateException ex)
         Guid budgetId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -438,10 +483,32 @@ catch (DbUpdateException ex)
             dbContext.BudgetTransfers.RemoveRange(transfers);
         }
 
+        var budgetReference = budget.BudgetNumber;
+        var budgetName = budget.Name;
+        var lineCount = budget.Lines.Count;
+
         dbContext.BudgetLines.RemoveRange(budget.Lines);
         dbContext.Budgets.Remove(budget);
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "budget",
+            "Budget",
+            "Deleted",
+            budgetId,
+            budgetReference,
+            $"Budget '{budgetReference}' deleted.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                BudgetId = budgetId,
+                BudgetNumber = budgetReference,
+                BudgetName = budgetName,
+                LineCount = lineCount
+            },
+            cancellationToken);
 
         return Ok(new { Message = "Budget deleted successfully.", BudgetId = budgetId });
     }
@@ -452,6 +519,7 @@ catch (DbUpdateException ex)
         Guid budgetId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var budget = await dbContext.Budgets
@@ -464,6 +532,19 @@ catch (DbUpdateException ex)
         {
             budget.SubmitForApproval(currentUserService.UserId ?? "system");
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            await auditTrailWriter.WriteAsync(
+                "budget",
+                "Budget",
+                "Submitted",
+                budget.Id,
+                budget.BudgetNumber,
+                $"Budget '{budget.BudgetNumber}' submitted for approval.",
+                User.Identity?.Name,
+                budget.TenantId,
+                new { budget.BudgetNumber, budget.Status },
+                cancellationToken);
+
             return Ok(new { Message = "Budget submitted for approval successfully.", BudgetId = budget.Id, budget.Status });
         }
         catch (InvalidOperationException ex)
@@ -478,6 +559,7 @@ catch (DbUpdateException ex)
         Guid budgetId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var budget = await dbContext.Budgets.FirstOrDefaultAsync(x => x.Id == budgetId, cancellationToken);
@@ -487,6 +569,19 @@ catch (DbUpdateException ex)
         {
             budget.Approve(currentUserService.UserId ?? "system");
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            await auditTrailWriter.WriteAsync(
+                "budget",
+                "Budget",
+                "Approved",
+                budget.Id,
+                budget.BudgetNumber,
+                $"Budget '{budget.BudgetNumber}' approved.",
+                User.Identity?.Name,
+                budget.TenantId,
+                new { budget.BudgetNumber, budget.Status },
+                cancellationToken);
+
             return Ok(new { Message = "Budget approved successfully.", BudgetId = budget.Id, budget.Status });
         }
         catch (InvalidOperationException ex)
@@ -502,6 +597,7 @@ catch (DbUpdateException ex)
         [FromBody] RejectBudgetRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var budget = await dbContext.Budgets.FirstOrDefaultAsync(x => x.Id == budgetId, cancellationToken);
@@ -516,6 +612,19 @@ catch (DbUpdateException ex)
         {
             budget.Reject(currentUserService.UserId ?? "system", request.Reason);
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            await auditTrailWriter.WriteAsync(
+                "budget",
+                "Budget",
+                "Rejected",
+                budget.Id,
+                budget.BudgetNumber,
+                $"Budget '{budget.BudgetNumber}' rejected.",
+                User.Identity?.Name,
+                budget.TenantId,
+                new { budget.BudgetNumber, budget.Status, request.Reason },
+                cancellationToken);
+
             return Ok(new { Message = "Budget rejected successfully.", BudgetId = budget.Id, budget.Status });
         }
         catch (InvalidOperationException ex)
@@ -530,6 +639,7 @@ catch (DbUpdateException ex)
         Guid budgetId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var budget = await dbContext.Budgets.FirstOrDefaultAsync(x => x.Id == budgetId, cancellationToken);
@@ -539,6 +649,19 @@ catch (DbUpdateException ex)
         {
             budget.Lock(currentUserService.UserId ?? "system");
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            await auditTrailWriter.WriteAsync(
+                "budget",
+                "Budget",
+                "Locked",
+                budget.Id,
+                budget.BudgetNumber,
+                $"Budget '{budget.BudgetNumber}' locked.",
+                User.Identity?.Name,
+                budget.TenantId,
+                new { budget.BudgetNumber, budget.Status },
+                cancellationToken);
+
             return Ok(new { Message = "Budget locked successfully.", BudgetId = budget.Id, budget.Status });
         }
         catch (InvalidOperationException ex)
@@ -554,6 +677,7 @@ catch (DbUpdateException ex)
         [FromBody] CloseBudgetRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var budget = await dbContext.Budgets.FirstOrDefaultAsync(x => x.Id == budgetId, cancellationToken);
@@ -568,6 +692,19 @@ catch (DbUpdateException ex)
         {
             budget.Close(currentUserService.UserId ?? "system", request.Reason);
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            await auditTrailWriter.WriteAsync(
+                "budget",
+                "Budget",
+                "Closed",
+                budget.Id,
+                budget.BudgetNumber,
+                $"Budget '{budget.BudgetNumber}' closed.",
+                User.Identity?.Name,
+                budget.TenantId,
+                new { budget.BudgetNumber, budget.Status, request.Reason },
+                cancellationToken);
+
             return Ok(new { Message = "Budget closed successfully.", BudgetId = budget.Id, budget.Status });
         }
         catch (InvalidOperationException ex)
@@ -582,6 +719,7 @@ catch (DbUpdateException ex)
         Guid budgetId,
         [FromBody] SetBudgetOverrunPolicyRequest request,
         [FromServices] ApplicationDbContext dbContext,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var budget = await dbContext.Budgets.FirstOrDefaultAsync(x => x.Id == budgetId, cancellationToken);
@@ -591,6 +729,23 @@ catch (DbUpdateException ex)
         {
             budget.SetOverrunPolicy(request.OverrunPolicy);
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            await auditTrailWriter.WriteAsync(
+                "budget",
+                "Budget",
+                "OverrunPolicyUpdated",
+                budget.Id,
+                budget.BudgetNumber,
+                $"Budget '{budget.BudgetNumber}' overrun policy updated.",
+                User.Identity?.Name,
+                budget.TenantId,
+                new
+                {
+                    budget.BudgetNumber,
+                    budget.OverrunPolicy,
+                    budget.AllowOverrun
+                },
+                cancellationToken);
 
             return Ok(new
             {
@@ -614,6 +769,7 @@ catch (DbUpdateException ex)
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -703,6 +859,25 @@ catch (DbUpdateException ex)
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "budget",
+            "BudgetTransfer",
+            "Transferred",
+            transfer.Id,
+            budget.BudgetNumber,
+            $"Budget transfer completed for budget '{budget.BudgetNumber}'.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                budget.BudgetNumber,
+                transfer.FromBudgetLineId,
+                transfer.ToBudgetLineId,
+                transfer.Amount,
+                transfer.Reason
+            },
+            cancellationToken);
+
        var transferUserNames = await GetUserDisplayNamesAsync(
     dbContext,
     new[] { transfer.TransferredBy },
@@ -745,6 +920,7 @@ return Ok(new
         [FromBody] UploadBudgetRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -857,6 +1033,27 @@ return Ok(new
 
         dbContext.Budgets.Add(budget);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "budget",
+            "Budget",
+            "Created",
+            budget.Id,
+            budget.BudgetNumber,
+            $"Budget '{budget.BudgetNumber}' created.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                budget.BudgetNumber,
+                budget.Name,
+                budget.Type,
+                budget.PeriodStartUtc,
+                budget.PeriodEndUtc,
+                budget.OverrunPolicy,
+                LineCount = budget.Lines.Count
+            },
+            cancellationToken);
 
         return Ok(new
         {

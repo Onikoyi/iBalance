@@ -1,4 +1,5 @@
 using iBalance.Api.Security;
+using iBalance.Api.Services.Audit;
 using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
 using iBalance.Modules.Finance.Domain.Entities;
@@ -49,7 +50,7 @@ public sealed class InventoryController : ControllerBase
 
     [HttpPost("items")]
     [Authorize(Policy = AuthorizationPolicies.InventoryManage)]
-    public async Task<IActionResult> CreateItem([FromBody] CreateInventoryItemRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
+    public async Task<IActionResult> CreateItem([FromBody] CreateInventoryItemRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, [FromServices] IAuditTrailWriter auditTrailWriter, CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
         if (!tenantContext.IsAvailable) return TenantRequired();
@@ -71,6 +72,19 @@ public sealed class InventoryController : ControllerBase
             var item = new InventoryItem(Guid.NewGuid(), tenantContext.TenantId, normalizedCode, itemName, itemType, request.UnitOfMeasure, request.ValuationMethod, request.Description, request.ReorderLevel, request.Notes);
             dbContext.InventoryItems.Add(item);
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            await auditTrailWriter.WriteAsync(
+                "inventory",
+                "InventoryItem",
+                "Created",
+                item.Id,
+                item.ItemCode,
+                $"Inventory item '{item.ItemCode}' created.",
+                User.Identity?.Name,
+                tenantContext.TenantId,
+                new { item.ItemCode, item.ItemName, item.ItemType, item.UnitOfMeasure, item.ValuationMethod, item.IsActive },
+                cancellationToken);
+
             return Ok(new { Message = "Inventory item created successfully.", Item = item });
         }
         catch (ArgumentException ex)
@@ -81,7 +95,7 @@ public sealed class InventoryController : ControllerBase
 
     [HttpPut("items/{itemId:guid}")]
     [Authorize(Policy = AuthorizationPolicies.InventoryManage)]
-    public async Task<IActionResult> UpdateItem(Guid itemId, [FromBody] UpdateInventoryItemRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
+    public async Task<IActionResult> UpdateItem(Guid itemId, [FromBody] UpdateInventoryItemRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, [FromServices] IAuditTrailWriter auditTrailWriter, CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
         if (!tenantContext.IsAvailable) return TenantRequired();
@@ -97,6 +111,19 @@ public sealed class InventoryController : ControllerBase
             item.Update(itemName, itemType, request.UnitOfMeasure, request.ValuationMethod, request.Description, request.ReorderLevel, request.Notes);
             if (request.IsActive) item.Activate(); else item.Deactivate();
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            await auditTrailWriter.WriteAsync(
+                "inventory",
+                "InventoryItem",
+                "Updated",
+                item.Id,
+                item.ItemCode,
+                $"Inventory item '{item.ItemCode}' updated.",
+                User.Identity?.Name,
+                tenantContext.TenantId,
+                new { item.ItemCode, item.ItemName, item.ItemType, item.UnitOfMeasure, item.ValuationMethod, item.IsActive },
+                cancellationToken);
+
             return Ok(new { Message = "Inventory item updated successfully.", Item = item });
         }
         catch (ArgumentException ex)
@@ -107,7 +134,7 @@ public sealed class InventoryController : ControllerBase
 
     [HttpPost("items/{itemId:guid}/activate")]
     [Authorize(Policy = AuthorizationPolicies.InventoryManage)]
-    public async Task<IActionResult> ActivateItem(Guid itemId, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
+    public async Task<IActionResult> ActivateItem(Guid itemId, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, [FromServices] IAuditTrailWriter auditTrailWriter, CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
         if (!tenantContext.IsAvailable) return TenantRequired();
@@ -115,12 +142,25 @@ public sealed class InventoryController : ControllerBase
         if (item is null) return NotFound(new { Message = "Inventory item was not found.", ItemId = itemId });
         item.Activate();
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "inventory",
+            "InventoryItem",
+            "Activated",
+            item.Id,
+            item.ItemCode,
+            $"Inventory item '{item.ItemCode}' activated.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            null,
+            cancellationToken);
+
         return Ok(new { Message = "Inventory item activated successfully." });
     }
 
     [HttpPost("items/{itemId:guid}/deactivate")]
     [Authorize(Policy = AuthorizationPolicies.InventoryManage)]
-    public async Task<IActionResult> DeactivateItem(Guid itemId, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
+    public async Task<IActionResult> DeactivateItem(Guid itemId, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, [FromServices] IAuditTrailWriter auditTrailWriter, CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
         if (!tenantContext.IsAvailable) return TenantRequired();
@@ -128,6 +168,19 @@ public sealed class InventoryController : ControllerBase
         if (item is null) return NotFound(new { Message = "Inventory item was not found.", ItemId = itemId });
         item.Deactivate();
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "inventory",
+            "InventoryItem",
+            "Deactivated",
+            item.Id,
+            item.ItemCode,
+            $"Inventory item '{item.ItemCode}' deactivated.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            null,
+            cancellationToken);
+
         return Ok(new { Message = "Inventory item deactivated successfully." });
     }
 
@@ -161,7 +214,7 @@ public sealed class InventoryController : ControllerBase
 
     [HttpPost("warehouses")]
     [Authorize(Policy = AuthorizationPolicies.InventoryManage)]
-    public async Task<IActionResult> CreateWarehouse([FromBody] CreateWarehouseRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
+    public async Task<IActionResult> CreateWarehouse([FromBody] CreateWarehouseRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, [FromServices] IAuditTrailWriter auditTrailWriter, CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
         if (!tenantContext.IsAvailable) return TenantRequired();
@@ -179,6 +232,19 @@ public sealed class InventoryController : ControllerBase
             var warehouse = new Warehouse(Guid.NewGuid(), tenantContext.TenantId, normalizedCode, warehouseName, request.Location, request.Notes);
             dbContext.Warehouses.Add(warehouse);
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            await auditTrailWriter.WriteAsync(
+                "inventory",
+                "Warehouse",
+                "Created",
+                warehouse.Id,
+                warehouse.WarehouseCode,
+                $"Warehouse '{warehouse.WarehouseCode}' created.",
+                User.Identity?.Name,
+                tenantContext.TenantId,
+                new { warehouse.WarehouseCode, warehouse.WarehouseName, warehouse.Location, warehouse.IsActive },
+                cancellationToken);
+
             return Ok(new { Message = "Warehouse created successfully.", Warehouse = warehouse });
         }
         catch (ArgumentException ex)
@@ -189,7 +255,7 @@ public sealed class InventoryController : ControllerBase
 
     [HttpPut("warehouses/{warehouseId:guid}")]
     [Authorize(Policy = AuthorizationPolicies.InventoryManage)]
-    public async Task<IActionResult> UpdateWarehouse(Guid warehouseId, [FromBody] UpdateWarehouseRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
+    public async Task<IActionResult> UpdateWarehouse(Guid warehouseId, [FromBody] UpdateWarehouseRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, [FromServices] IAuditTrailWriter auditTrailWriter, CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
         if (!tenantContext.IsAvailable) return TenantRequired();
@@ -203,6 +269,19 @@ public sealed class InventoryController : ControllerBase
             warehouse.Update(warehouseName, request.Location, request.Notes);
             if (request.IsActive) warehouse.Activate(); else warehouse.Deactivate();
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            await auditTrailWriter.WriteAsync(
+                "inventory",
+                "Warehouse",
+                "Updated",
+                warehouse.Id,
+                warehouse.WarehouseCode,
+                $"Warehouse '{warehouse.WarehouseCode}' updated.",
+                User.Identity?.Name,
+                tenantContext.TenantId,
+                new { warehouse.WarehouseCode, warehouse.WarehouseName, warehouse.Location, warehouse.IsActive },
+                cancellationToken);
+
             return Ok(new { Message = "Warehouse updated successfully.", Warehouse = warehouse });
         }
         catch (ArgumentException ex)
@@ -213,7 +292,7 @@ public sealed class InventoryController : ControllerBase
 
     [HttpPost("warehouses/{warehouseId:guid}/activate")]
     [Authorize(Policy = AuthorizationPolicies.InventoryManage)]
-    public async Task<IActionResult> ActivateWarehouse(Guid warehouseId, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
+    public async Task<IActionResult> ActivateWarehouse(Guid warehouseId, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, [FromServices] IAuditTrailWriter auditTrailWriter, CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
         if (!tenantContext.IsAvailable) return TenantRequired();
@@ -221,12 +300,25 @@ public sealed class InventoryController : ControllerBase
         if (warehouse is null) return NotFound(new { Message = "Warehouse was not found.", WarehouseId = warehouseId });
         warehouse.Activate();
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "inventory",
+            "Warehouse",
+            "Activated",
+            warehouse.Id,
+            warehouse.WarehouseCode,
+            $"Warehouse '{warehouse.WarehouseCode}' activated.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            null,
+            cancellationToken);
+
         return Ok(new { Message = "Warehouse activated successfully." });
     }
 
     [HttpPost("warehouses/{warehouseId:guid}/deactivate")]
     [Authorize(Policy = AuthorizationPolicies.InventoryManage)]
-    public async Task<IActionResult> DeactivateWarehouse(Guid warehouseId, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
+    public async Task<IActionResult> DeactivateWarehouse(Guid warehouseId, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, [FromServices] IAuditTrailWriter auditTrailWriter, CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
         if (!tenantContext.IsAvailable) return TenantRequired();
@@ -234,6 +326,19 @@ public sealed class InventoryController : ControllerBase
         if (warehouse is null) return NotFound(new { Message = "Warehouse was not found.", WarehouseId = warehouseId });
         warehouse.Deactivate();
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "inventory",
+            "Warehouse",
+            "Deactivated",
+            warehouse.Id,
+            warehouse.WarehouseCode,
+            $"Warehouse '{warehouse.WarehouseCode}' deactivated.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            null,
+            cancellationToken);
+
         return Ok(new { Message = "Warehouse deactivated successfully." });
     }
 
@@ -360,15 +465,15 @@ public sealed class InventoryController : ControllerBase
 
     [HttpPost("stock-in")]
     [Authorize(Policy = AuthorizationPolicies.InventoryManage)]
-    public async Task<IActionResult> PostStockIn([FromBody] PostStockInRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
+    public async Task<IActionResult> PostStockIn([FromBody] PostStockInRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, [FromServices] IAuditTrailWriter auditTrailWriter, CancellationToken cancellationToken)
     {
-        return await PostStockInAsync(dbContext, tenantContextAccessor, request, cancellationToken);
+        return await PostStockInAsync(dbContext, tenantContextAccessor, auditTrailWriter, User.Identity?.Name, request, cancellationToken);
     }
 
     [HttpPost("adjust")]
     [HttpPost("adjustments")]
     [Authorize(Policy = AuthorizationPolicies.InventoryManage)]
-    public async Task<IActionResult> PostAdjustment([FromBody] PostStockAdjustmentRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, CancellationToken cancellationToken)
+    public async Task<IActionResult> PostAdjustment([FromBody] PostStockAdjustmentRequest request, [FromServices] ApplicationDbContext dbContext, [FromServices] ITenantContextAccessor tenantContextAccessor, [FromServices] IAuditTrailWriter auditTrailWriter, CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
         if (!tenantContext.IsAvailable) return TenantRequired();
@@ -482,6 +587,18 @@ public sealed class InventoryController : ControllerBase
         dbContext.LedgerMovements.AddRange(movements);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "inventory",
+            "InventoryTransaction",
+            "AdjustmentPosted",
+            transaction.Id,
+            transaction.TransactionNumber,
+            $"Inventory adjustment '{transaction.TransactionNumber}' posted.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new { transaction.TransactionNumber, transaction.TransactionType, request.TransactionDateUtc, LineCount = lines.Count, JournalEntryId = journalEntry.Id },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Inventory adjustment posted successfully with GL journal.",
@@ -495,7 +612,7 @@ public sealed class InventoryController : ControllerBase
         });
     }
 
-    private static async Task<IActionResult> PostStockInAsync(ApplicationDbContext dbContext, ITenantContextAccessor tenantContextAccessor, PostStockInRequest request, CancellationToken cancellationToken)
+    private static async Task<IActionResult> PostStockInAsync(ApplicationDbContext dbContext, ITenantContextAccessor tenantContextAccessor, IAuditTrailWriter auditTrailWriter, string? actorIdentifier, PostStockInRequest request, CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
         if (!tenantContext.IsAvailable) return TenantRequired();
@@ -586,6 +703,18 @@ public sealed class InventoryController : ControllerBase
         dbContext.JournalEntries.Add(journalEntry);
         dbContext.LedgerMovements.AddRange(movements);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "inventory",
+            "InventoryTransaction",
+            "StockInPosted",
+            transaction.Id,
+            transaction.TransactionNumber,
+            $"Inventory stock-in '{transaction.TransactionNumber}' posted.",
+            actorIdentifier,
+            tenantContext.TenantId,
+            new { transaction.TransactionNumber, transaction.TransactionType, request.TransactionDateUtc, LineCount = lines.Count, JournalEntryId = journalEntry.Id },
+            cancellationToken);
 
         return new OkObjectResult(new
         {

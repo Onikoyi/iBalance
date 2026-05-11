@@ -7,6 +7,7 @@ using iBalance.Modules.Finance.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using iBalance.Api.Services.Audit;
 
 namespace iBalance.Api.Controllers;
 
@@ -66,6 +67,7 @@ public sealed class FixedAssetsController : ControllerBase
         [FromBody] CreateFixedAssetClassRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -116,6 +118,26 @@ public sealed class FixedAssetsController : ControllerBase
 
             dbContext.Add(assetClass);
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            await auditTrailWriter.WriteAsync(
+                "fixedassets",
+                "FixedAssetClass",
+                "Created",
+                assetClass.Id,
+                assetClass.Code,
+                $"Fixed asset class '{assetClass.Code}' created.",
+                User.Identity?.Name,
+                tenantContext.TenantId,
+                new
+                {
+                    assetClass.Code,
+                    assetClass.Name,
+                    assetClass.CapitalizationThreshold,
+                    assetClass.UsefulLifeMonthsDefault,
+                    assetClass.DepreciationMethodDefault,
+                    assetClass.Status
+                },
+                cancellationToken);
 
             return Ok(new { Message = "Fixed asset class created successfully.", AssetClass = assetClass });
         }
@@ -286,6 +308,7 @@ public sealed class FixedAssetsController : ControllerBase
         [FromBody] CapitalizePurchaseInvoiceToFixedAssetRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -429,6 +452,27 @@ public sealed class FixedAssetsController : ControllerBase
 
             await dbContext.SaveChangesAsync(cancellationToken);
 
+            await auditTrailWriter.WriteAsync(
+                "fixedassets",
+                "FixedAsset",
+                "CapitalizedFromPurchaseInvoice",
+                fixedAsset.Id,
+                fixedAsset.AssetNumber,
+                $"Purchase invoice '{invoice.InvoiceNumber}' capitalized into fixed asset '{fixedAsset.AssetNumber}'.",
+                User.Identity?.Name,
+                tenantContext.TenantId,
+                new
+                {
+                    fixedAsset.AssetNumber,
+                    fixedAsset.AssetName,
+                    PurchaseInvoiceId = invoice.Id,
+                    invoice.InvoiceNumber,
+                    fixedAsset.AcquisitionCost,
+                    fixedAsset.CapitalizationDateUtc,
+                    VendorId = invoice.VendorId
+                },
+                cancellationToken);
+
             return Ok(new
             {
                 Message = "Purchase invoice capitalized into fixed asset successfully.",
@@ -460,6 +504,7 @@ public sealed class FixedAssetsController : ControllerBase
         [FromBody] CreateFixedAssetRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -528,6 +573,27 @@ public sealed class FixedAssetsController : ControllerBase
                 notes: request.Notes));
 
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            await auditTrailWriter.WriteAsync(
+                "fixedassets",
+                "FixedAsset",
+                "Created",
+                fixedAsset.Id,
+                fixedAsset.AssetNumber,
+                $"Fixed asset '{fixedAsset.AssetNumber}' created.",
+                User.Identity?.Name,
+                tenantContext.TenantId,
+                new
+                {
+                    fixedAsset.AssetNumber,
+                    fixedAsset.AssetName,
+                    fixedAsset.AcquisitionDateUtc,
+                    fixedAsset.AcquisitionCost,
+                    fixedAsset.DepreciationMethod,
+                    fixedAsset.Status
+                },
+                cancellationToken);
+
             return Ok(new { Message = "Fixed asset created successfully.", FixedAsset = fixedAsset });
         }
         catch (ArgumentException ex)
@@ -589,6 +655,7 @@ public sealed class FixedAssetsController : ControllerBase
         [FromBody] CapitalizeFixedAssetRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -664,6 +731,26 @@ public sealed class FixedAssetsController : ControllerBase
                 request.Description));
 
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            await auditTrailWriter.WriteAsync(
+                "fixedassets",
+                "FixedAsset",
+                "Capitalized",
+                asset.Id,
+                asset.AssetNumber,
+                $"Fixed asset '{asset.AssetNumber}' capitalized.",
+                User.Identity?.Name,
+                tenantContext.TenantId,
+                new
+                {
+                    asset.AssetNumber,
+                    asset.AssetName,
+                    request.CapitalizationDateUtc,
+                    asset.AcquisitionCost,
+                    JournalEntryId = journalEntry.Id
+                },
+                cancellationToken);
+
             return Ok(new { Message = "Fixed asset capitalized successfully.", FixedAsset = asset, JournalEntryId = journalEntry.Id, FiscalPeriodId = postingPeriod.Id, FiscalPeriodName = postingPeriod.Name });
         }
         catch (ArgumentException ex)
@@ -768,6 +855,7 @@ public sealed class FixedAssetsController : ControllerBase
         [FromBody] RunFixedAssetDepreciationRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -939,6 +1027,26 @@ public sealed class FixedAssetsController : ControllerBase
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "fixedassets",
+            "FixedAssetDepreciationRun",
+            "DepreciationRunPosted",
+            run.Id,
+            journalEntry.Reference,
+            $"Fixed asset depreciation run posted for period {request.PeriodStartUtc:yyyy-MM-dd} to {request.PeriodEndUtc:yyyy-MM-dd}.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                run.PeriodStartUtc,
+                run.PeriodEndUtc,
+                run.RunDateUtc,
+                LineCount = depreciationLines.Count,
+                TotalDepreciationAmount = depreciationLines.Sum(x => x.DepreciationAmount),
+                JournalEntryId = journalEntry.Id
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Fixed asset depreciation run posted successfully.",
@@ -974,6 +1082,7 @@ public sealed class FixedAssetsController : ControllerBase
         [FromBody] FixedAssetImprovementRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -1046,6 +1155,25 @@ public sealed class FixedAssetsController : ControllerBase
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "fixedassets",
+            "FixedAsset",
+            "ImprovementRecorded",
+            asset.Id,
+            asset.AssetNumber,
+            $"Improvement recorded for fixed asset '{asset.AssetNumber}'.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                asset.AssetNumber,
+                request.TransactionDateUtc,
+                request.Amount,
+                request.UsefulLifeMonthsOverride,
+                JournalEntryId = journalEntry.Id
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Fixed asset improvement recorded successfully.",
@@ -1063,6 +1191,7 @@ public sealed class FixedAssetsController : ControllerBase
         [FromBody] TransferFixedAssetRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -1089,6 +1218,25 @@ public sealed class FixedAssetsController : ControllerBase
                 notes: request.Notes));
 
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            await auditTrailWriter.WriteAsync(
+                "fixedassets",
+                "FixedAsset",
+                "Transferred",
+                asset.Id,
+                asset.AssetNumber,
+                $"Transfer recorded for fixed asset '{asset.AssetNumber}'.",
+                User.Identity?.Name,
+                tenantContext.TenantId,
+                new
+                {
+                    asset.AssetNumber,
+                    request.TransactionDateUtc,
+                    request.Location,
+                    request.Custodian
+                },
+                cancellationToken);
+
             return Ok(new { Message = "Fixed asset transfer recorded successfully.", FixedAsset = asset });
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
@@ -1104,6 +1252,7 @@ public sealed class FixedAssetsController : ControllerBase
         [FromBody] ReclassifyFixedAssetRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -1134,6 +1283,26 @@ public sealed class FixedAssetsController : ControllerBase
                 notes: request.Notes));
 
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            await auditTrailWriter.WriteAsync(
+                "fixedassets",
+                "FixedAsset",
+                "Reclassified",
+                asset.Id,
+                asset.AssetNumber,
+                $"Reclassification recorded for fixed asset '{asset.AssetNumber}'.",
+                User.Identity?.Name,
+                tenantContext.TenantId,
+                new
+                {
+                    asset.AssetNumber,
+                    request.TransactionDateUtc,
+                    request.TargetFixedAssetClassId,
+                    TargetFixedAssetClassCode = targetClass.Code,
+                    TargetFixedAssetClassName = targetClass.Name
+                },
+                cancellationToken);
+
             return Ok(new { Message = "Fixed asset reclassification recorded successfully.", FixedAsset = asset, TargetFixedAssetClassId = targetClass.Id, TargetFixedAssetClassCode = targetClass.Code, TargetFixedAssetClassName = targetClass.Name });
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
@@ -1149,6 +1318,7 @@ public sealed class FixedAssetsController : ControllerBase
         [FromBody] ImpairFixedAssetRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -1221,6 +1391,24 @@ public sealed class FixedAssetsController : ControllerBase
 
             await dbContext.SaveChangesAsync(cancellationToken);
 
+            await auditTrailWriter.WriteAsync(
+                "fixedassets",
+                "FixedAsset",
+                "Impaired",
+                asset.Id,
+                asset.AssetNumber,
+                $"Impairment recorded for fixed asset '{asset.AssetNumber}'.",
+                User.Identity?.Name,
+                tenantContext.TenantId,
+                new
+                {
+                    asset.AssetNumber,
+                    request.TransactionDateUtc,
+                    request.Amount,
+                    JournalEntryId = journalEntry.Id
+                },
+                cancellationToken);
+
             return Ok(new { Message = "Fixed asset impairment recorded successfully.", FixedAsset = asset, JournalEntryId = journalEntry.Id, FiscalPeriodId = postingPeriod.Id, FiscalPeriodName = postingPeriod.Name });
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
@@ -1236,6 +1424,7 @@ public sealed class FixedAssetsController : ControllerBase
         [FromBody] DisposeFixedAssetRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -1373,6 +1562,27 @@ public sealed class FixedAssetsController : ControllerBase
                 journalEntry.Id));
 
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            await auditTrailWriter.WriteAsync(
+                "fixedassets",
+                "FixedAsset",
+                "Disposed",
+                asset.Id,
+                asset.AssetNumber,
+                $"Disposal recorded for fixed asset '{asset.AssetNumber}'.",
+                User.Identity?.Name,
+                tenantContext.TenantId,
+                new
+                {
+                    asset.AssetNumber,
+                    request.DisposalDateUtc,
+                    request.DisposalType,
+                    request.DisposalProceedsAmount,
+                    NetBookValueAtDisposal = netBookValue,
+                    GainOrLossAmount = gainOrLoss,
+                    JournalEntryId = journalEntry.Id
+                },
+                cancellationToken);
 
             return Ok(new
             {

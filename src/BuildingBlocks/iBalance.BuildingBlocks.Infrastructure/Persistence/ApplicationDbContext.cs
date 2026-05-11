@@ -99,6 +99,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<UserSecurityRoleAssignment> UserSecurityRoleAssignments => Set<UserSecurityRoleAssignment>();
     public DbSet<UserScopeAssignment> UserScopeAssignments => Set<UserScopeAssignment>();
     public DbSet<DepartmentWorkflowPolicy> DepartmentWorkflowPolicies => Set<DepartmentWorkflowPolicy>();
+    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
 
 
@@ -1251,6 +1252,27 @@ modelBuilder.Entity<PurchaseOrderLine>(entity =>
         .OnDelete(DeleteBehavior.Restrict);
     entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
 });
+
+
+modelBuilder.Entity<AuditEvent>(entity =>
+        {
+            entity.ToTable("AuditEvents", "platform");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.ModuleCode).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.EntityName).HasMaxLength(150).IsRequired();
+            entity.Property(x => x.Action).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Reference).HasMaxLength(200);
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.Property(x => x.ActorUserId).HasMaxLength(100);
+            entity.Property(x => x.ActorIdentifier).HasMaxLength(256);
+            entity.Property(x => x.MetadataJson);
+
+            entity.HasIndex(x => new { x.TenantId, x.OccurredOnUtc });
+            entity.HasIndex(x => new { x.TenantId, x.ModuleCode, x.OccurredOnUtc });
+            entity.HasIndex(x => x.Reference);
+        });
+
 
 
 }

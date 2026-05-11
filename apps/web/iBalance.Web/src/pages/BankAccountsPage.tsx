@@ -16,7 +16,7 @@ import {
   type LedgerAccountDto,
   type UpdateBankAccountRequest,
 } from '../lib/api';
-import { canManageFinanceSetup, canViewFinance } from '../lib/auth';
+import { canViewTreasury, hasPermission } from '../lib/auth';
 
 const emptyForm: CreateBankAccountRequest = {
   name: '',
@@ -329,8 +329,8 @@ function buildBankRegisterPrintHtml(args: {
 
 export function BankAccountsPage() {
   const qc = useQueryClient();
-  const canView = canViewFinance();
-  const canManage = canManageFinanceSetup();
+  const canView = canViewTreasury();
+  const canManage = hasPermission('treasury.manage') || hasPermission('treasury.bankaccounts.manage');
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState('');

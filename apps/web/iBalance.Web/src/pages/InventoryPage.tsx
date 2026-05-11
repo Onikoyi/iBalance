@@ -30,7 +30,7 @@ import {
   type StockLedgerEntryDto,
   type WarehouseDto,
 } from '../lib/api';
-import { canManageFinanceSetup, canViewFinance } from '../lib/auth';
+import { canViewInventory, hasPermission } from '../lib/auth';
 
 const emptyItemForm: CreateInventoryItemRequest = {
   code: '',
@@ -280,8 +280,8 @@ function warehouseLabel(warehouse?: WarehouseDto | null) {
 
 export function InventoryPage() {
   const qc = useQueryClient();
-  const canView = canViewFinance();
-  const canManage = canManageFinanceSetup();
+  const canView = canViewInventory();
+  const canManage = hasPermission('inventory.manage');
 
   const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'warehouses' | 'stock-in' | 'adjustments' | 'ap-receipt' | 'sales-issue' | 'ledger' | 'valuation' | 'reconciliation' | 'audit'>('overview');
   const [itemForm, setItemForm] = useState<CreateInventoryItemRequest>(emptyItemForm);
@@ -1093,11 +1093,11 @@ export function InventoryPage() {
     return <div className="panel error-panel">You do not have access to view inventory.</div>;
   }
 
-  if (itemsQ.isLoading || warehousesQ.isLoading || accountsQ.isLoading || ledgerQ.isLoading || purchaseInvoicesQ.isLoading || salesInvoicesQ.isLoading) {
+  if (itemsQ.isLoading || warehousesQ.isLoading || ledgerQ.isLoading) {
     return <div className="panel">Loading inventory...</div>;
   }
 
-  if (itemsQ.isError || warehousesQ.isError || accountsQ.isError || ledgerQ.isError || purchaseInvoicesQ.isError || salesInvoicesQ.isError || !itemsQ.data || !warehousesQ.data || !accountsQ.data || !ledgerQ.data) {
+  if (itemsQ.isError || warehousesQ.isError || ledgerQ.isError || !itemsQ.data || !warehousesQ.data || !ledgerQ.data) {
     return <div className="panel error-panel">We could not load inventory data at this time.</div>;
   }
 
@@ -1322,7 +1322,7 @@ export function InventoryPage() {
 
           <div className="modal-footer">
             <button className="button" onClick={() => addStockLine(setStockInLines)}>Add Line</button>
-            <button className="button primary" onClick={submitStockIn} disabled={stockInMut.isPending}>{stockInMut.isPending ? 'Posting…' : 'Post Stock In'}</button>
+            <button className="button primary" onClick={submitStockIn} disabled={stockInMut.isPending || accountsQ.isError}>{stockInMut.isPending ? 'Posting…' : 'Post Stock In'}</button>
           </div>
         </section>
       ) : null}
@@ -1359,7 +1359,7 @@ export function InventoryPage() {
 
           <div className="modal-footer">
             <button className="button" onClick={() => addStockLine(setAdjustmentLines)}>Add Line</button>
-            <button className="button primary" onClick={submitAdjustment} disabled={adjustmentMut.isPending}>{adjustmentMut.isPending ? 'Posting…' : 'Post Adjustment'}</button>
+            <button className="button primary" onClick={submitAdjustment} disabled={adjustmentMut.isPending || accountsQ.isError}>{adjustmentMut.isPending ? 'Posting…' : 'Post Adjustment'}</button>
           </div>
         </section>
       ) : null}

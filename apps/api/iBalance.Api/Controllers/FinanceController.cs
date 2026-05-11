@@ -8,6 +8,7 @@ using iBalance.Modules.Finance.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using iBalance.Api.Services.Audit;
 
 namespace iBalance.Api.Controllers;
 
@@ -22,6 +23,7 @@ public sealed class FinanceController : ControllerBase
         [FromBody] CreateOpeningBalanceRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -164,6 +166,26 @@ public sealed class FinanceController : ControllerBase
             dbContext.LedgerMovements.AddRange(movements);
             await dbContext.SaveChangesAsync(cancellationToken);
 
+             await auditTrailWriter.WriteAsync(
+            "finance",
+            "JournalEntry",
+            "OpeningBalancePosted",
+            openingJournal.Id,
+            openingJournal.Reference,
+            "Opening balance journal created and posted successfully.",
+            null,
+            tenantContext.TenantId,
+            new
+            {
+                openingJournal.Reference,
+                openingJournal.EntryDateUtc,
+                openingJournal.TotalDebit,
+                openingJournal.TotalCredit,
+                LineCount = openingJournal.Lines.Count
+            },
+            cancellationToken);
+
+
             return Ok(new
             {
                 Message = "Opening balance journal created and posted successfully.",
@@ -196,6 +218,7 @@ public sealed class FinanceController : ControllerBase
         [FromBody] CreateJournalNumberSequenceRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -239,6 +262,25 @@ public sealed class FinanceController : ControllerBase
 
         dbContext.JournalNumberSequences.Add(sequence);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "finance",
+            "JournalNumberSequence",
+            "Created",
+            sequence.Id,
+            sequence.Prefix,
+            $"Journal number sequence '{sequence.Prefix}' created.",
+            null,
+            tenantContext.TenantId,
+            new
+            {
+                sequence.Prefix,
+                sequence.NextNumber,
+                sequence.Padding,
+                sequence.IsActive
+            },
+            cancellationToken);
+
 
         return Ok(new
         {
@@ -360,6 +402,7 @@ public sealed class FinanceController : ControllerBase
         [FromBody] UpdateJournalEntryRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -483,6 +526,29 @@ public sealed class FinanceController : ControllerBase
 
             await dbContext.SaveChangesAsync(cancellationToken);
 
+            await auditTrailWriter.WriteAsync(
+                "finance",
+                "JournalEntry",
+                journalEntry.Status == JournalEntryStatus.Rejected ? "RejectedDraftCorrected" : "DraftUpdated",
+                journalEntry.Id,
+                journalEntry.Reference,
+                journalEntry.Status == JournalEntryStatus.Rejected
+                    ? $"Rejected journal '{journalEntry.Reference}' corrected."
+                    : $"Draft journal '{journalEntry.Reference}' updated.",
+                User.Identity?.Name,
+                tenantContext.TenantId,
+                new
+                {
+                    journalEntry.Reference,
+                    journalEntry.EntryDateUtc,
+                    journalEntry.Status,
+                    journalEntry.Type,
+                    journalEntry.TotalDebit,
+                    journalEntry.TotalCredit,
+                    LineCount = journalEntry.Lines.Count
+                },
+                cancellationToken);
+
             return Ok(new
             {
                 Message = journalEntry.Status == JournalEntryStatus.Rejected
@@ -537,6 +603,7 @@ public sealed class FinanceController : ControllerBase
         [FromBody] CreateFiscalYearRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -593,6 +660,25 @@ public sealed class FinanceController : ControllerBase
         dbContext.FiscalPeriods.AddRange(fiscalPeriods);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "finance",
+            "FiscalYear",
+            "Created",
+            null,
+            normalizedYearName,
+            $"Fiscal year '{normalizedYearName}' created.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                FiscalYearName = normalizedYearName,
+                FiscalYearStartDate = fiscalYearStartDate,
+                FiscalYearEndDate = fiscalYearEndDate,
+                Count = fiscalPeriods.Count,
+                CreateMonthsOpen = request.CreateMonthsOpen
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Fiscal year created successfully.",
@@ -623,6 +709,7 @@ public sealed class FinanceController : ControllerBase
         [FromBody] CreateFiscalPeriodRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -684,6 +771,24 @@ public sealed class FinanceController : ControllerBase
         dbContext.FiscalPeriods.Add(fiscalPeriod);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "finance",
+            "FiscalPeriod",
+            "Created",
+            fiscalPeriod.Id,
+            fiscalPeriod.Name,
+            $"Fiscal period '{fiscalPeriod.Name}' created.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                fiscalPeriod.Name,
+                fiscalPeriod.StartDate,
+                fiscalPeriod.EndDate,
+                fiscalPeriod.Status
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Fiscal period created successfully.",
@@ -735,6 +840,7 @@ public sealed class FinanceController : ControllerBase
         Guid fiscalPeriodId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -763,6 +869,24 @@ public sealed class FinanceController : ControllerBase
         fiscalPeriod.Open();
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "finance",
+            "FiscalPeriod",
+            "Opened",
+            fiscalPeriod.Id,
+            fiscalPeriod.Name,
+            $"Fiscal period '{fiscalPeriod.Name}' opened.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                fiscalPeriod.Name,
+                fiscalPeriod.StartDate,
+                fiscalPeriod.EndDate,
+                fiscalPeriod.Status
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Fiscal period opened successfully.",
@@ -780,6 +904,7 @@ public sealed class FinanceController : ControllerBase
         Guid fiscalPeriodId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -890,6 +1015,30 @@ public sealed class FinanceController : ControllerBase
         fiscalPeriod.Close();
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "finance",
+            "FiscalPeriod",
+            "Closed",
+            fiscalPeriod.Id,
+            fiscalPeriod.Name,
+            $"Fiscal period '{fiscalPeriod.Name}' closed.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                fiscalPeriod.Name,
+                fiscalPeriod.StartDate,
+                fiscalPeriod.EndDate,
+                fiscalPeriod.Status,
+                DraftOrUnresolvedJournalCount = draftJournalCount,
+                UnpostedSalesInvoiceCount = unpostedSalesInvoiceCount,
+                UnpostedPurchaseInvoiceCount = unpostedPurchaseInvoiceCount,
+                UnpostedCustomerReceiptCount = unpostedCustomerReceiptCount,
+                UnpostedVendorPaymentCount = unpostedVendorPaymentCount,
+                BlockingCount = blockingCount
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Fiscal period closed successfully.",
@@ -916,6 +1065,7 @@ public sealed class FinanceController : ControllerBase
         [FromBody] YearEndCloseRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -1149,6 +1299,32 @@ public sealed class FinanceController : ControllerBase
             dbContext.LedgerMovements.AddRange(closingMovements);
             await dbContext.SaveChangesAsync(cancellationToken);
 
+            await auditTrailWriter.WriteAsync(
+                "finance",
+                "YearEndClose",
+                "Completed",
+                closingJournal.Id,
+                closingJournal.Reference,
+                "Year end close completed successfully.",
+                User.Identity?.Name,
+                tenantContext.TenantId,
+                new
+                {
+                    closingJournal.Reference,
+                    closingJournal.EntryDateUtc,
+                    closingJournal.TotalDebit,
+                    closingJournal.TotalCredit,
+                    FiscalYearStartDate = request.FiscalYearStartDate,
+                    FiscalYearEndDate = request.FiscalYearEndDate,
+                    RetainedEarningsLedgerAccountId = retainedEarningsAccount.Id,
+                    TotalIncomeClosed = totalIncomeClosed,
+                    TotalExpenseClosed = totalExpenseClosed,
+                    NetIncome = netIncome,
+                    ClosedAccountCount = groupedBalances.Count,
+                    PeriodCount = periods.Count
+                },
+                cancellationToken);
+
             return Ok(new
             {
                 Message = "Year end close completed successfully.",
@@ -1188,6 +1364,7 @@ public sealed class FinanceController : ControllerBase
         [FromBody] CreateLedgerAccountRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -1282,6 +1459,30 @@ public sealed class FinanceController : ControllerBase
         dbContext.LedgerAccounts.Add(ledgerAccount);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "finance",
+            "LedgerAccount",
+            "Created",
+            ledgerAccount.Id,
+            ledgerAccount.Code,
+            $"Ledger account '{ledgerAccount.Code}' created.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                ledgerAccount.Code,
+                ledgerAccount.Name,
+                ledgerAccount.Purpose,
+                ledgerAccount.Category,
+                ledgerAccount.NormalBalance,
+                ledgerAccount.IsHeader,
+                ledgerAccount.IsPostingAllowed,
+                ledgerAccount.IsActive,
+                ledgerAccount.IsCashOrBankAccount,
+                ledgerAccount.ParentLedgerAccountId
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Ledger account created successfully.",
@@ -1307,6 +1508,7 @@ public sealed class FinanceController : ControllerBase
         [FromBody] UpdateLedgerAccountRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -1363,6 +1565,30 @@ public sealed class FinanceController : ControllerBase
 
             await dbContext.SaveChangesAsync(cancellationToken);
 
+            await auditTrailWriter.WriteAsync(
+                "finance",
+                "LedgerAccount",
+                "Updated",
+                ledgerAccount.Id,
+                ledgerAccount.Code,
+                $"Ledger account '{ledgerAccount.Code}' updated.",
+                User.Identity?.Name,
+                tenantContext.TenantId,
+                new
+                {
+                    ledgerAccount.Code,
+                    ledgerAccount.Name,
+                    ledgerAccount.Purpose,
+                    ledgerAccount.Category,
+                    ledgerAccount.NormalBalance,
+                    ledgerAccount.IsHeader,
+                    ledgerAccount.IsPostingAllowed,
+                    ledgerAccount.IsActive,
+                    ledgerAccount.IsCashOrBankAccount,
+                    ledgerAccount.ParentLedgerAccountId
+                },
+                cancellationToken);
+
             return Ok(new
             {
                 Message = "Ledger account updated successfully.",
@@ -1393,6 +1619,7 @@ public sealed class FinanceController : ControllerBase
         [FromBody] CreateTaxCodeRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -1488,6 +1715,30 @@ public sealed class FinanceController : ControllerBase
 
             dbContext.TaxCodes.Add(taxCode);
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            await auditTrailWriter.WriteAsync(
+                "finance",
+                "TaxCode",
+                "Created",
+                taxCode.Id,
+                taxCode.Code,
+                $"Tax code '{taxCode.Code}' created.",
+                User.Identity?.Name,
+                tenantContext.TenantId,
+                new
+                {
+                    taxCode.Code,
+                    taxCode.Name,
+                    taxCode.ComponentKind,
+                    taxCode.ApplicationMode,
+                    taxCode.TransactionScope,
+                    taxCode.RatePercent,
+                    taxCode.TaxLedgerAccountId,
+                    taxCode.IsActive,
+                    taxCode.EffectiveFromUtc,
+                    taxCode.EffectiveToUtc
+                },
+                cancellationToken);
 
             return Ok(new
             {
@@ -1886,7 +2137,7 @@ public sealed class FinanceController : ControllerBase
     }
 
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceView)]
+    [Authorize(Policy = AuthorizationPolicies.TreasuryView)]
     [HttpGet("accounts")]
     public async Task<IActionResult> GetLedgerAccounts(
         [FromServices] ApplicationDbContext dbContext,
@@ -1933,6 +2184,7 @@ public sealed class FinanceController : ControllerBase
         [FromBody] CreateJournalEntryRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -2036,6 +2288,27 @@ public sealed class FinanceController : ControllerBase
 
             dbContext.JournalEntries.Add(journalEntry);
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            await auditTrailWriter.WriteAsync(
+                "finance",
+                "JournalEntry",
+                "Created",
+                journalEntry.Id,
+                journalEntry.Reference,
+                $"Journal entry '{journalEntry.Reference}' created.",
+                User.Identity?.Name,
+                tenantContext.TenantId,
+                new
+                {
+                    journalEntry.Reference,
+                    journalEntry.EntryDateUtc,
+                    journalEntry.Status,
+                    journalEntry.Type,
+                    journalEntry.TotalDebit,
+                    journalEntry.TotalCredit,
+                    LineCount = journalEntry.Lines.Count
+                },
+                cancellationToken);
 
             return Ok(new
             {
@@ -2166,6 +2439,7 @@ public async Task<IActionResult> GetJournalEntries(
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -2196,6 +2470,25 @@ public async Task<IActionResult> GetJournalEntries(
         {
             journalEntry.SubmitForApproval(EnsureAuthenticatedUserId(currentUserService));
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            await auditTrailWriter.WriteAsync(
+                "finance",
+                "JournalEntry",
+                "Submitted",
+                journalEntry.Id,
+                journalEntry.Reference,
+                $"Journal entry '{journalEntry.Reference}' submitted for approval.",
+                User.Identity?.Name,
+                tenantContext.TenantId,
+                new
+                {
+                    journalEntry.Reference,
+                    journalEntry.Status,
+                    journalEntry.Type,
+                    journalEntry.SubmittedBy,
+                    journalEntry.SubmittedOnUtc
+                },
+                cancellationToken);
 
             return Ok(new
             {
@@ -2230,6 +2523,7 @@ public async Task<IActionResult> GetJournalEntries(
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -2260,6 +2554,25 @@ public async Task<IActionResult> GetJournalEntries(
         {
             journalEntry.Approve(EnsureAuthenticatedUserId(currentUserService));
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            await auditTrailWriter.WriteAsync(
+                "finance",
+                "JournalEntry",
+                "Approved",
+                journalEntry.Id,
+                journalEntry.Reference,
+                $"Journal entry '{journalEntry.Reference}' approved.",
+                User.Identity?.Name,
+                tenantContext.TenantId,
+                new
+                {
+                    journalEntry.Reference,
+                    journalEntry.Status,
+                    journalEntry.Type,
+                    journalEntry.ApprovedBy,
+                    journalEntry.ApprovedOnUtc
+                },
+                cancellationToken);
 
             return Ok(new
             {
@@ -2295,6 +2608,7 @@ public async Task<IActionResult> GetJournalEntries(
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -2331,6 +2645,26 @@ public async Task<IActionResult> GetJournalEntries(
             journalEntry.Reject(EnsureAuthenticatedUserId(currentUserService), request.Reason);
             await dbContext.SaveChangesAsync(cancellationToken);
 
+            await auditTrailWriter.WriteAsync(
+                "finance",
+                "JournalEntry",
+                "Rejected",
+                journalEntry.Id,
+                journalEntry.Reference,
+                $"Journal entry '{journalEntry.Reference}' rejected.",
+                User.Identity?.Name,
+                tenantContext.TenantId,
+                new
+                {
+                    journalEntry.Reference,
+                    journalEntry.Status,
+                    journalEntry.Type,
+                    journalEntry.RejectedBy,
+                    journalEntry.RejectedOnUtc,
+                    journalEntry.RejectionReason
+                },
+                cancellationToken);
+
             return Ok(new
             {
                 Message = "Journal entry rejected successfully.",
@@ -2364,6 +2698,7 @@ public async Task<IActionResult> GetJournalEntries(
         Guid journalEntryId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -2529,6 +2864,28 @@ if (budgetResult is not null && !budgetResult.Allowed)
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "finance",
+            "JournalEntry",
+            "Posted",
+            journalEntry.Id,
+            journalEntry.Reference,
+            $"Journal entry '{journalEntry.Reference}' posted.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                journalEntry.Reference,
+                journalEntry.EntryDateUtc,
+                journalEntry.Status,
+                journalEntry.Type,
+                journalEntry.PostedAtUtc,
+                journalEntry.TotalDebit,
+                journalEntry.TotalCredit,
+                MovementCount = movements.Count
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Journal entry posted successfully.",
@@ -2553,6 +2910,7 @@ if (budgetResult is not null && !budgetResult.Allowed)
         Guid journalEntryId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -2592,6 +2950,23 @@ if (budgetResult is not null && !budgetResult.Allowed)
         journalEntry.MarkVoided();
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "finance",
+            "JournalEntry",
+            "Voided",
+            journalEntry.Id,
+            journalEntry.Reference,
+            $"Journal entry '{journalEntry.Reference}' voided.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                journalEntry.Reference,
+                journalEntry.Status,
+                journalEntry.Type
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Journal entry voided successfully.",
@@ -2609,6 +2984,7 @@ if (budgetResult is not null && !budgetResult.Allowed)
         [FromBody] ReverseJournalEntryRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -2754,6 +3130,29 @@ if (budgetResult is not null && !budgetResult.Allowed)
         dbContext.LedgerMovements.AddRange(reversalMovements);
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "finance",
+            "JournalEntry",
+            "Reversed",
+            journalEntry.Id,
+            journalEntry.Reference,
+            $"Journal entry '{journalEntry.Reference}' reversed.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                OriginalJournalEntryId = journalEntry.Id,
+                OriginalReference = journalEntry.Reference,
+                ReversalJournalEntryId = reversalEntry.Id,
+                ReversalReference = reversalEntry.Reference,
+                ReversalDateUtc = request.ReversalDateUtc,
+                PostedAtUtc = postedAtUtc,
+                FiscalPeriodId = reversalPeriod.Id,
+                FiscalPeriodName = reversalPeriod.Name,
+                MovementCount = reversalMovements.Count
+            },
+            cancellationToken);
 
         return Ok(new
         {
@@ -3148,7 +3547,7 @@ if (budgetResult is not null && !budgetResult.Allowed)
         });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+    [Authorize(Policy = AuthorizationPolicies.TreasuryView)]
     [HttpGet("reports/cashbook")]
     public async Task<IActionResult> GetCashbook(
         [FromQuery] Guid? ledgerAccountId,
@@ -3333,12 +3732,13 @@ if (budgetResult is not null && !budgetResult.Allowed)
         });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+    [Authorize(Policy = AuthorizationPolicies.TreasuryManage)]
     [HttpPost("reconciliations")]
     public async Task<IActionResult> CreateBankReconciliation(
         [FromBody] CreateBankReconciliationRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -3471,6 +3871,29 @@ if (budgetResult is not null && !budgetResult.Allowed)
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "treasury",
+            "BankReconciliation",
+            "Created",
+            reconciliation.Id,
+            ledgerAccount.Code,
+            "Bank reconciliation draft created successfully.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                reconciliation.LedgerAccountId,
+                LedgerAccountCode = ledgerAccount.Code,
+                LedgerAccountName = ledgerAccount.Name,
+                reconciliation.StatementFromUtc,
+                reconciliation.StatementToUtc,
+                reconciliation.StatementClosingBalance,
+                reconciliation.BookClosingBalance,
+                DifferenceAmount = reconciliation.DifferenceAmount,
+                LineCount = lines.Count
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Bank reconciliation draft created successfully.",
@@ -3491,7 +3914,7 @@ if (budgetResult is not null && !budgetResult.Allowed)
     }
 
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+    [Authorize(Policy = AuthorizationPolicies.TreasuryView)]
     [HttpGet("reports/cashbook-summary")]
     public async Task<IActionResult> GetCashbookSummary(
         [FromQuery] DateTime? fromUtc,
@@ -3650,7 +4073,7 @@ if (budgetResult is not null && !budgetResult.Allowed)
         });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+    [Authorize(Policy = AuthorizationPolicies.TreasuryView)]
     [HttpGet("reconciliations")]
     public async Task<IActionResult> GetBankReconciliations(
         [FromQuery] Guid? ledgerAccountId,
@@ -3701,7 +4124,7 @@ if (budgetResult is not null && !budgetResult.Allowed)
     }
 
 
-        [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+        [Authorize(Policy = AuthorizationPolicies.TreasuryView)]
     [HttpGet("reconciliations/{bankReconciliationId:guid}")]
     public async Task<IActionResult> GetBankReconciliationDetail(
         Guid bankReconciliationId,
@@ -3802,7 +4225,7 @@ if (budgetResult is not null && !budgetResult.Allowed)
         });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+    [Authorize(Policy = AuthorizationPolicies.TreasuryManage)]
     [HttpPost("reconciliations/{bankReconciliationId:guid}/lines/{bankReconciliationLineId:guid}/set-reconciled")]
     public async Task<IActionResult> SetBankReconciliationLineReconciledState(
         Guid bankReconciliationId,
@@ -3810,6 +4233,7 @@ if (budgetResult is not null && !budgetResult.Allowed)
         [FromBody] SetBankReconciliationLineReconciledStateRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -3871,6 +4295,25 @@ if (budgetResult is not null && !budgetResult.Allowed)
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "treasury",
+            "BankReconciliationLine",
+            request.IsReconciled ? "LineMarkedReconciled" : "LineMarkedUnreconciled",
+            line.Id,
+            bankReconciliationId.ToString(),
+            "Bank reconciliation line updated successfully.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                line.Id,
+                line.BankReconciliationId,
+                line.LedgerMovementId,
+                line.IsReconciled,
+                line.Notes
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Bank reconciliation line updated successfully.",
@@ -3883,12 +4326,13 @@ if (budgetResult is not null && !budgetResult.Allowed)
     }
 
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+    [Authorize(Policy = AuthorizationPolicies.TreasuryManage)]
     [HttpPost("reconciliations/{bankReconciliationId:guid}/complete")]
     public async Task<IActionResult> CompleteBankReconciliation(
         Guid bankReconciliationId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -3919,6 +4363,30 @@ if (budgetResult is not null && !budgetResult.Allowed)
             reconciliation.Complete(DateTime.UtcNow);
             await dbContext.SaveChangesAsync(cancellationToken);
 
+            await auditTrailWriter.WriteAsync(
+                "treasury",
+                "BankReconciliation",
+                "Completed",
+                reconciliation.Id,
+                reconciliation.LedgerAccountId.ToString(),
+                $"Bank reconciliation completed successfully.",
+                User.Identity?.Name,
+                tenantContext.TenantId,
+                new
+                {
+                    reconciliation.Id,
+                    reconciliation.LedgerAccountId,
+                    reconciliation.StatementFromUtc,
+                    reconciliation.StatementToUtc,
+                    reconciliation.StatementClosingBalance,
+                    reconciliation.BookClosingBalance,
+                    DifferenceAmount = reconciliation.DifferenceAmount,
+                    reconciliation.Status,
+                    reconciliation.CompletedOnUtc,
+                    reconciliation.CancelledOnUtc
+                },
+                cancellationToken);
+
             return Ok(new
             {
                 Message = "Bank reconciliation completed successfully.",
@@ -3945,12 +4413,13 @@ if (budgetResult is not null && !budgetResult.Allowed)
     }
 
 
-        [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+        [Authorize(Policy = AuthorizationPolicies.TreasuryManage)]
     [HttpPost("reconciliations/{bankReconciliationId:guid}/cancel")]
     public async Task<IActionResult> CancelBankReconciliation(
         Guid bankReconciliationId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -3981,6 +4450,30 @@ if (budgetResult is not null && !budgetResult.Allowed)
             reconciliation.Cancel(DateTime.UtcNow);
             await dbContext.SaveChangesAsync(cancellationToken);
 
+            await auditTrailWriter.WriteAsync(
+                "treasury",
+                "BankReconciliation",
+                "Cancelled",
+                reconciliation.Id,
+                reconciliation.LedgerAccountId.ToString(),
+                $"Bank reconciliation cancelled successfully.",
+                User.Identity?.Name,
+                tenantContext.TenantId,
+                new
+                {
+                    reconciliation.Id,
+                    reconciliation.LedgerAccountId,
+                    reconciliation.StatementFromUtc,
+                    reconciliation.StatementToUtc,
+                    reconciliation.StatementClosingBalance,
+                    reconciliation.BookClosingBalance,
+                    DifferenceAmount = reconciliation.DifferenceAmount,
+                    reconciliation.Status,
+                    reconciliation.CompletedOnUtc,
+                    reconciliation.CancelledOnUtc
+                },
+                cancellationToken);
+
             return Ok(new
             {
                 Message = "Bank reconciliation cancelled successfully.",
@@ -4007,12 +4500,13 @@ if (budgetResult is not null && !budgetResult.Allowed)
     }
 
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+    [Authorize(Policy = AuthorizationPolicies.TreasuryManage)]
     [HttpPost("bank-statements/imports/upload")]
     public async Task<IActionResult> UploadBankStatementImport(
         [FromBody] UploadBankStatementImportRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -4119,6 +4613,27 @@ if (budgetResult is not null && !budgetResult.Allowed)
 
             await dbContext.SaveChangesAsync(cancellationToken);
 
+            await auditTrailWriter.WriteAsync(
+                "treasury",
+                "BankStatementImport",
+                "Uploaded",
+                bankStatementImport.Id,
+                ledgerAccount.Code,
+                "Bank statement upload import created successfully.",
+                User.Identity?.Name,
+                tenantContext.TenantId,
+                new
+                {
+                    bankStatementImport.LedgerAccountId,
+                    LedgerAccountCode = ledgerAccount.Code,
+                    LedgerAccountName = ledgerAccount.Name,
+                    bankStatementImport.StatementFromUtc,
+                    bankStatementImport.StatementToUtc,
+                                        bankStatementImport.SourceType,
+                    LineCount = lines.Count
+                },
+                cancellationToken);
+
             return Ok(new
             {
                 Message = "Bank statement upload import created successfully.",
@@ -4143,12 +4658,13 @@ if (budgetResult is not null && !budgetResult.Allowed)
         }
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+    [Authorize(Policy = AuthorizationPolicies.TreasuryManage)]
     [HttpPost("bank-statements/imports/api-placeholder")]
     public async Task<IActionResult> CreateApiPlaceholderBankStatementImport(
         [FromBody] CreateApiPlaceholderBankStatementImportRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -4237,6 +4753,27 @@ if (budgetResult is not null && !budgetResult.Allowed)
         dbContext.BankStatementImports.Add(bankStatementImport);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "treasury",
+            "BankStatementImport",
+            "ApiPlaceholderCreated",
+            bankStatementImport.Id,
+            ledgerAccount.Code,
+            "Bank statement API placeholder import created successfully.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                bankStatementImport.LedgerAccountId,
+                LedgerAccountCode = ledgerAccount.Code,
+                LedgerAccountName = ledgerAccount.Name,
+                bankStatementImport.StatementFromUtc,
+                bankStatementImport.StatementToUtc,
+                                bankStatementImport.SourceType,
+                bankStatementImport.SourceReference
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Bank statement API placeholder import created successfully.",
@@ -4257,7 +4794,7 @@ if (budgetResult is not null && !budgetResult.Allowed)
     }
 
 
-        [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+        [Authorize(Policy = AuthorizationPolicies.TreasuryView)]
     [HttpGet("bank-statements/imports")]
     public async Task<IActionResult> GetBankStatementImports(
         [FromQuery] Guid? ledgerAccountId,
@@ -4308,7 +4845,7 @@ if (budgetResult is not null && !budgetResult.Allowed)
 
 
 
-        [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+        [Authorize(Policy = AuthorizationPolicies.TreasuryView)]
     [HttpGet("bank-statements/imports/{bankStatementImportId:guid}")]
     public async Task<IActionResult> GetBankStatementImportDetail(
         Guid bankStatementImportId,
@@ -4415,13 +4952,14 @@ if (budgetResult is not null && !budgetResult.Allowed)
         });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+    [Authorize(Policy = AuthorizationPolicies.TreasuryManage)]
     [HttpPost("reconciliations/{bankReconciliationId:guid}/matches")]
     public async Task<IActionResult> CreateBankReconciliationMatch(
         Guid bankReconciliationId,
         [FromBody] CreateBankReconciliationMatchRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -4569,6 +5107,25 @@ if (budgetResult is not null && !budgetResult.Allowed)
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "treasury",
+            "BankReconciliationMatch",
+            "Created",
+            match.Id,
+            bankReconciliationId.ToString(),
+            "Bank reconciliation match created successfully.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                match.BankReconciliationId,
+                match.BankReconciliationLineId,
+                match.BankStatementImportLineId,
+                match.MatchedOnUtc,
+                match.Notes
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Bank reconciliation match created successfully.",
@@ -4581,13 +5138,14 @@ if (budgetResult is not null && !budgetResult.Allowed)
         });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+    [Authorize(Policy = AuthorizationPolicies.TreasuryManage)]
     [HttpPost("reconciliations/{bankReconciliationId:guid}/matches/{bankReconciliationMatchId:guid}/remove")]
     public async Task<IActionResult> RemoveBankReconciliationMatch(
         Guid bankReconciliationId,
         Guid bankReconciliationMatchId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -4651,6 +5209,23 @@ if (budgetResult is not null && !budgetResult.Allowed)
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "treasury",
+            "BankReconciliationMatch",
+            "Removed",
+            match.Id,
+            bankReconciliationId.ToString(),
+            "Bank reconciliation match removed successfully.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                match.BankReconciliationId,
+                match.BankReconciliationLineId,
+                match.BankStatementImportLineId
+            },
+            cancellationToken);
 
         return Ok(new
         {

@@ -1,5 +1,6 @@
 using iBalance.Api.Security;
 using iBalance.Api.Services;
+using iBalance.Api.Services.Audit;
 using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
 using iBalance.Modules.Finance.Domain.Entities;
@@ -21,6 +22,7 @@ public sealed class InventoryIntegrationController : ControllerBase
         [FromBody] ReceivePurchaseInvoiceIntoInventoryRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -155,6 +157,18 @@ public sealed class InventoryIntegrationController : ControllerBase
         dbContext.LedgerMovements.AddRange(movements);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "inventory",
+            "InventoryTransaction",
+            "PurchaseInvoiceReceivedIntoInventory",
+            transaction.Id,
+            transaction.TransactionNumber,
+            $"Purchase invoice '{invoice.InvoiceNumber}' received into inventory.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new { invoice.InvoiceNumber, transaction.TransactionNumber, LineCount = transactionLines.Count, JournalEntryId = journalEntry.Id },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Purchase invoice received into inventory successfully.",
@@ -176,6 +190,7 @@ public sealed class InventoryIntegrationController : ControllerBase
         [FromBody] IssueInventoryForSalesInvoiceRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -309,6 +324,18 @@ public sealed class InventoryIntegrationController : ControllerBase
         dbContext.JournalEntries.Add(journalEntry);
         dbContext.LedgerMovements.AddRange(movements);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "inventory",
+            "InventoryTransaction",
+            "SalesInvoiceIssuedToCogs",
+            transaction.Id,
+            transaction.TransactionNumber,
+            $"Inventory issued to COGS for sales invoice '{invoice.InvoiceNumber}'.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new { invoice.InvoiceNumber, transaction.TransactionNumber, LineCount = transactionLines.Count, JournalEntryId = journalEntry.Id },
+            cancellationToken);
 
         return Ok(new
         {

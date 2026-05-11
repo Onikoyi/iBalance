@@ -349,6 +349,10 @@ export function Sidebar() {
               </NavLink>
             ) : null}
 
+            <NavLink to="/admin/audit-trail" className={({ isActive }) => linkClassName(isActive)}>
+              Audit Trail
+            </NavLink>
+
             {canManageUsers ? (
               <NavLink to="/admin/users" className={({ isActive }) => linkClassName(isActive)}>
                 User Management

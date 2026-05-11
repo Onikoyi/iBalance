@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using iBalance.Api.Services.Audit;
 
 namespace iBalance.Api.Controllers;
 
@@ -107,6 +108,7 @@ public sealed class AdminUsersController : ControllerBase
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         [FromServices] PasswordHasher passwordHasher,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -171,6 +173,25 @@ public sealed class AdminUsersController : ControllerBase
         dbContext.UserAccounts.Add(user);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "admin",
+            "UserAccount",
+            "UserCreated",
+            user.Id,
+            user.Email,
+            $"User '{user.Email}' created.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                user.Email,
+                user.FirstName,
+                user.LastName,
+                user.Role,
+                user.IsActive
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "User created successfully.",
@@ -196,6 +217,7 @@ public sealed class AdminUsersController : ControllerBase
         [FromBody] UpdateUserRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var validationError = ValidateCreateOrUpdateRequest(
@@ -255,6 +277,25 @@ public sealed class AdminUsersController : ControllerBase
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "admin",
+            "UserAccount",
+            "UserUpdated",
+            user.Id,
+            user.Email,
+            $"User '{user.Email}' updated.",
+            User.Identity?.Name,
+            user.TenantId,
+            new
+            {
+                user.Email,
+                user.FirstName,
+                user.LastName,
+                user.Role,
+                user.IsActive
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "User updated successfully.",
@@ -278,6 +319,7 @@ public sealed class AdminUsersController : ControllerBase
     public async Task<IActionResult> ActivateUser(
         Guid userId,
         [FromServices] ApplicationDbContext dbContext,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var user = await dbContext.UserAccounts
@@ -291,6 +333,23 @@ public sealed class AdminUsersController : ControllerBase
         user.Activate();
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "admin",
+            "UserAccount",
+            "UserActivated",
+            user.Id,
+            user.Email,
+            $"User '{user.Email}' activated.",
+            User.Identity?.Name,
+            user.TenantId,
+            new
+            {
+                user.Email,
+                user.Role,
+                user.IsActive
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "User activated successfully."
@@ -302,6 +361,7 @@ public sealed class AdminUsersController : ControllerBase
         Guid userId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var user = await dbContext.UserAccounts
@@ -323,6 +383,23 @@ public sealed class AdminUsersController : ControllerBase
         user.Deactivate();
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "admin",
+            "UserAccount",
+            "UserDeactivated",
+            user.Id,
+            user.Email,
+            $"User '{user.Email}' deactivated.",
+            User.Identity?.Name,
+            user.TenantId,
+            new
+            {
+                user.Email,
+                user.Role,
+                user.IsActive
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "User deactivated successfully."
@@ -338,6 +415,7 @@ public sealed class AdminUsersController : ControllerBase
         [FromServices] IEmailSender emailSender,
         [FromServices] IOptions<EmailOptions> emailOptionsAccessor,
         [FromServices] IConfiguration configuration,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -403,6 +481,22 @@ public sealed class AdminUsersController : ControllerBase
             "Password Reset Request",
             emailBody.HtmlBody,
             emailBody.TextBody,
+            cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "admin",
+            "UserAccount",
+            "PasswordResetIssued",
+            user.Id,
+            user.Email,
+            $"Password reset instructions issued for user '{user.Email}'.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                user.Email,
+                ExpiresAtUtc = expiresAtUtc
+            },
             cancellationToken);
 
         return Ok(new

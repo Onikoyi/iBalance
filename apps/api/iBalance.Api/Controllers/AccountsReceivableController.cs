@@ -8,6 +8,7 @@ using iBalance.Modules.Finance.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using iBalance.Api.Services.Audit;
 
 namespace iBalance.Api.Controllers;
 
@@ -68,6 +69,7 @@ public sealed class AccountsReceivableController : ControllerBase
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -115,6 +117,25 @@ public sealed class AccountsReceivableController : ControllerBase
 
         dbContext.Customers.Add(customer);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await auditTrailWriter.WriteAsync(
+            "ar",
+            "Customer",
+            "Created",
+            customer.Id,
+            customer.CustomerCode,
+            $"Customer '{customer.CustomerName}' created.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                customer.CustomerCode,
+                customer.CustomerName,
+                customer.Email,
+                customer.PhoneNumber,
+                customer.IsActive
+            },
+            cancellationToken);
+
 
         return Ok(new
         {
@@ -203,6 +224,7 @@ public sealed class AccountsReceivableController : ControllerBase
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -405,6 +427,28 @@ public sealed class AccountsReceivableController : ControllerBase
         //     .Where(x => x.ApplicationMode == TaxApplicationMode.DeductFromAmount)
         //     .Sum(x => x.TaxAmount);
 
+        await auditTrailWriter.WriteAsync(
+            "ar",
+            "SalesInvoice",
+            "Created",
+            invoice.Id,
+            invoice.InvoiceNumber,
+            $"Sales invoice '{invoice.InvoiceNumber}' created.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                invoice.InvoiceNumber,
+                invoice.CustomerId,
+                invoice.InvoiceDateUtc,
+                invoice.TotalAmount,
+                invoice.GrossAmount,
+                invoice.NetReceivableAmount,
+                TaxLineCount = salesInvoiceTaxLines.Count
+            },
+            cancellationToken);
+
+
         return Ok(new
         {
             Message = "Sales invoice created successfully.",
@@ -434,6 +478,7 @@ public sealed class AccountsReceivableController : ControllerBase
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -484,6 +529,24 @@ public sealed class AccountsReceivableController : ControllerBase
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "ar",
+            "SalesInvoice",
+            "SubmittedForApproval",
+            invoice.Id,
+            invoice.InvoiceNumber,
+            $"Sales invoice '{invoice.InvoiceNumber}' submitted for approval.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                invoice.InvoiceNumber,
+                invoice.Status,
+                invoice.SubmittedBy,
+                invoice.SubmittedOnUtc
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Sales invoice submitted for approval successfully.",
@@ -505,6 +568,7 @@ public sealed class AccountsReceivableController : ControllerBase
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -553,6 +617,24 @@ public sealed class AccountsReceivableController : ControllerBase
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "ar",
+            "SalesInvoice",
+            "Approved",
+            invoice.Id,
+            invoice.InvoiceNumber,
+            $"Sales invoice '{invoice.InvoiceNumber}' approved.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                invoice.InvoiceNumber,
+                invoice.Status,
+                invoice.ApprovedBy,
+                invoice.ApprovedOnUtc
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Sales invoice approved successfully.",
@@ -575,6 +657,7 @@ public sealed class AccountsReceivableController : ControllerBase
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -628,6 +711,25 @@ public sealed class AccountsReceivableController : ControllerBase
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "ar",
+            "SalesInvoice",
+            "Rejected",
+            invoice.Id,
+            invoice.InvoiceNumber,
+            $"Sales invoice '{invoice.InvoiceNumber}' rejected.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                invoice.InvoiceNumber,
+                invoice.Status,
+                invoice.RejectedBy,
+                invoice.RejectedOnUtc,
+                invoice.RejectionReason
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Sales invoice rejected successfully.",
@@ -649,6 +751,7 @@ public sealed class AccountsReceivableController : ControllerBase
 public async Task<IActionResult> GetRejectedSalesInvoices(
     [FromServices] ApplicationDbContext dbContext,
     [FromServices] ITenantContextAccessor tenantContextAccessor,
+    [FromServices] IAuditTrailWriter auditTrailWriter,
     CancellationToken cancellationToken)
 {
     var tenantContext = tenantContextAccessor.Current;
@@ -784,6 +887,7 @@ public async Task<IActionResult> UpdateRejectedSalesInvoice(
     [FromServices] ApplicationDbContext dbContext,
     [FromServices] ITenantContextAccessor tenantContextAccessor,
     [FromServices] ICurrentUserService currentUserService,
+    [FromServices] IAuditTrailWriter auditTrailWriter,
     CancellationToken cancellationToken)
 {
     var tenantContext = tenantContextAccessor.Current;
@@ -1046,6 +1150,27 @@ public async Task<IActionResult> UpdateRejectedSalesInvoice(
     try
     {
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "ar",
+            "SalesInvoice",
+            "RejectedInvoiceUpdated",
+            invoice.Id,
+            invoice.InvoiceNumber,
+            $"Rejected sales invoice '{invoice.InvoiceNumber}' updated.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                invoice.InvoiceNumber,
+                invoice.Status,
+                invoice.InvoiceDateUtc,
+                invoice.TotalAmount,
+                invoice.GrossAmount,
+                invoice.NetReceivableAmount,
+                TaxLineCount = salesInvoiceTaxLines.Count
+            },
+            cancellationToken);
     }
     catch (DbUpdateException ex)
     {
@@ -1089,6 +1214,7 @@ public async Task<IActionResult> DeleteRejectedSalesInvoice(
     Guid salesInvoiceId,
     [FromServices] ApplicationDbContext dbContext,
     [FromServices] ITenantContextAccessor tenantContextAccessor,
+    [FromServices] IAuditTrailWriter auditTrailWriter,
     CancellationToken cancellationToken)
 {
     var tenantContext = tenantContextAccessor.Current;
@@ -1150,6 +1276,22 @@ public async Task<IActionResult> DeleteRejectedSalesInvoice(
 
     await dbContext.SaveChangesAsync(cancellationToken);
 
+    await auditTrailWriter.WriteAsync(
+        "ar",
+        "SalesInvoice",
+        "RejectedInvoiceDeleted",
+        invoice.Id,
+        invoice.InvoiceNumber,
+        $"Rejected sales invoice '{invoice.InvoiceNumber}' deleted.",
+        User.Identity?.Name,
+        tenantContext.TenantId,
+        new
+        {
+            invoice.InvoiceNumber,
+            invoice.Status
+        },
+        cancellationToken);
+
     return Ok(new
     {
         Message = "Rejected sales invoice deleted successfully.",
@@ -1168,6 +1310,7 @@ public async Task<IActionResult> DeleteRejectedSalesInvoice(
         [FromBody] PostSalesInvoiceRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -1495,6 +1638,26 @@ if (BudgetEvaluationSupport.IsBudgetConsumableAccountCategory(revenueLedgerAccou
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "ar",
+            "SalesInvoice",
+            "Posted",
+            invoice.Id,
+            invoice.InvoiceNumber,
+            $"Sales invoice '{invoice.InvoiceNumber}' posted.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                invoice.InvoiceNumber,
+                invoice.Status,
+                invoice.JournalEntryId,
+                invoice.PostedOnUtc,
+                GrossInvoiceAmount = grossInvoiceAmount,
+                NetReceivableAmount = netReceivableAmount
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Sales invoice posted successfully.",
@@ -1739,6 +1902,7 @@ if (BudgetEvaluationSupport.IsBudgetConsumableAccountCategory(revenueLedgerAccou
 public async Task<IActionResult> GetRejectedCustomerReceipts(
     [FromServices] ApplicationDbContext dbContext,
     [FromServices] ITenantContextAccessor tenantContextAccessor,
+    [FromServices] IAuditTrailWriter auditTrailWriter,
     CancellationToken cancellationToken)
 {
     var tenantContext = tenantContextAccessor.Current;
@@ -1837,6 +2001,7 @@ public async Task<IActionResult> UpdateRejectedCustomerReceipt(
     [FromServices] ApplicationDbContext dbContext,
     [FromServices] ITenantContextAccessor tenantContextAccessor,
     [FromServices] ICurrentUserService currentUserService,
+    [FromServices] IAuditTrailWriter auditTrailWriter,
     CancellationToken cancellationToken)
 {
     var tenantContext = tenantContextAccessor.Current;
@@ -1998,6 +2163,25 @@ public async Task<IActionResult> UpdateRejectedCustomerReceipt(
 
     await dbContext.SaveChangesAsync(cancellationToken);
 
+    await auditTrailWriter.WriteAsync(
+        "ar",
+        "CustomerReceipt",
+        "RejectedReceiptUpdated",
+        receipt.Id,
+        receipt.ReceiptNumber,
+        $"Rejected customer receipt '{receipt.ReceiptNumber}' updated.",
+        currentUserService.UserId,
+        tenantContext.TenantId,
+        new
+        {
+            receipt.ReceiptNumber,
+            receipt.Status,
+            receipt.ReceiptDateUtc,
+            receipt.Amount,
+            receipt.SalesInvoiceId
+        },
+        cancellationToken);
+
     return Ok(new
     {
         Message = "Rejected customer receipt updated successfully.",
@@ -2023,6 +2207,7 @@ public async Task<IActionResult> DeleteRejectedCustomerReceipt(
     Guid customerReceiptId,
     [FromServices] ApplicationDbContext dbContext,
     [FromServices] ITenantContextAccessor tenantContextAccessor,
+    [FromServices] IAuditTrailWriter auditTrailWriter,
     CancellationToken cancellationToken)
 {
     var tenantContext = tenantContextAccessor.Current;
@@ -2072,6 +2257,23 @@ public async Task<IActionResult> DeleteRejectedCustomerReceipt(
     dbContext.CustomerReceipts.Remove(receipt);
     await dbContext.SaveChangesAsync(cancellationToken);
 
+    await auditTrailWriter.WriteAsync(
+        "ar",
+        "CustomerReceipt",
+        "RejectedReceiptDeleted",
+        receipt.Id,
+        receipt.ReceiptNumber,
+        $"Rejected customer receipt '{receipt.ReceiptNumber}' deleted.",
+        User.Identity?.Name,
+        tenantContext.TenantId,
+        new
+        {
+            receipt.ReceiptNumber,
+            receipt.Status,
+            receipt.Amount
+        },
+        cancellationToken);
+
     return Ok(new
     {
         Message = "Rejected customer receipt deleted successfully.",
@@ -2092,6 +2294,7 @@ public async Task<IActionResult> DeleteRejectedCustomerReceipt(
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -2200,6 +2403,27 @@ public async Task<IActionResult> DeleteRejectedCustomerReceipt(
         dbContext.CustomerReceipts.Add(receipt);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "ar",
+            "CustomerReceipt",
+            "Created",
+            receipt.Id,
+            receipt.ReceiptNumber,
+            $"Customer receipt '{receipt.ReceiptNumber}' created.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                receipt.ReceiptNumber,
+                receipt.CustomerId,
+                receipt.SalesInvoiceId,
+                receipt.ReceiptDateUtc,
+                receipt.Amount,
+                receipt.Status,
+                receipt.PostingRequiresApproval
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Customer receipt created successfully.",
@@ -2223,6 +2447,7 @@ public async Task<IActionResult> DeleteRejectedCustomerReceipt(
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -2267,6 +2492,25 @@ public async Task<IActionResult> DeleteRejectedCustomerReceipt(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "ar",
+            "CustomerReceipt",
+            "SubmittedForApproval",
+            receipt.Id,
+            receipt.ReceiptNumber,
+            $"Customer receipt '{receipt.ReceiptNumber}' submitted for approval.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                receipt.ReceiptNumber,
+                receipt.Status,
+                receipt.SubmittedBy,
+                receipt.SubmittedOnUtc,
+                receipt.PostingRequiresApproval
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Customer receipt submitted for approval successfully.",
@@ -2289,6 +2533,7 @@ public async Task<IActionResult> DeleteRejectedCustomerReceipt(
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -2333,6 +2578,24 @@ public async Task<IActionResult> DeleteRejectedCustomerReceipt(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "ar",
+            "CustomerReceipt",
+            "Approved",
+            receipt.Id,
+            receipt.ReceiptNumber,
+            $"Customer receipt '{receipt.ReceiptNumber}' approved.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                receipt.ReceiptNumber,
+                receipt.Status,
+                receipt.ApprovedBy,
+                receipt.ApprovedOnUtc
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Customer receipt approved successfully.",
@@ -2355,6 +2618,7 @@ public async Task<IActionResult> DeleteRejectedCustomerReceipt(
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -2408,6 +2672,25 @@ public async Task<IActionResult> DeleteRejectedCustomerReceipt(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "ar",
+            "CustomerReceipt",
+            "Rejected",
+            receipt.Id,
+            receipt.ReceiptNumber,
+            $"Customer receipt '{receipt.ReceiptNumber}' rejected.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                receipt.ReceiptNumber,
+                receipt.Status,
+                receipt.RejectedBy,
+                receipt.RejectedOnUtc,
+                receipt.RejectionReason
+            },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Customer receipt rejected successfully.",
@@ -2431,6 +2714,7 @@ public async Task<IActionResult> DeleteRejectedCustomerReceipt(
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -2647,6 +2931,26 @@ public async Task<IActionResult> DeleteRejectedCustomerReceipt(
         dbContext.LedgerMovements.AddRange(movements);
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "ar",
+            "CustomerReceipt",
+            "Posted",
+            receipt.Id,
+            receipt.ReceiptNumber,
+            $"Customer receipt '{receipt.ReceiptNumber}' posted.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new
+            {
+                receipt.ReceiptNumber,
+                receipt.Status,
+                receipt.JournalEntryId,
+                receipt.PostedOnUtc,
+                receipt.Amount,
+                receipt.SalesInvoiceId
+            },
+            cancellationToken);
 
         return Ok(new
         {

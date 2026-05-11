@@ -1,4 +1,5 @@
 using iBalance.Api.Services;
+using iBalance.Api.Services.Audit;
 using iBalance.Api.Security;
 using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
@@ -116,6 +117,7 @@ public sealed class ProcurementController : ControllerBase
         [FromBody] CreatePurchaseRequisitionRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -163,6 +165,18 @@ public sealed class ProcurementController : ControllerBase
         dbContext.Add(requisition);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "procurement",
+            "PurchaseRequisition",
+            "Created",
+            requisition.Id,
+            requisition.RequisitionNumber,
+            $"Purchase requisition '{requisition.RequisitionNumber}' created.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new { requisition.RequisitionNumber, requisition.Department, LineCount = lines.Count },
+            cancellationToken);
+
         return Ok(new { Message = "Purchase requisition created successfully.", requisition.Id, requisition.RequisitionNumber });
     }
 
@@ -173,6 +187,7 @@ public sealed class ProcurementController : ControllerBase
         [FromBody] UpdatePurchaseRequisitionRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -219,6 +234,19 @@ public sealed class ProcurementController : ControllerBase
         if (requisition.Status == 7) requisition.ResetToDraft();
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "procurement",
+            "PurchaseRequisition",
+            "Updated",
+            requisition.Id,
+            requisition.RequisitionNumber,
+            $"Purchase requisition '{requisition.RequisitionNumber}' updated.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new { requisition.RequisitionNumber, requisition.Status, LineCount = replacementLines.Count },
+            cancellationToken);
+
         return Ok(new { Message = "Purchase requisition updated successfully.", requisition.Id, requisition.RequisitionNumber, requisition.Status });
     }
 
@@ -228,6 +256,7 @@ public sealed class ProcurementController : ControllerBase
         Guid requisitionId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -244,6 +273,18 @@ public sealed class ProcurementController : ControllerBase
         requisition.MarkSubmitted();
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "procurement",
+            "PurchaseRequisition",
+            "Submitted",
+            requisition.Id,
+            requisition.RequisitionNumber,
+            $"Purchase requisition '{requisition.RequisitionNumber}' submitted.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            null,
+            cancellationToken);
+
         return Ok(new { Message = "Purchase requisition submitted successfully.", requisition.Id, requisition.RequisitionNumber, requisition.Status });
     }
 
@@ -253,6 +294,7 @@ public sealed class ProcurementController : ControllerBase
         Guid requisitionId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -267,6 +309,18 @@ public sealed class ProcurementController : ControllerBase
         requisition.MarkApproved();
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "procurement",
+            "PurchaseRequisition",
+            "Approved",
+            requisition.Id,
+            requisition.RequisitionNumber,
+            $"Purchase requisition '{requisition.RequisitionNumber}' approved.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            null,
+            cancellationToken);
+
         return Ok(new { Message = "Purchase requisition approved successfully.", requisition.Id, requisition.RequisitionNumber, requisition.Status });
     }
 
@@ -277,6 +331,7 @@ public sealed class ProcurementController : ControllerBase
         [FromBody] RejectProcurementDocumentRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -294,6 +349,18 @@ public sealed class ProcurementController : ControllerBase
         requisition.MarkRejected();
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "procurement",
+            "PurchaseRequisition",
+            "Rejected",
+            requisition.Id,
+            requisition.RequisitionNumber,
+            $"Purchase requisition '{requisition.RequisitionNumber}' rejected.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new { Reason = request.Reason.Trim() },
+            cancellationToken);
+
         return Ok(new { Message = "Purchase requisition rejected successfully.", requisition.Id, requisition.RequisitionNumber, requisition.Status, Reason = request.Reason.Trim() });
     }
 
@@ -303,6 +370,7 @@ public sealed class ProcurementController : ControllerBase
         Guid requisitionId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -318,6 +386,18 @@ public sealed class ProcurementController : ControllerBase
         dbContext.RemoveRange(requisition.Lines);
         dbContext.Remove(requisition);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "procurement",
+            "PurchaseRequisition",
+            "Deleted",
+            requisition.Id,
+            requisition.RequisitionNumber,
+            $"Purchase requisition '{requisition.RequisitionNumber}' deleted.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            null,
+            cancellationToken);
 
         return Ok(new { Message = "Purchase requisition deleted successfully.", requisition.Id, requisition.RequisitionNumber });
     }
@@ -429,6 +509,7 @@ public sealed class ProcurementController : ControllerBase
         [FromBody] CreatePurchaseOrderFromRequisitionRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -489,6 +570,7 @@ public sealed class ProcurementController : ControllerBase
         [FromBody] UpdatePurchaseOrderRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -528,6 +610,19 @@ public sealed class ProcurementController : ControllerBase
         if (purchaseOrder.Status == 7) purchaseOrder.ResetToDraft();
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "procurement",
+            "PurchaseOrder",
+            "Updated",
+            purchaseOrder.Id,
+            purchaseOrder.PurchaseOrderNumber,
+            $"Purchase order '{purchaseOrder.PurchaseOrderNumber}' updated.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new { purchaseOrder.PurchaseOrderNumber, purchaseOrder.Status },
+            cancellationToken);
+
         return Ok(new { Message = "Purchase order updated successfully.", purchaseOrder.Id, purchaseOrder.PurchaseOrderNumber, purchaseOrder.Status });
     }
 
@@ -537,6 +632,7 @@ public sealed class ProcurementController : ControllerBase
         Guid purchaseOrderId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -553,6 +649,18 @@ public sealed class ProcurementController : ControllerBase
         purchaseOrder.MarkSubmitted();
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "procurement",
+            "PurchaseOrder",
+            "Submitted",
+            purchaseOrder.Id,
+            purchaseOrder.PurchaseOrderNumber,
+            $"Purchase order '{purchaseOrder.PurchaseOrderNumber}' submitted.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            null,
+            cancellationToken);
+
         return Ok(new { Message = "Purchase order submitted successfully.", purchaseOrder.Id, purchaseOrder.PurchaseOrderNumber, purchaseOrder.Status });
     }
 
@@ -562,6 +670,7 @@ public sealed class ProcurementController : ControllerBase
         Guid purchaseOrderId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -587,6 +696,7 @@ public sealed class ProcurementController : ControllerBase
         [FromBody] RejectProcurementDocumentRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -604,6 +714,18 @@ public sealed class ProcurementController : ControllerBase
         purchaseOrder.MarkRejected();
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "procurement",
+            "PurchaseOrder",
+            "Rejected",
+            purchaseOrder.Id,
+            purchaseOrder.PurchaseOrderNumber,
+            $"Purchase order '{purchaseOrder.PurchaseOrderNumber}' rejected.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new { Reason = request.Reason.Trim() },
+            cancellationToken);
+
         return Ok(new { Message = "Purchase order rejected successfully.", purchaseOrder.Id, purchaseOrder.PurchaseOrderNumber, purchaseOrder.Status, Reason = request.Reason.Trim() });
     }
 
@@ -613,6 +735,7 @@ public sealed class ProcurementController : ControllerBase
         Guid purchaseOrderId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -628,6 +751,18 @@ public sealed class ProcurementController : ControllerBase
         dbContext.RemoveRange(purchaseOrder.Lines);
         dbContext.Remove(purchaseOrder);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "procurement",
+            "PurchaseOrder",
+            "Deleted",
+            purchaseOrder.Id,
+            purchaseOrder.PurchaseOrderNumber,
+            $"Purchase order '{purchaseOrder.PurchaseOrderNumber}' deleted.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            null,
+            cancellationToken);
 
         return Ok(new { Message = "Purchase order deleted successfully.", purchaseOrder.Id, purchaseOrder.PurchaseOrderNumber });
     }
@@ -694,6 +829,7 @@ public sealed class ProcurementController : ControllerBase
         [FromBody] CreatePurchaseOrderReceiptRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;

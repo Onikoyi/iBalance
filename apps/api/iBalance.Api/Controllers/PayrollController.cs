@@ -1,4 +1,5 @@
 using iBalance.Api.Security;
+using iBalance.Api.Services.Audit;
 using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
 using iBalance.Modules.Finance.Domain.Entities;
@@ -173,6 +174,7 @@ public async Task<IActionResult> CreateEmployee(
     [FromBody] CreatePayrollEmployeeRequest request,
     [FromServices] ApplicationDbContext dbContext,
     [FromServices] ITenantContextAccessor tenantContextAccessor,
+    [FromServices] IAuditTrailWriter auditTrailWriter,
     CancellationToken cancellationToken)
 {
     var tenantContext = tenantContextAccessor.Current;
@@ -228,6 +230,18 @@ public async Task<IActionResult> CreateEmployee(
     dbContext.PayrollEmployees.Add(employee);
     await dbContext.SaveChangesAsync(cancellationToken);
 
+    await auditTrailWriter.WriteAsync(
+        "payroll",
+        "PayrollEmployee",
+        "Created",
+        employee.Id,
+        employee.EmployeeNumber,
+        $"Payroll employee '{employee.EmployeeNumber}' created.",
+        User.Identity?.Name,
+        tenantContext.TenantId,
+        new { employee.EmployeeNumber, employee.FullName, employee.Department, employee.IsActive },
+        cancellationToken);
+
     return Ok(new { Message = "Payroll employee created successfully.", employee.Id, employee.EmployeeNumber, employee.FullName });
 }
 
@@ -238,6 +252,7 @@ public async Task<IActionResult> UpdateEmployee(
     [FromBody] UpdatePayrollEmployeeRequest request,
     [FromServices] ApplicationDbContext dbContext,
     [FromServices] ITenantContextAccessor tenantContextAccessor,
+    [FromServices] IAuditTrailWriter auditTrailWriter,
     CancellationToken cancellationToken)
 {
     var tenantContext = tenantContextAccessor.Current;
@@ -291,6 +306,18 @@ public async Task<IActionResult> UpdateEmployee(
 
     await dbContext.SaveChangesAsync(cancellationToken);
 
+    await auditTrailWriter.WriteAsync(
+        "payroll",
+        "PayrollEmployee",
+        "Updated",
+        employee.Id,
+        employee.EmployeeNumber,
+        $"Payroll employee '{employee.EmployeeNumber}' updated.",
+        User.Identity?.Name,
+        tenantContext.TenantId,
+        new { employee.EmployeeNumber, employee.FullName, employee.Department, employee.IsActive },
+        cancellationToken);
+
     return Ok(new
     {
         Message = "Payroll employee updated successfully.",
@@ -307,6 +334,7 @@ public async Task<IActionResult> DeleteEmployee(
     [FromRoute] Guid employeeId,
     [FromServices] ApplicationDbContext dbContext,
     [FromServices] ITenantContextAccessor tenantContextAccessor,
+    [FromServices] IAuditTrailWriter auditTrailWriter,
     CancellationToken cancellationToken)
 {
     var tenantContext = tenantContextAccessor.Current;
@@ -353,6 +381,18 @@ public async Task<IActionResult> DeleteEmployee(
     dbContext.PayrollEmployees.Remove(employee);
     await dbContext.SaveChangesAsync(cancellationToken);
 
+    await auditTrailWriter.WriteAsync(
+        "payroll",
+        "PayrollEmployee",
+        "Deleted",
+        employee.Id,
+        employee.EmployeeNumber,
+        $"Payroll employee '{employee.EmployeeNumber}' deleted.",
+        User.Identity?.Name,
+        tenantContext.TenantId,
+        new { employee.EmployeeNumber, employee.FullName },
+        cancellationToken);
+
     return Ok(new
     {
         Message = "Payroll employee deleted successfully.",
@@ -368,6 +408,7 @@ public async Task<IActionResult> ImportEmployees(
     [FromBody] ImportPayrollEmployeesRequest request,
     [FromServices] ApplicationDbContext dbContext,
     [FromServices] ITenantContextAccessor tenantContextAccessor,
+    [FromServices] IAuditTrailWriter auditTrailWriter,
     CancellationToken cancellationToken)
 {
     var tenantContext = tenantContextAccessor.Current;
@@ -461,6 +502,18 @@ public async Task<IActionResult> ImportEmployees(
     dbContext.PayrollEmployees.AddRange(imported);
     await dbContext.SaveChangesAsync(cancellationToken);
 
+    await auditTrailWriter.WriteAsync(
+        "payroll",
+        "PayrollEmployee",
+        "Imported",
+        null,
+        "employee-import",
+        $"Imported {imported.Count} payroll employee(s).",
+        User.Identity?.Name,
+        tenantContext.TenantId,
+        new { Count = imported.Count },
+        cancellationToken);
+
     return Ok(new
     {
         Message = "Payroll employees imported successfully.",
@@ -511,6 +564,7 @@ public async Task<IActionResult> ImportEmployees(
         [FromBody] CreatePayrollPayGroupRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -537,6 +591,18 @@ public async Task<IActionResult> ImportEmployees(
         dbContext.PayrollPayGroups.Add(payGroup);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "payroll",
+            "PayrollPayGroup",
+            "Created",
+            payGroup.Id,
+            payGroup.Code,
+            $"Payroll pay group '{payGroup.Code}' created.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new { payGroup.Code, payGroup.Name, payGroup.IsActive },
+            cancellationToken);
+
         return Ok(new { Message = "Payroll pay group created successfully.", payGroup.Id, payGroup.Code });
     }
 
@@ -547,6 +613,7 @@ public async Task<IActionResult> ImportEmployees(
         [FromBody] UpdatePayrollPayGroupRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -578,6 +645,18 @@ public async Task<IActionResult> ImportEmployees(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "payroll",
+            "PayrollPayGroup",
+            "Updated",
+            payGroup.Id,
+            payGroup.Code,
+            $"Payroll pay group '{payGroup.Code}' updated.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            new { payGroup.Code, Name = normalizedName, request.IsActive },
+            cancellationToken);
+
         return Ok(new
         {
             Message = "Payroll pay group updated successfully.",
@@ -595,6 +674,7 @@ public async Task<IActionResult> ImportEmployees(
         [FromRoute] Guid payGroupId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -629,6 +709,18 @@ public async Task<IActionResult> ImportEmployees(
 
         dbContext.PayrollPayGroups.Remove(payGroup);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "payroll",
+            "PayrollPayGroup",
+            "Deleted",
+            payGroup.Id,
+            payGroup.Code,
+            $"Payroll pay group '{payGroup.Code}' deleted.",
+            User.Identity?.Name,
+            tenantContext.TenantId,
+            null,
+            cancellationToken);
 
         return Ok(new
         {
@@ -690,6 +782,7 @@ public async Task<IActionResult> ImportEmployees(
         [FromBody] CreatePayrollPayElementRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -743,6 +836,9 @@ public async Task<IActionResult> ImportEmployees(
         dbContext.PayrollPayElements.Add(element);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "payroll","PayrollPayElement","Created",element.Id,element.Code,$"Payroll pay element '{element.Code}' created.",User.Identity?.Name,tenantContext.TenantId,new { element.Code, element.Name, element.IsActive },cancellationToken);
+
         return Ok(new { Message = "Payroll pay element created successfully.", element.Id, element.Code });
     }
 
@@ -753,6 +849,7 @@ public async Task<IActionResult> ImportEmployees(
         [FromBody] UpdatePayrollPayElementRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -804,6 +901,9 @@ public async Task<IActionResult> ImportEmployees(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "payroll","PayrollPayElement","Updated",payElement.Id,payElement.Code,$"Payroll pay element '{payElement.Code}' updated.",User.Identity?.Name,tenantContext.TenantId,new { payElement.Code, Name = normalizedName, request.IsActive },cancellationToken);
+
         return Ok(new
         {
             Message = "Payroll pay element updated successfully.",
@@ -827,6 +927,7 @@ public async Task<IActionResult> ImportEmployees(
         [FromRoute] Guid payElementId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -846,6 +947,9 @@ public async Task<IActionResult> ImportEmployees(
 
         dbContext.PayrollPayElements.Remove(payElement);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "payroll","PayrollPayElement","Deleted",payElement.Id,payElement.Code,$"Payroll pay element '{payElement.Code}' deleted.",User.Identity?.Name,tenantContext.TenantId,null,cancellationToken);
 
         return Ok(new
         {
@@ -912,6 +1016,7 @@ public async Task<IActionResult> ImportEmployees(
         [FromBody] CreatePayrollSalaryStructureRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -953,6 +1058,9 @@ public async Task<IActionResult> ImportEmployees(
         dbContext.PayrollSalaryStructures.Add(structure);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "payroll","PayrollSalaryStructure","Created",structure.Id,structure.Id.ToString(),"Payroll salary structure created successfully.",User.Identity?.Name,tenantContext.TenantId,new { structure.EmployeeId, structure.PayGroupId, structure.BasicSalary, structure.IsActive },cancellationToken);
+
         return Ok(new { Message = "Payroll salary structure created successfully.", structure.Id });
     }
 
@@ -963,6 +1071,7 @@ public async Task<IActionResult> ImportEmployees(
         [FromBody] UpdatePayrollSalaryStructureRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -1011,6 +1120,9 @@ public async Task<IActionResult> ImportEmployees(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "payroll","PayrollSalaryStructure","Updated",structure.Id,structure.Id.ToString(),"Payroll salary structure updated successfully.",User.Identity?.Name,tenantContext.TenantId,new { request.EmployeeId, request.PayGroupId, request.BasicSalary, request.IsActive },cancellationToken);
+
         return Ok(new
         {
             Message = "Payroll salary structure updated successfully.",
@@ -1031,6 +1143,7 @@ public async Task<IActionResult> ImportEmployees(
         [FromRoute] Guid salaryStructureId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -1066,6 +1179,7 @@ public async Task<IActionResult> ImportEmployees(
         [FromBody] PostPayrollRunRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -1379,6 +1493,7 @@ public async Task<IActionResult> ImportEmployees(
         [FromBody] SubmitPayrollRunRequest? request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -1410,6 +1525,9 @@ public async Task<IActionResult> ImportEmployees(
         run.MarkProcessed();
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "payroll","PayrollRun","Submitted",run.Id,run.PayrollPeriod,$"Payroll run '{run.PayrollPeriod}' submitted.",User.Identity?.Name,tenantContext.TenantId,new { run.PayrollPeriod, run.Status },cancellationToken);
+
         return Ok(new
         {
             Message = "Payroll run submitted successfully.",
@@ -1426,6 +1544,7 @@ public async Task<IActionResult> ImportEmployees(
         [FromRoute] Guid runId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -1455,6 +1574,9 @@ public async Task<IActionResult> ImportEmployees(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "payroll","PayrollRun","Approved",run.Id,run.PayrollPeriod,$"Payroll run '{run.PayrollPeriod}' approved.",User.Identity?.Name,tenantContext.TenantId,new { run.PayrollPeriod, run.Status },cancellationToken);
+
         return Ok(new
         {
             Message = "Payroll run approved successfully.",
@@ -1471,6 +1593,7 @@ public async Task<IActionResult> ImportEmployees(
         [FromBody] RejectPayrollRunRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -1506,6 +1629,9 @@ public async Task<IActionResult> ImportEmployees(
         dbContext.Entry(run).Property(nameof(PayrollRun.Status)).CurrentValue = 4;
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "payroll","PayrollRun","Rejected",run.Id,run.PayrollPeriod,$"Payroll run '{run.PayrollPeriod}' rejected.",User.Identity?.Name,tenantContext.TenantId,new { Reason = request.Reason.Trim() },cancellationToken);
+
         return Ok(new
         {
             Message = "Payroll run rejected successfully.",
@@ -1522,6 +1648,7 @@ public async Task<IActionResult> ImportEmployees(
         [FromRoute] Guid runId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -1548,6 +1675,9 @@ public async Task<IActionResult> ImportEmployees(
         dbContext.Entry(run).Property(nameof(PayrollRun.Status)).CurrentValue = 0;
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "payroll","PayrollRun","Reopened",run.Id,run.PayrollPeriod,$"Rejected payroll run '{run.PayrollPeriod}' returned to draft.",User.Identity?.Name,tenantContext.TenantId,null,cancellationToken);
+
         return Ok(new
         {
             Message = "Rejected payroll run returned to draft successfully.",
@@ -1563,6 +1693,7 @@ public async Task<IActionResult> ImportEmployees(
         [FromRoute] Guid runId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -1594,6 +1725,9 @@ public async Task<IActionResult> ImportEmployees(
         dbContext.Entry(run).Property(nameof(PayrollRun.Status)).CurrentValue = 1;
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "payroll","PayrollRun","Resubmitted",run.Id,run.PayrollPeriod,$"Rejected payroll run '{run.PayrollPeriod}' resubmitted.",User.Identity?.Name,tenantContext.TenantId,null,cancellationToken);
+
         return Ok(new
         {
             Message = "Rejected payroll run resubmitted successfully.",
@@ -1609,6 +1743,7 @@ public async Task<IActionResult> ImportEmployees(
         [FromRoute] Guid runId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -1669,6 +1804,9 @@ public async Task<IActionResult> ImportEmployees(
         dbContext.PayrollRuns.Remove(run);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "payroll","PayrollRun","Deleted",run.Id,run.PayrollPeriod,$"Payroll run '{run.PayrollPeriod}' deleted.",User.Identity?.Name,tenantContext.TenantId,null,cancellationToken);
+
         return Ok(new
         {
             Message = "Payroll run deleted successfully.",
@@ -1721,6 +1859,7 @@ public async Task<IActionResult> ImportEmployees(
         [FromBody] UpdatePayrollPolicySettingRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -1764,6 +1903,9 @@ public async Task<IActionResult> ImportEmployees(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "payroll","PayrollPolicySetting","Saved",policy.Id,"payroll-policy","Payroll policy saved successfully.",User.Identity?.Name,tenantContext.TenantId,new { policy.EnforceMinimumTakeHome, policy.MinimumTakeHomeRuleType, policy.MinimumTakeHomeAmount, policy.MinimumTakeHomePercent, policy.CurrencyCode },cancellationToken);
 
         return Ok(new
         {
@@ -2088,6 +2230,7 @@ public async Task<IActionResult> CreatePayGroupElement(
     [FromBody] CreatePayrollPayGroupElementRequest request,
     [FromServices] ApplicationDbContext dbContext,
     [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
     CancellationToken cancellationToken)
 {
     var tenantContext = tenantContextAccessor.Current;
@@ -2135,6 +2278,9 @@ public async Task<IActionResult> CreatePayGroupElement(
     dbContext.Set<PayrollPayGroupElement>().Add(item);
     await dbContext.SaveChangesAsync(cancellationToken);
 
+    await auditTrailWriter.WriteAsync(
+        "payroll","PayrollPayGroupElement","Created",item.Id,item.Id.ToString(),"Pay group composition item created successfully.",User.Identity?.Name,tenantContext.TenantId,new { item.PayGroupId, item.PayElementId, item.Sequence, item.IsActive },cancellationToken);
+
     return Ok(new { Message = "Pay group composition item created successfully.", item.Id, item.PayGroupId, item.PayElementId, item.Sequence });
 }
 
@@ -2145,6 +2291,7 @@ public async Task<IActionResult> UpdatePayGroupElement(
     [FromBody] UpdatePayrollPayGroupElementRequest request,
     [FromServices] ApplicationDbContext dbContext,
     [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
     CancellationToken cancellationToken)
 {
     var tenantContext = tenantContextAccessor.Current;
@@ -2166,6 +2313,9 @@ public async Task<IActionResult> UpdatePayGroupElement(
     item.Update(request.Sequence, request.AmountOverride, request.RateOverride, request.IsMandatory, request.IsActive, request.EffectiveFromUtc, request.EffectiveToUtc, request.Notes);
     await dbContext.SaveChangesAsync(cancellationToken);
 
+    await auditTrailWriter.WriteAsync(
+        "payroll","PayrollPayGroupElement","Updated",item.Id,item.Id.ToString(),"Pay group composition item updated successfully.",User.Identity?.Name,tenantContext.TenantId,new { item.PayGroupId, item.PayElementId, item.Sequence, item.IsActive },cancellationToken);
+
     return Ok(new { Message = "Pay group composition item updated successfully.", item.Id, item.Sequence, item.IsActive });
 }
 
@@ -2175,6 +2325,7 @@ public async Task<IActionResult> DeletePayGroupElement(
     [FromRoute] Guid payGroupElementId,
     [FromServices] ApplicationDbContext dbContext,
     [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
     CancellationToken cancellationToken)
 {
     var tenantContext = tenantContextAccessor.Current;
@@ -2189,6 +2340,9 @@ public async Task<IActionResult> DeletePayGroupElement(
 
     dbContext.Set<PayrollPayGroupElement>().Remove(item);
     await dbContext.SaveChangesAsync(cancellationToken);
+
+    await auditTrailWriter.WriteAsync(
+        "payroll","PayrollPayGroupElement","Deleted",item.Id,item.Id.ToString(),"Pay group composition item deleted successfully.",User.Identity?.Name,tenantContext.TenantId,null,cancellationToken);
 
     return Ok(new { Message = "Pay group composition item deleted successfully.", item.Id });
 }
@@ -2395,6 +2549,7 @@ public async Task<IActionResult> DeletePayGroupElement(
         [FromBody] CreatePayrollSalaryStructureOverrideRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -2462,6 +2617,9 @@ public async Task<IActionResult> DeletePayGroupElement(
         dbContext.Set<PayrollSalaryStructureOverride>().Add(item);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "payroll","PayrollSalaryStructureOverride","Created",item.Id,item.Id.ToString(),"Salary structure override created successfully.",User.Identity?.Name,tenantContext.TenantId,new { item.PayrollSalaryStructureId, item.PayElementId, item.IsActive },cancellationToken);
+
         return Ok(new
         {
             Message = "Salary structure override created successfully.",
@@ -2478,6 +2636,7 @@ public async Task<IActionResult> DeletePayGroupElement(
         [FromBody] UpdatePayrollSalaryStructureOverrideRequest request,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -2512,6 +2671,9 @@ public async Task<IActionResult> DeletePayGroupElement(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await auditTrailWriter.WriteAsync(
+            "payroll","PayrollSalaryStructureOverride","Updated",item.Id,item.Id.ToString(),"Salary structure override updated successfully.",User.Identity?.Name,tenantContext.TenantId,new { item.PayrollSalaryStructureId, item.PayElementId, item.IsActive, item.IsExcluded },cancellationToken);
+
         return Ok(new
         {
             Message = "Salary structure override updated successfully.",
@@ -2527,6 +2689,7 @@ public async Task<IActionResult> DeletePayGroupElement(
         [FromRoute] Guid salaryStructureOverrideId,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -2546,6 +2709,9 @@ public async Task<IActionResult> DeletePayGroupElement(
 
         dbContext.Set<PayrollSalaryStructureOverride>().Remove(item);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "payroll","PayrollSalaryStructureOverride","Deleted",item.Id,item.Id.ToString(),"Salary structure override deleted successfully.",User.Identity?.Name,tenantContext.TenantId,null,cancellationToken);
 
         return Ok(new
         {
@@ -2663,6 +2829,7 @@ private static string? ValidatePayGroupElementUpdateRequest(UpdatePayrollPayGrou
         [FromQuery] string period,
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
         var tenantContext = tenantContextAccessor.Current;
@@ -2904,6 +3071,9 @@ private static string? ValidatePayGroupElementUpdateRequest(UpdatePayrollPayGrou
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "payroll","PayrollRun","Generated",run.Id,run.PayrollPeriod,$"Payroll run '{run.PayrollPeriod}' generated.",User.Identity?.Name,tenantContext.TenantId,new { run.PayrollPeriod, LineCount = run.Lines.Count, run.Status },cancellationToken);
 
         return Ok(new
         {

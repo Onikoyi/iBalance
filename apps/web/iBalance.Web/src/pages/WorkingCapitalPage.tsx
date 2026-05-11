@@ -17,7 +17,7 @@ import {
   type WorkingCapitalPayableStrategyRowDto,
   type WorkingCapitalReceivableHealthRowDto,
 } from '../lib/api';
-import { canViewFinance } from '../lib/auth';
+import { canViewReports } from '../lib/auth';
 
 function dateInputToUtc(value: string) {
   return value ? new Date(`${value}T00:00:00.000Z`).toISOString() : undefined;
@@ -119,7 +119,7 @@ function printWorkingCapitalReport(sectionId: string) {
 }
 
 export function WorkingCapitalPage() {
-  const canView = canViewFinance();
+  const canView = canViewReports();
   const [asOfDate, setAsOfDate] = useState(todayInputValue());
   const [fromDate, setFromDate] = useState(ninetyDaysAgoInputValue());
   const [toDate, setToDate] = useState(todayInputValue());
@@ -175,7 +175,7 @@ export function WorkingCapitalPage() {
   }
 
   if (dashboardQ.isError || receivablesQ.isError || payablesQ.isError || actionsQ.isError || cashflowQ.isError || !dashboardQ.data) {
-    return <div className="panel error-panel">{getTenantReadableError(dashboardQ.error, 'Unable to load working capital dashboard.')}</div>;
+    return <div className="panel error-panel">{getTenantReadableError(dashboardQ.error || receivablesQ.error || payablesQ.error || actionsQ.error || cashflowQ.error, 'Unable to load working capital dashboard.')}</div>;
   }
 
   const data = dashboardQ.data;
@@ -210,6 +210,12 @@ export function WorkingCapitalPage() {
           </div>
         </div>
       </section>
+
+      {optimizationQ.isError ? (
+        <section className="panel">
+          <div className="muted">Working capital optimization suggestions could not be loaded. The main dashboard, health views, actions, and cashflow forecast are still available.</div>
+        </section>
+      ) : null}
 
       <section id="working-capital-print" className="panel">
         <div className="section-heading">
