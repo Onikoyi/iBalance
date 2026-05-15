@@ -35,7 +35,15 @@ public sealed class AdminUsersController : ControllerBase
         "InventoryOfficer",
         "ApOfficer",
         "ArOfficer",
-        "FixedAssetOfficer"
+        "FixedAssetOfficer",
+        "ExpenseAdvanceOfficer",
+        "ExpenseAdvanceApprover",
+        "ExpenseAdvanceReviewer",
+        "ExpenseAdvanceViewer",
+        "FleetOfficer",
+        "FleetApprover",
+        "FleetReviewer",
+        "FleetViewer"
     ];
 
     [HttpGet]
@@ -173,6 +181,13 @@ public sealed class AdminUsersController : ControllerBase
         dbContext.UserAccounts.Add(user);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        await SyncPrimaryEnterpriseRoleAssignmentAsync(
+            dbContext,
+            tenantContext.TenantId,
+            user,
+            normalizedRole,
+            cancellationToken);
+
         await auditTrailWriter.WriteAsync(
             "admin",
             "UserAccount",
@@ -276,6 +291,13 @@ public sealed class AdminUsersController : ControllerBase
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await SyncPrimaryEnterpriseRoleAssignmentAsync(
+            dbContext,
+            user.TenantId,
+            user,
+            normalizedRole,
+            cancellationToken);
 
         await auditTrailWriter.WriteAsync(
             "admin",
@@ -546,6 +568,70 @@ public sealed class AdminUsersController : ControllerBase
     {
         return SupportedRoles.First(x => string.Equals(x, role.Trim(), StringComparison.OrdinalIgnoreCase));
     }
+
+private static async Task SyncPrimaryEnterpriseRoleAssignmentAsync(
+    ApplicationDbContext dbContext,
+    Guid tenantId,
+    UserAccount user,
+    string normalizedRole,
+    CancellationToken cancellationToken)
+{
+    var targetRoleCode = normalizedRole.Trim().ToUpperInvariant() switch
+    {
+        "PLATFORMADMIN" => "PLATFORM_ADMIN",
+        "TENANTADMIN" => "TENANT_ADMIN",
+        "FINANCECONTROLLER" => "FINANCE_CONTROLLER",
+        "BUDGETOFFICER" => "BUDGET_OFFICER",
+        "BUDGETOWNER" => "BUDGET_OWNER",
+        "PAYROLLOFFICER" => "PAYROLL_OFFICER",
+        "HROFFICER" => "HR_OFFICER",
+        "PROCUREMENTOFFICER" => "PROCUREMENT_OFFICER",
+        "TREASURYOFFICER" => "TREASURY_OFFICER",
+        "INVENTORYOFFICER" => "INVENTORY_OFFICER",
+        "APOFFICER" => "AP_OFFICER",
+        "AROFFICER" => "AR_OFFICER",
+        "FIXEDASSETOFFICER" => "FIXED_ASSET_OFFICER",
+        "EXPENSEADVANCEOFFICER" => "EXPENSE_ADVANCE_OFFICER",
+        "EXPENSEADVANCEAPPROVER" => "EXPENSE_ADVANCE_APPROVER",
+        "EXPENSEADVANCEREVIEWER" => "EXPENSE_ADVANCE_REVIEWER",
+        "EXPENSEADVANCEVIEWER" => "EXPENSE_ADVANCE_VIEWER",
+        "FLEETOFFICER" => "FLEET_OFFICER",
+        "FLEETAPPROVER" => "FLEET_APPROVER",
+        "FLEETREVIEWER" => "FLEET_REVIEWER",
+        "FLEETVIEWER" => "FLEET_VIEWER",
+        _ => normalizedRole.Trim().Replace(" ", "_").ToUpperInvariant()
+    };
+
+    var securityRole = await dbContext.Set<SecurityRole>()
+        .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Code == targetRoleCode, cancellationToken);
+
+    if (securityRole is null)
+    {
+        return;
+    }
+
+    var existingAssignments = await dbContext.Set<UserSecurityRoleAssignment>()
+        .Where(x => x.TenantId == tenantId && x.UserAccountId == user.Id)
+        .ToListAsync(cancellationToken);
+
+    if (existingAssignments.Count == 1 &&
+        existingAssignments[0].SecurityRoleId == securityRole.Id &&
+        existingAssignments[0].IsPrimary)
+    {
+        return;
+    }
+
+    dbContext.Set<UserSecurityRoleAssignment>().RemoveRange(existingAssignments);
+
+    dbContext.Set<UserSecurityRoleAssignment>().Add(new UserSecurityRoleAssignment(
+        Guid.NewGuid(),
+        tenantId,
+        user.Id,
+        securityRole.Id,
+        true));
+
+    await dbContext.SaveChangesAsync(cancellationToken);
+}
 
         private static bool IsSelfDemotionOrDeactivation(
         UserAccount targetUser,

@@ -75,6 +75,26 @@ public static class AuthorizationPolicies
     public const string ArReceiptReject = "ArReceiptReject";
     public const string ArReceiptPost = "ArReceiptPost";
 
+
+    public const string EamView = "EamView";
+    public const string EamRequestCreate = "EamRequestCreate";
+    public const string EamRequestUpdate = "EamRequestUpdate";
+    public const string EamRequestDelete = "EamRequestDelete";
+    public const string EamRequestSubmit = "EamRequestSubmit";
+    public const string EamRequestApprove = "EamRequestApprove";
+    public const string EamRequestReject = "EamRequestReject";
+    public const string EamDisburse = "EamDisburse";
+    public const string EamRetirementCreate = "EamRetirementCreate";
+    public const string EamRetirementUpdate = "EamRetirementUpdate";
+    public const string EamRetirementSubmit = "EamRetirementSubmit";
+    public const string EamRetirementApprove = "EamRetirementApprove";
+    public const string EamRetirementReject = "EamRetirementReject";
+    public const string EamRetirementPost = "EamRetirementPost";
+    public const string EamRefundRecord = "EamRefundRecord";
+    public const string EamRecoveryManage = "EamRecoveryManage";
+    public const string EamPolicyManage = "EamPolicyManage";
+    public const string EamReportsView = "EamReportsView";
+
     public const string TreasuryView = "TreasuryView";
     public const string TreasuryManage = "TreasuryManage";
     public const string InventoryView = "InventoryView";
@@ -84,4 +104,24 @@ public static class AuthorizationPolicies
 
     public const string ReportsView = "ReportsView";
     public const string ReportsExport = "ReportsExport";
+
+    public const string FleetView = "fleet.view";
+    public const string FleetVehicleManage = "fleet.vehicle.manage";
+    public const string FleetDriverManage = "fleet.driver.manage";
+    public const string FleetTripCreate = "fleet.trip.create";
+    public const string FleetTripSubmit = "FleetTripSubmit";
+    public const string FleetTripApprove = "fleet.trip.approve";
+    public const string FleetTripReject = "fleet.trip.reject";
+    public const string FleetTripPost = "fleet.trip.post";
+    public const string FleetFuelManage = "fleet.fuel.manage";
+    public const string FleetFuelApprove = "fleet.fuel.approve";
+    public const string FleetFuelPost = "fleet.fuel.post";
+    public const string FleetMaintenanceManage = "fleet.maintenance.manage";
+    public const string FleetMaintenanceSubmit = "fleet.maintenance.submit";
+    public const string FleetMaintenanceApprove = "fleet.maintenance.approve";
+    public const string FleetMaintenanceReject = "fleet.maintenance.reject";
+    public const string FleetMaintenancePost = "fleet.maintenance.post";
+    public const string FleetPolicyManage = "fleet.policy.manage";
+    public const string FleetReportsView = "fleet.reports.view";
+
 }

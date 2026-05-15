@@ -35,6 +35,7 @@ function licenseLabel(value?: number) {
 }
 
 function pageTitleForPath(pathname: string) {
+  if (pathname.startsWith('/eam')) return 'Expense & Advance Management';
   if (pathname.startsWith('/payroll')) return 'Payroll / Salary Management';
   if (pathname.startsWith('/working-capital')) return 'Working Capital Management';
   if (pathname.startsWith('/reconciliation')) return 'Bank Reconciliation';
@@ -67,11 +68,14 @@ function pageTitleForPath(pathname: string) {
   if (pathname.startsWith('/budgets/rejected')) return 'Rejected Budgets';
   if (pathname.startsWith('/budget-vs-actual')) return 'Budget vs Actual';
   if (pathname.startsWith('/budgets')) return 'Budget Management';
+  if (pathname.startsWith('/fleet')) return 'Fleet Management';
+
 
   return 'Finance Dashboard';
 }
 
 function pageSubtitleForPath(pathname: string) {
+  if (pathname.startsWith('/fleet')) return 'Manage vehicles, drivers, trips, fuel, maintenance, and fleet operating costs.';
   if (pathname.startsWith('/ageing-analysis')) return 'Review receivables and payables ageing by customer, vendor, and ageing bucket.';
   if (pathname.startsWith('/accounts')) return 'Manage ledger structure and posting accounts.';
   if (pathname.startsWith('/journals')) return 'Manage journals, posting workflow, and reversals.';
@@ -101,6 +105,7 @@ function pageSubtitleForPath(pathname: string) {
   if (pathname.startsWith('/budgets/rejected')) return 'Correct, resubmit, or delete rejected budgets.';
   if (pathname.startsWith('/budget-vs-actual')) return 'Compare approved budgets against posted accounting actuals.';
   if (pathname.startsWith('/budgets')) return 'Create, approve, lock, close, upload, and control budgets.';
+  if (pathname.startsWith('/eam')) return 'Manage staff advances, travel advances, imprest, float, retirement, refunds, recoveries, and reimbursement controls.';
   if (pathname.startsWith('/payroll')) return 'Manage employees, salary structures, payroll elements, and payroll processing.';
   if (pathname.startsWith('/working-capital')) return 'Monitor liquidity, optimize receivables and payables, and manage cash flow.';
   if (pathname.startsWith('/reconciliation')) return 'Match bank statements with ledger entries and resolve differences.';

@@ -122,6 +122,25 @@ public static class ServiceCollectionExtensions
             AddPermissionPolicy(AuthorizationPolicies.ArReceiptReject, "ar.receipt.reject");
             AddPermissionPolicy(AuthorizationPolicies.ArReceiptPost, "ar.receipt.post");
 
+            AddPermissionPolicy(AuthorizationPolicies.EamView, "eam.view");
+            AddPermissionPolicy(AuthorizationPolicies.EamRequestCreate, "eam.request.create");
+            AddPermissionPolicy(AuthorizationPolicies.EamRequestUpdate, "eam.request.update");
+            AddPermissionPolicy(AuthorizationPolicies.EamRequestDelete, "eam.request.delete");
+            AddPermissionPolicy(AuthorizationPolicies.EamRequestSubmit, "eam.request.submit");
+            AddPermissionPolicy(AuthorizationPolicies.EamRequestApprove, "eam.request.approve", "workflow.approve");
+            AddPermissionPolicy(AuthorizationPolicies.EamRequestReject, "eam.request.reject", "workflow.reject");
+            AddPermissionPolicy(AuthorizationPolicies.EamDisburse, "eam.disburse");
+            AddPermissionPolicy(AuthorizationPolicies.EamRetirementCreate, "eam.retirement.create");
+            AddPermissionPolicy(AuthorizationPolicies.EamRetirementUpdate, "eam.retirement.update");
+            AddPermissionPolicy(AuthorizationPolicies.EamRetirementSubmit, "eam.retirement.submit");
+            AddPermissionPolicy(AuthorizationPolicies.EamRetirementApprove, "eam.retirement.approve", "workflow.approve");
+            AddPermissionPolicy(AuthorizationPolicies.EamRetirementReject, "eam.retirement.reject", "workflow.reject");
+            AddPermissionPolicy(AuthorizationPolicies.EamRetirementPost, "eam.retirement.post");
+            AddPermissionPolicy(AuthorizationPolicies.EamRefundRecord, "eam.refund.record");
+            AddPermissionPolicy(AuthorizationPolicies.EamRecoveryManage, "eam.recovery.manage");
+            AddPermissionPolicy(AuthorizationPolicies.EamPolicyManage, "eam.policy.manage");
+            AddPermissionPolicy(AuthorizationPolicies.EamReportsView, "eam.reports.view", "reports.view");
+
             AddPermissionPolicy(AuthorizationPolicies.TreasuryView, "treasury.view");
             AddPermissionPolicy(AuthorizationPolicies.TreasuryManage, "treasury.manage", "treasury.bankaccounts.manage", "treasury.reconciliation.manage");
             AddPermissionPolicy(AuthorizationPolicies.InventoryView, "inventory.view");
@@ -131,6 +150,26 @@ public static class ServiceCollectionExtensions
 
             AddPermissionPolicy(AuthorizationPolicies.ReportsView, "reports.view", "finance.reports.view", "budget.reports.view");
             AddPermissionPolicy(AuthorizationPolicies.ReportsExport, "reports.export");
+
+
+            AddPermissionPolicy(AuthorizationPolicies.FleetView, "fleet.view");
+            AddPermissionPolicy(AuthorizationPolicies.FleetVehicleManage, "fleet.vehicle.manage");
+            AddPermissionPolicy(AuthorizationPolicies.FleetDriverManage, "fleet.driver.manage");
+            AddPermissionPolicy(AuthorizationPolicies.FleetTripCreate, "fleet.trip.create");
+            AddPermissionPolicy(AuthorizationPolicies.FleetTripSubmit, "fleet.trip.submit");
+            AddPermissionPolicy(AuthorizationPolicies.FleetTripApprove, "fleet.trip.approve");
+            AddPermissionPolicy(AuthorizationPolicies.FleetTripReject, "fleet.trip.reject");
+            AddPermissionPolicy(AuthorizationPolicies.FleetTripPost, "fleet.trip.post");
+            AddPermissionPolicy(AuthorizationPolicies.FleetFuelManage, "fleet.fuel.manage");
+            AddPermissionPolicy(AuthorizationPolicies.FleetFuelApprove, "fleet.fuel.approve");
+            AddPermissionPolicy(AuthorizationPolicies.FleetFuelPost, "fleet.fuel.post");
+            AddPermissionPolicy(AuthorizationPolicies.FleetMaintenanceManage, "fleet.maintenance.manage");
+            AddPermissionPolicy(AuthorizationPolicies.FleetMaintenanceSubmit, "fleet.maintenance.submit");
+            AddPermissionPolicy(AuthorizationPolicies.FleetMaintenanceApprove, "fleet.maintenance.approve");
+            AddPermissionPolicy(AuthorizationPolicies.FleetMaintenanceReject, "fleet.maintenance.reject");
+            AddPermissionPolicy(AuthorizationPolicies.FleetMaintenancePost, "fleet.maintenance.post");
+            AddPermissionPolicy(AuthorizationPolicies.FleetPolicyManage, "fleet.policy.manage");
+            AddPermissionPolicy(AuthorizationPolicies.FleetReportsView, "fleet.reports.view");
         });
 
         services.AddCors(options =>
@@ -146,8 +185,14 @@ public static class ServiceCollectionExtensions
 
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen();
-        services.AddControllers();
+        services
+            .AddControllers()
+            .AddJsonOptions(options =>
+            {
+                options.JsonSerializerOptions.PropertyNamingPolicy =
+                    System.Text.Json.JsonNamingPolicy.CamelCase;
+            });
 
-        return services;
-    }
+                return services;
+            }
 }

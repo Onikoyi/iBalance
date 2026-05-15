@@ -573,40 +573,39 @@ public sealed class AuthController : ControllerBase
     }
 
     private static async Task EnsureDefaultEnterpriseRoleAssignmentAsync(
-        ApplicationDbContext dbContext,
-        Guid tenantId,
-        UserAccount user,
-        CancellationToken cancellationToken)
+    ApplicationDbContext dbContext,
+    Guid tenantId,
+    UserAccount user,
+    CancellationToken cancellationToken)
+{
+    var targetRoleCode = ToSecurityRoleCode(user.Role);
+
+    var targetRole = await dbContext.Set<SecurityRole>()
+        .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Code == targetRoleCode, cancellationToken);
+
+    if (targetRole is null)
     {
-        var hasAssignments = await dbContext.Set<UserSecurityRoleAssignment>()
-            .AnyAsync(x => x.TenantId == tenantId && x.UserAccountId == user.Id, cancellationToken);
+        return;
+    }
 
-        if (hasAssignments)
-        {
-            return;
-        }
+    var hasAnyAssignment = await dbContext.Set<UserSecurityRoleAssignment>()
+        .AnyAsync(x => x.TenantId == tenantId && x.UserAccountId == user.Id, cancellationToken);
 
-        var legacyRoleCode = ToSecurityRoleCode(user.Role);
-
-        var role = await dbContext.Set<SecurityRole>()
-            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Code == legacyRoleCode, cancellationToken);
-
-        if (role is null)
-        {
-            return;
-        }
-
+    // ✅ ONLY assign default role IF user has no roles at all
+    if (!hasAnyAssignment)
+    {
         dbContext.Set<UserSecurityRoleAssignment>().Add(new UserSecurityRoleAssignment(
             Guid.NewGuid(),
             tenantId,
             user.Id,
-            role.Id,
+            targetRole.Id,
             true));
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }
+}
 
-    private static async Task<AuthorizationProfileDto> BuildAuthorizationProfileAsync(
+private static async Task<AuthorizationProfileDto> BuildAuthorizationProfileAsync(
         ApplicationDbContext dbContext,
         Guid tenantId,
         UserAccount user,
@@ -642,12 +641,20 @@ public sealed class AuthController : ControllerBase
             roleCodes = new List<string> { user.Role };
         }
 
+        if (!roleCodes.Contains(user.Role, StringComparer.OrdinalIgnoreCase))
+        {
+            roleCodes.Insert(0, user.Role);
+        }
+
         var primaryRole =
-            assignedRoles
-                .OrderByDescending(x => x.IsPrimary)
-                .Select(x => ToLegacyRoleName(x.Code))
-                .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x))
-            ?? user.Role;
+            string.Equals(user.Role, "PlatformAdmin", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(user.Role, "TenantAdmin", StringComparison.OrdinalIgnoreCase)
+                ? user.Role
+                : assignedRoles
+                    .OrderByDescending(x => x.IsPrimary)
+                    .Select(x => ToLegacyRoleName(x.Code))
+                    .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x))
+                ?? user.Role;
 
         var permissions = await dbContext.Set<UserSecurityRoleAssignment>()
             .AsNoTracking()
@@ -666,6 +673,17 @@ public sealed class AuthController : ControllerBase
             .Select(x => x.Code)
             .Distinct()
             .ToListAsync(cancellationToken);
+
+        if (permissions.Count == 0 &&
+            string.Equals(user.Role, "PlatformAdmin", StringComparison.OrdinalIgnoreCase))
+        {
+            permissions = await dbContext.Set<SecurityPermission>()
+                .AsNoTracking()
+                .Where(x => x.TenantId == tenantId && x.IsActive)
+                .Select(x => x.Code)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+        }
 
         var scopes = await dbContext.Set<UserScopeAssignment>()
             .AsNoTracking()
@@ -701,6 +719,14 @@ public sealed class AuthController : ControllerBase
             "APOFFICER" => "AP_OFFICER",
             "AROFFICER" => "AR_OFFICER",
             "FIXEDASSETOFFICER" => "FIXED_ASSET_OFFICER",
+            "EXPENSEADVANCEOFFICER" => "EXPENSE_ADVANCE_OFFICER",
+            "EXPENSEADVANCEAPPROVER" => "EXPENSE_ADVANCE_APPROVER",
+            "EXPENSEADVANCEREVIEWER" => "EXPENSE_ADVANCE_REVIEWER",
+            "EXPENSEADVANCEVIEWER" => "EXPENSE_ADVANCE_VIEWER",
+            "FLEETOFFICER" => "FLEET_OFFICER",
+            "FLEETAPPROVER" => "FLEET_APPROVER",
+            "FLEETREVIEWER" => "FLEET_REVIEWER",
+            "FLEETVIEWER" => "FLEET_VIEWER",
             _ => legacyRole.Trim().Replace(" ", "_").ToUpperInvariant()
         };
     }
@@ -726,6 +752,14 @@ public sealed class AuthController : ControllerBase
             "AP_OFFICER" => "ApOfficer",
             "AR_OFFICER" => "ArOfficer",
             "FIXED_ASSET_OFFICER" => "FixedAssetOfficer",
+            "EXPENSE_ADVANCE_OFFICER" => "ExpenseAdvanceOfficer",
+            "EXPENSE_ADVANCE_APPROVER" => "ExpenseAdvanceApprover",
+            "EXPENSE_ADVANCE_REVIEWER" => "ExpenseAdvanceReviewer",
+            "EXPENSE_ADVANCE_VIEWER" => "ExpenseAdvanceViewer",
+            "FLEET_OFFICER" => "FleetOfficer",
+            "FLEET_APPROVER" => "FleetApprover",
+            "FLEET_REVIEWER" => "FleetReviewer",
+            "FLEET_VIEWER" => "FleetViewer",
             _ => roleCode.Trim()
         };
     }

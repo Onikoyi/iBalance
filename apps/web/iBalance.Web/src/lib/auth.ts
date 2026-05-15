@@ -1,7 +1,6 @@
 import { getTenantKey, setTenantKey } from './api';
 import {
   getAssignableRolesForRole,
-  roleHasPermission,
   type AppPermission,
 } from './permissions';
 
@@ -22,7 +21,22 @@ export type UserRole =
   | 'InventoryOfficer'
   | 'ApOfficer'
   | 'ArOfficer'
-  | 'FixedAssetOfficer';
+  | 'FixedAssetOfficer'
+  | 'ExpenseAdvanceOfficer'
+  | 'ExpenseAdvanceApprover'
+  | 'ExpenseAdvanceReviewer'
+  | 'ExpenseAdvanceViewer'
+  | 'FleetOfficer'
+  | 'FleetApprover'
+  | 'FleetReviewer'
+  | 'FleetViewer';
+
+export type AuthScope = {
+  scopeType: string;
+  scopeEntityId: string;
+  scopeCode?: string | null;
+  scopeName?: string | null;
+};
 
 export type AuthSession = {
   accessToken: string;
@@ -35,12 +49,7 @@ export type AuthSession = {
   expiresAtUtc: string;
   roles?: string[];
   permissions?: string[];
-  scopes?: {
-    scopeType: string;
-    scopeEntityId: string;
-    scopeCode?: string | null;
-    scopeName?: string | null;
-  }[];
+  scopes?: AuthScope[];
 };
 
 type AuthSuccessResponse = {
@@ -60,12 +69,7 @@ type AuthSuccessResponse = {
     tenantKey: string;
     roles?: string[];
     permissions?: string[];
-    scopes?: {
-      scopeType: string;
-      scopeEntityId: string;
-      scopeCode?: string | null;
-      scopeName?: string | null;
-    }[];
+    scopes?: AuthScope[];
   };
 };
 
@@ -102,7 +106,7 @@ function normalizeTenantKeyForSession(session: AuthSession | null): AuthSession 
     return session;
   }
 
-  if (session.role !== 'PlatformAdmin') {
+  if (!containsRole(session, 'PlatformAdmin')) {
     const currentTenantKey = getTenantKey();
     if (currentTenantKey.trim() !== session.tenantKey.trim()) {
       setTenantKey(session.tenantKey);
@@ -110,6 +114,33 @@ function normalizeTenantKeyForSession(session: AuthSession | null): AuthSession 
   }
 
   return session;
+}
+
+function getNormalizedRoleSet(session: AuthSession | null): string[] {
+  if (!session) return [];
+  const raw = [session.role, ...(session.roles ?? [])]
+    .filter((value): value is string => !!value && value.trim().length > 0);
+
+  const unique: string[] = [];
+  for (const role of raw) {
+    if (!unique.some((item) => item.toLowerCase() == role.toLowerCase())) {
+      unique.push(role);
+    }
+  }
+
+  unique.sort((a, b) => {
+    if (a === 'PlatformAdmin') return -1;
+    if (b === 'PlatformAdmin') return 1;
+    if (a === 'TenantAdmin') return -1;
+    if (b === 'TenantAdmin') return 1;
+    return 0;
+  });
+
+  return unique;
+}
+
+function containsRole(session: AuthSession | null, role: string): boolean {
+  return getNormalizedRoleSet(session).some((item) => item.toLowerCase() === role.toLowerCase());
 }
 
 async function parseApiResponse(response: Response) {
@@ -129,16 +160,18 @@ async function parseApiResponse(response: Response) {
 }
 
 function setSessionFromResponse(data: AuthSuccessResponse, rememberMe: boolean): AuthSession {
+  const expandedRoles = Array.from(new Set([data.user.role, ...(data.user.roles ?? [])].filter(Boolean)));
+
   const session: AuthSession = {
     accessToken: data.accessToken,
     userId: data.user.id,
     userEmail: data.user.email,
     displayName: data.user.displayName,
-    role: data.user.role,
+    role: expandedRoles.includes('PlatformAdmin') ? 'PlatformAdmin' : data.user.role,
     tenantKey: data.user.tenantKey,
     issuedAtUtc: new Date().toISOString(),
     expiresAtUtc: data.expiresAtUtc,
-    roles: data.user.roles ?? [],
+    roles: expandedRoles,
     permissions: data.user.permissions ?? [],
     scopes: data.user.scopes ?? [],
   };
@@ -174,7 +207,14 @@ export function getSession(): AuthSession | null {
       return null;
     }
 
-    return normalizeTenantKeyForSession(parsed);
+    const normalizedRoles = Array.from(new Set([parsed.role, ...(parsed.roles ?? [])].filter(Boolean)));
+    const normalized: AuthSession = {
+      ...parsed,
+      role: normalizedRoles.includes('PlatformAdmin') ? 'PlatformAdmin' : parsed.role,
+      roles: normalizedRoles,
+    };
+
+    return normalizeTenantKeyForSession(normalized);
   } catch {
     clearStoredSession();
     return null;
@@ -190,22 +230,25 @@ export function getAccessToken(): string | null {
 }
 
 export function getCurrentRole(): UserRole | null {
-  return getSession()?.role ?? null;
+  const session = getSession();
+  if (!session) return null;
+  const roles = getNormalizedRoleSet(session);
+  return ((roles[0] ?? session.role) as UserRole) ?? null;
 }
 
 export function getCurrentRoles(): string[] {
-  const session = getSession();
-  if (!session) return [];
-  const expanded = session.roles ?? [];
-  return Array.from(new Set([session.role, ...expanded].filter(Boolean)));
+  return getNormalizedRoleSet(getSession());
 }
 
 export function getDisplayRoles(): string[] {
   const allRoles = getCurrentRoles();
   if (allRoles.length === 0) return [];
 
-  const specificRoles = allRoles.filter((role) => !genericDisplaySuppressedRoles.has(role));
+  if (allRoles[0] === 'PlatformAdmin') {
+    return allRoles;
+  }
 
+  const specificRoles = allRoles.filter((item) => !genericDisplaySuppressedRoles.has(item));
   if (specificRoles.length > 0) {
     return specificRoles;
   }
@@ -230,11 +273,11 @@ export function hasScope(scopeType: string, scopeEntityId: string): boolean {
 }
 
 export function isPlatformAdmin(): boolean {
-  return getCurrentRole() === 'PlatformAdmin';
+  return containsRole(getSession(), 'PlatformAdmin');
 }
 
 export function isTenantAdmin(): boolean {
-  return getCurrentRole() === 'TenantAdmin';
+  return !isPlatformAdmin() && containsRole(getSession(), 'TenantAdmin');
 }
 
 export function canSwitchTenantContext(): boolean {
@@ -246,7 +289,7 @@ export function canManagePlatformAdministration(): boolean {
 }
 
 export function canManagePlatformCommercials(): boolean {
-  return hasPermission('admin.settings.manage') && isPlatformAdmin();
+  return isPlatformAdmin();
 }
 
 export function canViewPlatformTenantConsole(): boolean {
@@ -258,36 +301,50 @@ export function canManageOwnTenantAdministration(): boolean {
 }
 
 export function canManageTenantUsers(): boolean {
-  return hasPermission('admin.users.manage');
+  return isPlatformAdmin() || isTenantAdmin() || hasPermission('admin.users.manage');
 }
 
 export function canManageEnterpriseAccessControl(): boolean {
   return (
+    isPlatformAdmin() ||
+    isTenantAdmin() ||
     hasPermission('admin.roles.manage') ||
     hasPermission('admin.permissions.manage') ||
     hasPermission('admin.scopes.manage')
   );
 }
 
-export function hasPermission(permission: AppPermission): boolean {
+export function hasPermission(permission: AppPermission | string): boolean {
   const session = getSession();
-  if (!session) return false;
 
-  const explicitPermissions = session.permissions ?? [];
-  if (explicitPermissions.includes(permission)) {
+  if (!session) {
+    return false;
+  }
+
+  // Platform administrators bypass all permission checks.
+  if (isPlatformAdmin()) {
     return true;
   }
 
-  return roleHasPermission(getCurrentRole(), permission);
+  const target = String(permission).trim().toLowerCase();
+
+
+  const explicitPermissions = (session.permissions ?? []).map((p) =>
+    p.trim().toLowerCase()
+  );
+
+  return explicitPermissions.includes(target);
 }
 
 export function shouldBypassLicenseEnforcement(): boolean {
-  return hasPermission('license.recovery.bypass');
+  return isPlatformAdmin() || hasPermission('license.recovery.bypass');
 }
 
 export function hasAnyRole(allowedRoles: UserRole[]): boolean {
-  const role = getCurrentRole();
-  return !!role && allowedRoles.includes(role);
+  const currentRoles = getCurrentRoles();
+  if (currentRoles.length === 0) return false;
+  if (currentRoles.includes('PlatformAdmin')) return true;
+  return allowedRoles.some((role) => currentRoles.includes(role));
 }
 
 export function canAccessAdmin(): boolean {
@@ -295,11 +352,11 @@ export function canAccessAdmin(): boolean {
 }
 
 export function canManageAdminSettings(): boolean {
-  return canManagePlatformCommercials() || hasPermission('admin.settings.manage');
+  return isPlatformAdmin();
 }
 
 export function canManageUsers(): boolean {
-  return hasPermission('admin.users.manage');
+  return isPlatformAdmin() || isTenantAdmin() || hasPermission('admin.users.manage');
 }
 
 export function canManageFinanceSetup(): boolean {
@@ -510,6 +567,98 @@ export function canPostFixedAssetDisposals(): boolean {
   return hasPermission('fixedassets.disposal.post');
 }
 
+export function canViewWorkingCapital(): boolean {
+  return hasPermission('workingcapital.view' as AppPermission);
+}
+
+export function canViewExpenseAdvances(): boolean {
+  return hasPermission('eam.view');
+}
+
+export function canCreateExpenseAdvances(): boolean {
+  return hasPermission('eam.request.create');
+}
+
+export function canSubmitExpenseAdvances(): boolean {
+  return hasPermission('eam.request.submit');
+}
+
+export function canApproveExpenseAdvances(): boolean {
+  return (
+    hasPermission('eam.view') &&
+    (
+      hasPermission('eam.approve') ||
+      hasPermission('workflow.approve')
+    )
+  );
+}
+
+export function canRejectExpenseAdvances(): boolean {
+  return canApproveExpenseAdvances();
+}
+
+export function canManageExpenseAdvancePolicies(): boolean {
+  return (
+    hasPermission('eam.view') &&
+    (
+      hasPermission('eam.policy.manage') ||
+      hasPermission('finance.setup.manage')
+    )
+  );
+}
+
+export function canViewExpenseAdvanceReports(): boolean {
+  return hasPermission('eam.view');
+}
+
+export function canViewFleet(): boolean {
+  return hasPermission('fleet.view');
+}
+
+export function canManageFleetVehicles(): boolean {
+  return hasPermission('fleet.vehicle.manage');
+}
+
+export function canManageFleetDrivers(): boolean {
+  return hasPermission('fleet.driver.manage');
+}
+
+export function canCreateFleetTrips(): boolean {
+  return hasPermission('fleet.trip.create');
+}
+
+export function canApproveFleetTrips(): boolean {
+  return hasPermission('fleet.trip.approve');
+}
+
+export function canManageFleetFuel(): boolean {
+  return hasPermission('fleet.fuel.manage');
+}
+
+export function canApproveFleetFuel(): boolean {
+  return hasPermission('fleet.fuel.approve');
+}
+
+export function canPostFleetFuel(): boolean {
+  return hasPermission('fleet.fuel.post');
+}
+
+export function canManageFleetMaintenance(): boolean {
+  return hasPermission('fleet.maintenance.manage');
+}
+
+export function canApproveFleetMaintenance(): boolean {
+  return hasPermission('fleet.maintenance.approve');
+}
+
+export function canPostFleetMaintenance(): boolean {
+  return hasPermission('fleet.maintenance.post');
+}
+
+export function canManageFleetPolicy(): boolean {
+  return hasPermission('fleet.policy.manage');
+}
+
 export function canEditUserRole(targetRole: UserRole): boolean {
   const currentRole = getCurrentRole();
 
@@ -529,7 +678,13 @@ export function canEditUserRole(targetRole: UserRole): boolean {
 }
 
 export function getAssignableRoles(): UserRole[] {
-  return getAssignableRolesForRole(getCurrentRole());
+  const currentRole = getCurrentRole();
+
+  if (currentRole === 'PlatformAdmin') {
+    return getAssignableRolesForRole(currentRole).filter((role) => role !== 'PlatformAdmin');
+  }
+
+  return getAssignableRolesForRole(currentRole);
 }
 
 export async function register(input: {
@@ -554,14 +709,19 @@ export async function register(input: {
   });
 
   const data = (await parseApiResponse(response)) as AuthSuccessResponse;
-  return setSessionFromResponse(data, input.rememberMe ?? true);
+  return setSessionFromResponse(data, !!input.rememberMe);
 }
 
 export async function login(
-  email: string,
-  password: string,
-  rememberMe: boolean
+  emailOrInput: string | { email: string; password: string; rememberMe?: boolean },
+  password?: string,
+  rememberMe?: boolean
 ): Promise<AuthSession> {
+  const input =
+    typeof emailOrInput === 'string'
+      ? { email: emailOrInput, password: password ?? '', rememberMe: !!rememberMe }
+      : emailOrInput;
+
   const response = await fetch(`${getApiBaseUrl()}/api/auth/login`, {
     method: 'POST',
     headers: {
@@ -569,13 +729,13 @@ export async function login(
       'X-Tenant-Key': getTenantKey(),
     },
     body: JSON.stringify({
-      email,
-      password,
+      email: input.email,
+      password: input.password,
     }),
   });
 
   const data = (await parseApiResponse(response)) as AuthSuccessResponse;
-  return setSessionFromResponse(data, rememberMe);
+  return setSessionFromResponse(data, !!input.rememberMe);
 }
 
 export async function forgotPassword(email: string): Promise<ForgotPasswordResponse> {
@@ -585,35 +745,79 @@ export async function forgotPassword(email: string): Promise<ForgotPasswordRespo
       'Content-Type': 'application/json',
       'X-Tenant-Key': getTenantKey(),
     },
-    body: JSON.stringify({
-      email,
-    }),
+    body: JSON.stringify({ email }),
   });
 
   return (await parseApiResponse(response)) as ForgotPasswordResponse;
 }
 
 export async function resetPassword(
-  email: string,
-  token: string,
-  newPassword: string
+  inputOrEmail: { email: string; token: string; newPassword: string } | string,
+  token?: string,
+  newPassword?: string
 ): Promise<{ message: string }> {
+  const payload =
+    typeof inputOrEmail === 'string'
+      ? { email: inputOrEmail, token: token ?? '', newPassword: newPassword ?? '' }
+      : inputOrEmail;
+
   const response = await fetch(`${getApiBaseUrl()}/api/auth/reset-password`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-Tenant-Key': getTenantKey(),
     },
-    body: JSON.stringify({
-      email,
-      token,
-      newPassword,
-    }),
+    body: JSON.stringify(payload),
   });
 
   return (await parseApiResponse(response)) as { message: string };
 }
 
-export function logout(): void {
+export function logout() {
   clearStoredSession();
+}
+
+export function hasAnyWorkspaceAccess(): boolean {
+  if (isPlatformAdmin()) {
+    return true;
+  }
+
+  return (
+    canViewReports() ||
+    canViewFinance() ||
+    canViewAccountsReceivable() ||
+    canViewAccountsPayable() ||
+    canViewProcurement() ||
+    canViewPayroll() ||
+    canViewBudget() ||
+    canViewFixedAssets() ||
+    canViewInventory() ||
+    canViewTreasury() ||
+    canViewExpenseAdvances() ||
+    canViewFleet() ||
+    canViewWorkingCapital() ||
+    canAccessAdmin()
+  );
+}
+
+export function getFirstAccessibleWorkspaceRoute(): string {
+  if (isPlatformAdmin()) {
+    return '/admin';
+  }
+
+  if (canViewReports()) return '/dashboard';
+  if (canViewFinance()) return '/accounts';
+  if (canViewAccountsReceivable()) return '/customers';
+  if (canViewAccountsPayable()) return '/vendors';
+  if (canViewProcurement()) return '/purchase-requisitions';
+  if (canViewPayroll()) return '/payroll';
+  if (canViewBudget()) return '/budgets';
+  if (canViewFixedAssets()) return '/fixed-assets';
+  if (canViewInventory()) return '/inventory';
+  if (canViewTreasury()) return '/reconciliation';
+  if (canViewExpenseAdvances()) return '/eam';
+  if (canViewFleet()) return '/fleet';
+  if (canViewWorkingCapital()) return '/working-capital';
+  if (canAccessAdmin()) return '/admin';
+  return '/dashboard';
 }

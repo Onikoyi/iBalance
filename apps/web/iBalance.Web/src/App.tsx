@@ -49,6 +49,30 @@ import { PayrollRunsPage } from './pages/PayrollRunsPage';
 import { PayrollPayslipsPage } from './pages/PayrollPayslipsPage';
 import { PayrollReportsPage } from './pages/PayrollReportsPage';
 import { RejectPayrollRunsPage } from './pages/RejectPayrollRunsPage';
+import { ExpenseAdvanceDashboardPage } from './pages/eam/ExpenseAdvanceDashboardPage';
+import { AdvanceRequestsPage } from './pages/eam/AdvanceRequestsPage';
+import { RejectedAdvanceRequestsPage } from './pages/eam/RejectedAdvanceRequestsPage';
+import { AdvanceApprovalQueuePage } from './pages/eam/AdvanceApprovalQueuePage';
+import { AdvanceDisbursementsPage } from './pages/eam/AdvanceDisbursementsPage';
+import { AdvanceRetirementsPage } from './pages/eam/AdvanceRetirementsPage';
+import { RejectedAdvanceRetirementsPage } from './pages/eam/RejectedAdvanceRetirementsPage';
+import { AdvanceRefundsPage } from './pages/eam/AdvanceRefundsPage';
+import { AdvanceRecoveriesPage } from './pages/eam/AdvanceRecoveriesPage';
+import { ExpenseAdvanceSetupPage } from './pages/eam/ExpenseAdvanceSetupPage';
+import { ExpenseAdvanceReportsPage } from './pages/eam/ExpenseAdvanceReportsPage';
+import { OutstandingAdvancesPage } from './pages/eam/OutstandingAdvancesPage';
+import { OverdueAdvancesPage } from './pages/eam/OverdueAdvancesPage';
+import { TravelAdvancesPage } from './pages/eam/TravelAdvancesPage';
+import { OperationalFloatPage } from './pages/eam/OperationalFloatPage';
+import { ImprestRegisterPage } from './pages/eam/ImprestRegisterPage';
+import { FleetDashboardPage } from './pages/fleet/FleetDashboardPage';
+import { FleetVehiclesPage } from './pages/fleet/FleetVehiclesPage';
+import { FleetDriversPage } from './pages/fleet/FleetDriversPage';
+import { FleetTripsPage } from './pages/fleet/FleetTripsPage';
+import { FleetFuelLogsPage } from './pages/fleet/FleetFuelLogsPage';
+import { FleetMaintenancePage } from './pages/fleet/FleetMaintenancePage';
+import { FleetPolicySetupPage } from './pages/fleet/FleetPolicySetupPage';
+import { FleetReportsPage } from './pages/fleet/FleetReportsPage';
 
 import { LoginPage } from './pages/auth/LoginPage';
 import { SignUpPage } from './pages/auth/SignUpPage';
@@ -66,6 +90,10 @@ import { AdminTenantDetailPage } from './pages/admin/AdminTenantDetailPage';
 import { AdminSubscriptionApplicationsPage } from './pages/admin/AdminSubscriptionApplicationsPage';
 import { AdminAccessControlPage } from './pages/admin/AdminAccessControlPage';
 import { AdminAuditTrailPage } from './pages/admin/AdminAuditTrailPage';
+import { AdminTenantModuleActivationPage } from './pages/admin/AdminTenantModuleActivationPage';
+import { WorkspaceResolverPage } from './pages/WorkspaceResolverPage';
+import { NoActiveModulesPage } from './pages/NoActiveModulesPage';
+
 
 
 export default function App() {
@@ -109,6 +137,83 @@ export default function App() {
           </PublicOnly>
         }
       />
+
+      <Route
+        path="/workspace"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              'PlatformAdmin',
+              'TenantAdmin',
+              'FinanceController',
+              'Accountant',
+              'Approver',
+              'Viewer',
+              'Auditor',
+              'BudgetOfficer',
+              'BudgetOwner',
+              'PayrollOfficer',
+              'HrOfficer',
+              'ProcurementOfficer',
+              'TreasuryOfficer',
+              'InventoryOfficer',
+              'ApOfficer',
+              'ArOfficer',
+              'FixedAssetOfficer',
+              'ExpenseAdvanceOfficer',
+              'ExpenseAdvanceApprover',
+              'ExpenseAdvanceReviewer',
+              'ExpenseAdvanceViewer',
+              'FleetOfficer',
+              'FleetApprover',
+              'FleetReviewer',
+              'FleetViewer',
+            ]}
+          >
+            <WorkspaceResolverPage />
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/no-active-modules"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              'PlatformAdmin',
+              'TenantAdmin',
+              'FinanceController',
+              'Accountant',
+              'Approver',
+              'Viewer',
+              'Auditor',
+              'BudgetOfficer',
+              'BudgetOwner',
+              'PayrollOfficer',
+              'HrOfficer',
+              'ProcurementOfficer',
+              'TreasuryOfficer',
+              'InventoryOfficer',
+              'ApOfficer',
+              'ArOfficer',
+              'FixedAssetOfficer',
+              'ExpenseAdvanceOfficer',
+              'ExpenseAdvanceApprover',
+              'ExpenseAdvanceReviewer',
+              'ExpenseAdvanceViewer',
+              'FleetOfficer',
+              'FleetApprover',
+              'FleetReviewer',
+              'FleetViewer',
+            ]}
+          >
+            <AppShell>
+              <NoActiveModulesPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
 
       <Route
         path="/dashboard"
@@ -856,6 +961,315 @@ export default function App() {
         }
       />
 
+
+      <Route
+        path="/eam"
+        element={
+          <RequireAuth
+            allowedRoles={['PlatformAdmin', 'TenantAdmin', 'FinanceController', 'Approver', 'Viewer', 'Auditor', 'ExpenseAdvanceOfficer', 'ExpenseAdvanceApprover', 'ExpenseAdvanceReviewer', 'ExpenseAdvanceViewer']}
+            requiredPermissions={['eam.view']}
+          >
+            <AppShell><ExpenseAdvanceDashboardPage /></AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/eam/requests"
+        element={<RequireAuth
+          allowedRoles={[
+            'PlatformAdmin',
+            'TenantAdmin',
+            'FinanceController',
+            'Approver',
+            'Viewer',
+            'Auditor',
+            'ExpenseAdvanceOfficer',
+            'ExpenseAdvanceApprover',
+            'ExpenseAdvanceReviewer',
+            'ExpenseAdvanceViewer']}
+          requiredPermissions={['eam.view']}>
+          <AppShell>
+            <AdvanceRequestsPage />
+          </AppShell>
+        </RequireAuth>}
+      />
+
+      <Route
+        path="/eam/requests/rejected"
+        element={<RequireAuth
+          allowedRoles={[
+            'PlatformAdmin',
+            'TenantAdmin',
+            'FinanceController',
+            'Approver',
+            'Viewer',
+            'Auditor',
+            'ExpenseAdvanceOfficer',
+            'ExpenseAdvanceApprover',
+            'ExpenseAdvanceReviewer',
+            'ExpenseAdvanceViewer']}
+          requiredPermissions={['eam.view']}>
+          <AppShell>
+            <RejectedAdvanceRequestsPage />
+          </AppShell>
+        </RequireAuth>}
+      />
+
+
+      <Route
+        path="/eam/approval-queue"
+        element={<RequireAuth
+          allowedRoles={[
+            'PlatformAdmin',
+            'TenantAdmin',
+            'FinanceController',
+            'Approver',
+            'ExpenseAdvanceApprover',
+            'ExpenseAdvanceReviewer']}
+            requiredPermissions={['eam.view']}>
+          <AppShell>
+            <AdvanceApprovalQueuePage />
+          </AppShell>
+        </RequireAuth>}
+      />
+      <Route
+        path="/eam/disbursements"
+        element={<RequireAuth
+          allowedRoles={[
+            'PlatformAdmin',
+            'TenantAdmin',
+            'FinanceController',
+            'Approver',
+            'ExpenseAdvanceOfficer',
+            'ExpenseAdvanceApprover',
+            'ExpenseAdvanceReviewer']}
+          requiredPermissions={['eam.view']}>
+          <AppShell><AdvanceDisbursementsPage />
+          </AppShell>
+        </RequireAuth>}
+      />
+      <Route
+        path="/eam/retirements"
+        element={<RequireAuth
+          allowedRoles={[
+            'PlatformAdmin',
+            'TenantAdmin',
+            'FinanceController',
+            'Approver',
+            'Viewer',
+            'Auditor',
+            'ExpenseAdvanceOfficer',
+            'ExpenseAdvanceApprover',
+            'ExpenseAdvanceReviewer',
+            'ExpenseAdvanceViewer']}
+          requiredPermissions={['eam.view']}>
+          <AppShell>
+            <AdvanceRetirementsPage />
+          </AppShell>
+        </RequireAuth>}
+      />
+      <Route
+        path="/eam/retirements/rejected"
+        element={<RequireAuth
+          allowedRoles={[
+            'PlatformAdmin',
+            'TenantAdmin',
+            'FinanceController',
+            'Approver',
+            'Viewer',
+            'Auditor',
+            'ExpenseAdvanceOfficer',
+            'ExpenseAdvanceApprover',
+            'ExpenseAdvanceReviewer',
+            'ExpenseAdvanceViewer']}
+          requiredPermissions={['eam.view']}>
+          <AppShell>
+            <RejectedAdvanceRetirementsPage />
+          </AppShell>
+        </RequireAuth>}
+      />
+      <Route
+        path="/eam/refunds"
+        element={<RequireAuth
+          allowedRoles={[
+            'PlatformAdmin',
+            'TenantAdmin',
+            'FinanceController',
+            'Approver', 'Viewer',
+            'Auditor',
+            'ExpenseAdvanceOfficer',
+            'ExpenseAdvanceApprover',
+            'ExpenseAdvanceReviewer',
+            'ExpenseAdvanceViewer']}
+          requiredPermissions={['eam.view']}>
+          <AppShell>
+            <AdvanceRefundsPage />
+          </AppShell>
+        </RequireAuth>}
+      />
+
+      <Route
+        path="/eam/recoveries"
+        element={<RequireAuth
+          allowedRoles={[
+            'PlatformAdmin',
+            'TenantAdmin',
+            'FinanceController',
+            'Approver',
+            'Viewer',
+            'Auditor',
+            'ExpenseAdvanceOfficer',
+            'ExpenseAdvanceApprover',
+            'ExpenseAdvanceReviewer',
+            'ExpenseAdvanceViewer']}
+          requiredPermissions={['eam.view']}>
+          <AppShell>
+            <AdvanceRecoveriesPage />
+          </AppShell>
+        </RequireAuth>}
+      />
+      <Route
+        path="/eam/imprest-register"
+        element={<RequireAuth
+          allowedRoles={[
+            'PlatformAdmin',
+            'TenantAdmin',
+            'FinanceController',
+            'Approver',
+            'Viewer',
+            'Auditor',
+            'ExpenseAdvanceOfficer',
+            'ExpenseAdvanceApprover',
+            'ExpenseAdvanceReviewer',
+            'ExpenseAdvanceViewer']}
+          requiredPermissions={['eam.view']}>
+          <AppShell>
+            <ImprestRegisterPage />
+          </AppShell>
+        </RequireAuth>}
+      />
+
+      <Route
+        path="/eam/travel-advances"
+        element={<RequireAuth
+          allowedRoles={[
+            'PlatformAdmin',
+            'TenantAdmin',
+            'FinanceController',
+            'Approver',
+            'Viewer',
+            'Auditor',
+            'ExpenseAdvanceOfficer',
+            'ExpenseAdvanceApprover',
+            'ExpenseAdvanceReviewer',
+            'ExpenseAdvanceViewer']}
+          requiredPermissions={['eam.view']}>
+          <AppShell>
+            <TravelAdvancesPage />
+          </AppShell>
+        </RequireAuth>}
+      />
+      <Route
+        path="/eam/operational-float"
+        element={<RequireAuth
+          allowedRoles={[
+            'PlatformAdmin',
+            'TenantAdmin',
+            'FinanceController',
+            'Approver',
+            'Viewer',
+            'Auditor',
+            'ExpenseAdvanceOfficer',
+            'ExpenseAdvanceApprover',
+            'ExpenseAdvanceReviewer',
+            'ExpenseAdvanceViewer']}
+          requiredPermissions={['eam.view']}
+        ><AppShell>
+            <OperationalFloatPage />
+          </AppShell>
+        </RequireAuth>}
+      />
+
+      <Route
+        path="/eam/outstanding"
+        element={<RequireAuth
+          allowedRoles={[
+            'PlatformAdmin',
+            'TenantAdmin',
+            'FinanceController',
+            'Approver',
+            'Viewer',
+            'Auditor',
+            'ExpenseAdvanceOfficer',
+            'ExpenseAdvanceApprover',
+            'ExpenseAdvanceReviewer',
+            'ExpenseAdvanceViewer']}
+          requiredPermissions={['eam.view']}>
+          <AppShell>
+            <OutstandingAdvancesPage />
+          </AppShell>
+        </RequireAuth>}
+      />
+
+      <Route
+        path="/eam/overdue"
+        element={<RequireAuth
+          allowedRoles={[
+            'PlatformAdmin',
+            'TenantAdmin',
+            'FinanceController',
+            'Approver',
+            'Viewer',
+            'Auditor',
+            'ExpenseAdvanceOfficer',
+            'ExpenseAdvanceApprover',
+            'ExpenseAdvanceReviewer',
+            'ExpenseAdvanceViewer']}
+          requiredPermissions={['eam.view']}>
+          <AppShell>
+            <OverdueAdvancesPage />
+          </AppShell>
+        </RequireAuth>}
+      />
+
+      <Route
+        path="/eam/setup"
+        element={<RequireAuth
+          allowedRoles={[
+            'PlatformAdmin',
+            'TenantAdmin',
+            'FinanceController',
+            'ExpenseAdvanceOfficer',
+            'ExpenseAdvanceApprover',
+            'ExpenseAdvanceReviewer']}
+            requiredPermissions={['eam.view']}>
+          <AppShell>
+            <ExpenseAdvanceSetupPage />
+          </AppShell>
+        </RequireAuth>}
+      />
+
+      <Route
+        path="/eam/reports"
+        element={<RequireAuth
+          allowedRoles={[
+            'PlatformAdmin',
+            'TenantAdmin',
+            'FinanceController',
+            'Approver',
+            'Viewer',
+            'Auditor',
+            'ExpenseAdvanceOfficer',
+            'ExpenseAdvanceApprover',
+            'ExpenseAdvanceReviewer',
+            'ExpenseAdvanceViewer']}
+            requiredPermissions={['eam.view']}>
+          <AppShell>
+            <ExpenseAdvanceReportsPage />
+          </AppShell>
+        </RequireAuth>}
+      />
+
       <Route
         path="/reports"
         element={
@@ -949,7 +1363,7 @@ export default function App() {
               'PayrollOfficer',
               'HrOfficer',
             ]}
-            requiredPermissions={['payroll.manage']}
+            requiredPermissions={['finance.view']}
           >
             <AppShell>
               <PayrollSetupPage />
@@ -1003,6 +1417,141 @@ export default function App() {
           </RequireAuth>
         }
       />
+
+      <Route
+        path="/fleet"
+        element={
+          <RequireAuth allowedRoles={[
+            'PlatformAdmin',
+            'TenantAdmin',
+            'FleetOfficer',
+            'FleetApprover',
+            'FleetReviewer',
+            'FleetViewer'
+          ]}
+            requiredPermissions={['fleet.view']}>
+            <AppShell>
+              <FleetDashboardPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/fleet/vehicles"
+        element={
+          <RequireAuth allowedRoles={[
+            'PlatformAdmin',
+            'TenantAdmin',
+            'FleetOfficer',
+            'FleetApprover',
+            'FleetReviewer'
+          ]}
+            requiredPermissions={['fleet.vehicle.manage']}>
+            <AppShell>
+              <FleetVehiclesPage />
+            </AppShell>
+          </RequireAuth>}
+      />
+
+      <Route
+        path="/fleet/drivers"
+        element={<RequireAuth allowedRoles={[
+          'PlatformAdmin',
+          'TenantAdmin',
+          'FleetOfficer',
+          'FleetApprover',
+          'FleetReviewer']}
+          requiredPermissions={['fleet.driver.manage'
+          ]}>
+          <AppShell>
+            <FleetDriversPage />
+          </AppShell>
+        </RequireAuth>}
+      />
+
+      <Route
+        path="/fleet/trips"
+        element={
+          <RequireAuth allowedRoles={[
+            'PlatformAdmin',
+            'TenantAdmin',
+            'FleetOfficer',
+            'FleetApprover',
+            'FleetReviewer'
+          ]}
+            requiredPermissions={['fleet.trip.create'
+            ]}>
+            <AppShell>
+              <FleetTripsPage />
+            </AppShell>
+          </RequireAuth>}
+      />
+
+      <Route
+        path="/fleet/fuel-logs"
+        element={<RequireAuth allowedRoles={[
+          'PlatformAdmin',
+          'TenantAdmin',
+          'FleetOfficer',
+          'FleetApprover',
+          'FleetReviewer']}
+          requiredPermissions={['fleet.fuel.manage']}>
+          <AppShell>
+            <FleetFuelLogsPage />
+          </AppShell>
+        </RequireAuth>}
+      />
+
+      <Route
+        path="/fleet/maintenance"
+        element={<RequireAuth
+          allowedRoles={[
+            'PlatformAdmin',
+            'TenantAdmin',
+            'FleetOfficer',
+            'FleetApprover',
+            'FleetReviewer']}
+          requiredPermissions={['fleet.maintenance.manage']}>
+          <AppShell>
+            <FleetMaintenancePage />
+          </AppShell>
+        </RequireAuth>}
+      />
+
+      <Route
+        path="/fleet/setup"
+        element={<RequireAuth
+          allowedRoles={[
+            'PlatformAdmin',
+            'TenantAdmin',
+            'FleetOfficer',
+            'FleetApprover']}
+          requiredPermissions={['fleet.policy.manage']}>
+          <AppShell>
+            <FleetPolicySetupPage />
+          </AppShell>
+        </RequireAuth>}
+      />
+
+      <Route
+        path="/fleet/reports"
+        element={<RequireAuth
+          allowedRoles={[
+            'PlatformAdmin',
+            'TenantAdmin',
+            'FleetOfficer',
+            'FleetApprover',
+            'FleetReviewer',
+            'FleetViewer']}
+          requiredPermissions={['fleet.reports.view']}>
+          <AppShell>
+            <FleetReportsPage />
+          </AppShell>
+        </RequireAuth>}
+      />
+
+
       <Route
         path="/payroll/reports"
         element={
@@ -1072,6 +1621,7 @@ export default function App() {
               'ArOfficer',
               'FixedAssetOfficer',
             ]}
+            requiredPermissions={['workingcapital.view']}
           >
             <AppShell>
               <WorkingCapitalPage />
@@ -1079,6 +1629,7 @@ export default function App() {
           </RequireAuth>
         }
       />
+
 
       <Route
         path="/ageing-analysis"
@@ -1171,6 +1722,18 @@ export default function App() {
           </RequireAuth>
         }
       />
+
+      <Route
+        path="/admin/tenant-modules"
+        element={
+          <RequireAuth allowedRoles={['PlatformAdmin']}>
+            <AdminShell>
+              <AdminTenantModuleActivationPage />
+            </AdminShell>
+          </RequireAuth>
+        }
+      />
+
       <Route
         path="/admin/access-control"
         element={

@@ -35,12 +35,53 @@ export function RequireAuth({
   }
 
   if (requiredPermissions && requiredPermissions.length > 0) {
-    const granted = requiredPermissions.some((permission) => hasPermission(permission as any));
+    // Route access should succeed if the user has ANY matching permission.
+    // Module visibility and action permissions are evaluated separately.
+    const granted = requiredPermissions.some((permission) =>
+      hasPermission(permission as any)
+    );
+  
     if (!granted) {
-      return <Navigate to="/dashboard" replace state={{ deniedFrom: location.pathname }} />;
+      return (
+        <div className="panel space-y-3">
+          <div>
+            <h2 className="text-lg font-semibold text-red-600">
+              Access Denied
+            </h2>
+          </div>
+    
+          <p className="text-sm text-slate-600">
+            You do not have permission to access this page.
+          </p>
+    
+          <div className="text-xs text-slate-500">
+            Route: {location.pathname}
+          </div>
+        </div>
+      );
     }
-  } else if (allowedRoles && allowedRoles.length > 0 && !hasAnyRole(allowedRoles)) {
-    return <Navigate to="/dashboard" replace state={{ deniedFrom: location.pathname }} />;
+  } else if (
+    allowedRoles &&
+    allowedRoles.length > 0 &&
+    !hasAnyRole(allowedRoles)
+  ) {
+    return (
+      <div className="panel space-y-3">
+        <div>
+          <h2 className="text-lg font-semibold text-red-600">
+            Access Denied
+          </h2>
+        </div>
+  
+        <p className="text-sm text-slate-600">
+          Your role is not permitted to access this page.
+        </p>
+  
+        <div className="text-xs text-slate-500">
+          Route: {location.pathname}
+        </div>
+      </div>
+    );
   }
 
   if (bypassLicense) {

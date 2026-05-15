@@ -113,6 +113,45 @@ public sealed class AccessControlController : ControllerBase
             new { Code = "ar.receipt.reject", Module = "ar", Action = "reject", Name = "Reject Customer Receipts", Description = "Reject customer receipts." },
             new { Code = "ar.receipt.post", Module = "ar", Action = "post", Name = "Post Customer Receipts", Description = "Post customer receipts." },
 
+
+            new { Code = "fleet.view", Module = "fleet", Action = "view", Name = "View Fleet", Description = "Access fleet management workspace." },
+            new { Code = "fleet.vehicle.manage", Module = "fleet", Action = "manage", Name = "Manage Fleet Vehicles", Description = "Create and maintain fleet vehicles." },
+            new { Code = "fleet.driver.manage", Module = "fleet", Action = "manage", Name = "Manage Fleet Drivers", Description = "Create and maintain fleet drivers." },
+            new { Code = "fleet.trip.create", Module = "fleet", Action = "create", Name = "Create Fleet Trips", Description = "Create fleet trip requests and journey logs." },
+            new { Code = "fleet.trip.submit", Module = "fleet", Action = "submit", Name = "Submit Fleet Trips", Description = "Submit fleet trips for approval." },
+            new { Code = "fleet.trip.approve", Module = "fleet", Action = "approve", Name = "Approve Fleet Trips", Description = "Approve fleet trip requests." },
+            new { Code = "fleet.trip.reject", Module = "fleet", Action = "reject", Name = "Reject Fleet Trips", Description = "Reject fleet trip requests." },
+            new { Code = "fleet.trip.post", Module = "fleet", Action = "post", Name = "Post Fleet Trips", Description = "Post fleet trip completions where policy requires posting." },
+            new { Code = "fleet.fuel.manage", Module = "fleet", Action = "manage", Name = "Manage Fleet Fuel", Description = "Create and maintain fleet fuel logs." },
+            new { Code = "fleet.fuel.approve", Module = "fleet", Action = "approve", Name = "Approve Fleet Fuel", Description = "Approve fleet fuel logs." },
+            new { Code = "fleet.fuel.post", Module = "fleet", Action = "post", Name = "Post Fleet Fuel", Description = "Post fleet fuel logs to general ledger." },
+            new { Code = "fleet.maintenance.manage", Module = "fleet", Action = "manage", Name = "Manage Fleet Maintenance", Description = "Create and maintain maintenance work orders." },
+            new { Code = "fleet.maintenance.submit", Module = "fleet", Action = "submit", Name = "Submit Fleet Maintenance", Description = "Submit maintenance work orders." },
+            new { Code = "fleet.maintenance.approve", Module = "fleet", Action = "approve", Name = "Approve Fleet Maintenance", Description = "Approve maintenance work orders." },
+            new { Code = "fleet.maintenance.reject", Module = "fleet", Action = "reject", Name = "Reject Fleet Maintenance", Description = "Reject maintenance work orders." },
+            new { Code = "fleet.maintenance.post", Module = "fleet", Action = "post", Name = "Post Fleet Maintenance", Description = "Post maintenance work orders to general ledger." },
+            new { Code = "fleet.policy.manage", Module = "fleet", Action = "manage", Name = "Manage Fleet Policy", Description = "Manage fleet policy, posting, and control setup." },
+            new { Code = "fleet.reports.view", Module = "fleet", Action = "report", Name = "View Fleet Reports", Description = "View fleet dashboards and analytical reports." },
+
+            new { Code = "eam.view", Module = "eam", Action = "view", Name = "View Expense & Advance Management", Description = "Access expense and advance management workspaces." },
+            new { Code = "eam.request.create", Module = "eam", Action = "create", Name = "Create Advance Requests", Description = "Create expense and advance requests." },
+            new { Code = "eam.request.update", Module = "eam", Action = "update", Name = "Update Advance Requests", Description = "Update draft or rejected advance requests." },
+            new { Code = "eam.request.delete", Module = "eam", Action = "delete", Name = "Delete Advance Requests", Description = "Delete draft or rejected advance requests." },
+            new { Code = "eam.request.submit", Module = "eam", Action = "submit", Name = "Submit Advance Requests", Description = "Submit advance requests for approval." },
+            new { Code = "eam.request.approve", Module = "eam", Action = "approve", Name = "Approve Advance Requests", Description = "Approve advance requests." },
+            new { Code = "eam.request.reject", Module = "eam", Action = "reject", Name = "Reject Advance Requests", Description = "Reject advance requests." },
+            new { Code = "eam.disburse", Module = "eam", Action = "disburse", Name = "Disburse Advances", Description = "Disburse approved advances and imprests." },
+            new { Code = "eam.retirement.create", Module = "eam", Action = "create", Name = "Create Retirements", Description = "Create advance retirement transactions." },
+            new { Code = "eam.retirement.update", Module = "eam", Action = "update", Name = "Update Retirements", Description = "Update draft or rejected retirement transactions." },
+            new { Code = "eam.retirement.submit", Module = "eam", Action = "submit", Name = "Submit Retirements", Description = "Submit retirement transactions for approval." },
+            new { Code = "eam.retirement.approve", Module = "eam", Action = "approve", Name = "Approve Retirements", Description = "Approve retirement transactions." },
+            new { Code = "eam.retirement.reject", Module = "eam", Action = "reject", Name = "Reject Retirements", Description = "Reject retirement transactions." },
+            new { Code = "eam.retirement.post", Module = "eam", Action = "post", Name = "Post Retirements", Description = "Post approved retirement transactions." },
+            new { Code = "eam.refund.record", Module = "eam", Action = "refund", Name = "Record Refunds", Description = "Record cash and bank refunds against outstanding advances." },
+            new { Code = "eam.recovery.manage", Module = "eam", Action = "recover", Name = "Manage Recoveries", Description = "Manage salary and journal recoveries and excess reimbursements." },
+            new { Code = "eam.policy.manage", Module = "eam", Action = "manage", Name = "Manage EAM Policy & Setup", Description = "Manage expense and advance policies, masters, posting setup, and numbering." },
+            new { Code = "eam.reports.view", Module = "eam", Action = "report", Name = "View EAM Reports", Description = "View expense and advance reports and dashboards." },
+
             new { Code = "treasury.view", Module = "treasury", Action = "view", Name = "View Treasury", Description = "Access treasury workspaces." },
             new { Code = "treasury.manage", Module = "treasury", Action = "manage", Name = "Manage Treasury", Description = "Manage treasury operations." },
             new { Code = "treasury.bankaccounts.manage", Module = "treasury", Action = "manage", Name = "Manage Bank Accounts", Description = "Maintain bank accounts." },
@@ -125,6 +164,7 @@ public sealed class AccessControlController : ControllerBase
             new { Code = "fixedassets.manage", Module = "fixedassets", Action = "manage", Name = "Manage Fixed Assets", Description = "Manage fixed assets." },
             new { Code = "fixedassets.depreciation.run", Module = "fixedassets", Action = "run", Name = "Run Depreciation", Description = "Run asset depreciation." },
             new { Code = "fixedassets.disposal.post", Module = "fixedassets", Action = "post", Name = "Post Asset Disposal", Description = "Post asset disposal transactions." },
+            new { Code = "workingcapital.view", Module = "workingcapital", Action = "view", Name = "View Working Capital", Description = "Access working capital workspace." },
 
             new { Code = "workflow.approve", Module = "workflow", Action = "approve", Name = "Approve Workflows", Description = "Approve workflow transactions across modules." },
             new { Code = "workflow.reject", Module = "workflow", Action = "reject", Name = "Reject Workflows", Description = "Reject workflow transactions across modules." },
@@ -169,13 +209,47 @@ public sealed class AccessControlController : ControllerBase
                 Description = "Platform-wide administrative access.",
                 PermissionCodes = permissionSeed.Select(x => x.Code).ToArray()
             },
-            new
-            {
-                Code = "TENANT_ADMIN",
-                Name = "Tenant Admin",
-                Description = "Tenant administrative access.",
-                PermissionCodes = permissionSeed.Where(x => !string.Equals(x.Code, "license.recovery.bypass", StringComparison.OrdinalIgnoreCase)).Select(x => x.Code).ToArray()
-            },
+            
+               new
+{
+    Code = "TENANT_ADMIN",
+    Name = "Tenant Admin",
+    Description = "Tenant administrative access with module visibility bound to tenant subscription.",
+    PermissionCodes = new[]
+    {
+        "admin.access",
+        "admin.users.manage",
+        "admin.roles.manage",
+        "admin.permissions.manage",
+        "admin.scopes.manage",
+
+        "reports.view",
+        "finance.view",
+        "budget.view",
+        "procurement.view",
+        "ap.view",
+        "ar.view",
+        "payroll.view",
+        "inventory.view",
+        "fixedassets.view",
+        "treasury.view",
+        "eam.view",
+        "fleet.view",
+        "fleet.vehicle.manage",
+        "fleet.driver.manage",
+        "fleet.trip.create",
+        "fleet.trip.approve",
+        "fleet.fuel.manage",
+        "fleet.fuel.approve",
+        "fleet.fuel.post",
+        "fleet.maintenance.manage",
+        "fleet.maintenance.approve",
+        "fleet.maintenance.post",
+        "fleet.policy.manage",
+        "fleet.reports.view",
+        "workingcapital.view",
+    }
+},
             new
             {
                 Code = "FINANCE_CONTROLLER",
@@ -319,6 +393,114 @@ public sealed class AccessControlController : ControllerBase
                     "reports.view","reports.export"
                 }
             },
+
+            new
+            {
+                Code = "FLEET_OFFICER",
+                Name = "Fleet Officer",
+                Description = "Create and manage operational fleet transactions.",
+                PermissionCodes = new[]
+                {
+                    "fleet.view",
+                    "fleet.vehicle.manage",
+                    "fleet.driver.manage",
+                    "fleet.trip.create",
+                    "fleet.trip.submit",
+                    "fleet.fuel.manage",
+                    "fleet.maintenance.manage",
+                    "fleet.maintenance.submit",
+                    "fleet.policy.manage",
+                    "fleet.reports.view"
+                }
+            },
+            new
+            {
+                Code = "FLEET_APPROVER",
+                Name = "Fleet Approver",
+                Description = "Approve and post controlled fleet transactions.",
+                PermissionCodes = new[]
+                {
+                    "fleet.view",
+                    "fleet.trip.approve",
+                    "fleet.trip.reject",
+                    "fleet.trip.post",
+                    "fleet.fuel.approve",
+                    "fleet.fuel.post",
+                    "fleet.maintenance.approve",
+                    "fleet.maintenance.reject",
+                    "fleet.maintenance.post",
+                    "fleet.reports.view",
+                    "workflow.approve",
+                    "workflow.reject"
+                }
+            },
+            new
+            {
+                Code = "FLEET_REVIEWER",
+                Name = "Fleet Reviewer",
+                Description = "Review fleet transactions and fleet performance.",
+                PermissionCodes = new[]
+                {
+                    "fleet.view",
+                    "fleet.reports.view"
+                }
+            },
+            new
+            {
+                Code = "FLEET_VIEWER",
+                Name = "Fleet Viewer",
+                Description = "Read-only visibility into fleet workspace and reports.",
+                PermissionCodes = new[]
+                {
+                    "fleet.view",
+                    "fleet.reports.view"
+                }
+            },
+
+            new
+            {
+                Code = "EXPENSE_ADVANCE_OFFICER",
+                Name = "Expense & Advance Officer",
+                Description = "Operational processing role for advances, retirements, refunds, and recoveries.",
+                PermissionCodes = new[]
+                {
+                    "eam.view","eam.request.create","eam.request.update","eam.request.delete","eam.request.submit","eam.disburse",
+                    "eam.retirement.create","eam.retirement.update","eam.retirement.submit","eam.refund.record","eam.recovery.manage","eam.reports.view",
+                    "reports.view","reports.export"
+                }
+            },
+            new
+            {
+                Code = "EXPENSE_ADVANCE_APPROVER",
+                Name = "Expense & Advance Approver",
+                Description = "Approver role for expense and advance transactions.",
+                PermissionCodes = new[]
+                {
+                    "eam.view","eam.request.approve","eam.request.reject","eam.retirement.approve","eam.retirement.reject","eam.reports.view",
+                    "workflow.approve","workflow.reject","reports.view","reports.export"
+                }
+            },
+            new
+            {
+                Code = "EXPENSE_ADVANCE_REVIEWER",
+                Name = "Expense & Advance Reviewer",
+                Description = "Review, disbursement, posting, and control role for expense and advance management.",
+                PermissionCodes = new[]
+                {
+                    "eam.view","eam.disburse","eam.retirement.post","eam.refund.record","eam.recovery.manage","eam.policy.manage","eam.reports.view",
+                    "reports.view","reports.export"
+                }
+            },
+            new
+            {
+                Code = "EXPENSE_ADVANCE_VIEWER",
+                Name = "Expense & Advance Viewer",
+                Description = "Read-only access to expense and advance management.",
+                PermissionCodes = new[]
+                {
+                    "eam.view","eam.reports.view","reports.view","reports.export"
+                }
+            },
             new
             {
                 Code = "TREASURY_OFFICER",
@@ -395,19 +577,33 @@ public sealed class AccessControlController : ControllerBase
                 await dbContext.SaveChangesAsync(cancellationToken);
             }
 
-            var existingPermissionIds = await dbContext.Set<SecurityRolePermission>()
+            var desiredPermissionIds = item.PermissionCodes
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(x => permissions.ContainsKey(x))
+                .Select(x => permissions[x].Id)
+                .ToHashSet();
+
+            var existingMappings = await dbContext.Set<SecurityRolePermission>()
                 .Where(x => x.TenantId == tenantContext.TenantId && x.SecurityRoleId == role.Id)
-                .Select(x => x.SecurityPermissionId)
                 .ToListAsync(cancellationToken);
 
-            foreach (var permissionCode in item.PermissionCodes)
-            {
-                if (!permissions.TryGetValue(permissionCode, out var permission))
-                {
-                    continue;
-                }
+            var existingPermissionIds = existingMappings
+                .Select(x => x.SecurityPermissionId)
+                .ToHashSet();
 
-                if (existingPermissionIds.Contains(permission.Id))
+            var mappingsToRemove = existingMappings
+                .Where(x => !desiredPermissionIds.Contains(x.SecurityPermissionId))
+                .ToList();
+
+            if (mappingsToRemove.Count > 0)
+            {
+                dbContext.Set<SecurityRolePermission>().RemoveRange(mappingsToRemove);
+            }
+
+            foreach (var permissionId in desiredPermissionIds)
+            {
+                if (existingPermissionIds.Contains(permissionId))
                 {
                     continue;
                 }
@@ -416,7 +612,7 @@ public sealed class AccessControlController : ControllerBase
                     Guid.NewGuid(),
                     tenantContext.TenantId,
                     role.Id,
-                    permission.Id));
+                    permissionId));
             }
         }
 

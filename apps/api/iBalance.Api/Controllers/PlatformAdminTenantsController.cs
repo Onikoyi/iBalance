@@ -82,6 +82,14 @@ public sealed class PlatformAdminTenantsController : ControllerBase
             var apOfficers = tenantUsers.Count(x => x.Role == "ApOfficer");
             var arOfficers = tenantUsers.Count(x => x.Role == "ArOfficer");
             var fixedAssetOfficers = tenantUsers.Count(x => x.Role == "FixedAssetOfficer");
+            var expenseAdvanceOfficers = tenantUsers.Count(x => x.Role == "ExpenseAdvanceOfficer");
+            var expenseAdvanceApprovers = tenantUsers.Count(x => x.Role == "ExpenseAdvanceApprover");
+            var expenseAdvanceReviewers = tenantUsers.Count(x => x.Role == "ExpenseAdvanceReviewer");
+            var expenseAdvanceViewers = tenantUsers.Count(x => x.Role == "ExpenseAdvanceViewer");
+            var fleetOfficers = tenantUsers.Count(x => x.Role == "FleetOfficer");
+            var fleetApprovers = tenantUsers.Count(x => x.Role == "FleetApprover");
+            var fleetReviewers = tenantUsers.Count(x => x.Role == "FleetReviewer");
+            var fleetViewers = tenantUsers.Count(x => x.Role == "FleetViewer");
 
             var (licenseStatus, daysRemaining, renewalWarning) =
                 ComputeLicenseSummary(tenant.Status, tenantLicense, utcNow);
@@ -127,7 +135,15 @@ public sealed class PlatformAdminTenantsController : ControllerBase
                         InventoryOfficer = inventoryOfficers,
                         ApOfficer = apOfficers,
                         ArOfficer = arOfficers,
-                        FixedAssetOfficer = fixedAssetOfficers
+                        FixedAssetOfficer = fixedAssetOfficers,
+                        ExpenseAdvanceOfficer = expenseAdvanceOfficers,
+                        ExpenseAdvanceApprover = expenseAdvanceApprovers,
+                        ExpenseAdvanceReviewer = expenseAdvanceReviewers,
+                        ExpenseAdvanceViewer = expenseAdvanceViewers,
+                        FleetOfficer = fleetOfficers,
+                        FleetApprover = fleetApprovers,
+                        FleetReviewer = fleetReviewers,
+                        FleetViewer = fleetViewers
                     }
                 }
             };

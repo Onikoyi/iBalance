@@ -77,11 +77,47 @@ export type AppPermission =
   | 'fixedassets.manage'
   | 'fixedassets.depreciation.run'
   | 'fixedassets.disposal.post'
+  | 'eam.view'
+  | 'eam.request.create'
+  | 'eam.request.update'
+  | 'eam.request.delete'
+  | 'eam.request.submit'
+  | 'eam.request.approve'
+  | 'eam.request.reject'
+  | 'eam.disburse'
+  | 'eam.retirement.create'
+  | 'eam.retirement.update'
+  | 'eam.retirement.submit'
+  | 'eam.retirement.approve'
+  | 'eam.retirement.reject'
+  | 'eam.refund.record'
+  | 'eam.recovery.manage'
+  | 'eam.policy.manage'
+  | 'eam.reports.view'
   | 'workflow.approve'
   | 'workflow.reject'
   | 'workflow.reopen'
   | 'reports.view'
-  | 'reports.export';
+  | 'reports.export'
+  | 'fleet.view' 
+  | 'fleet.vehicle.manage' 
+  | 'fleet.driver.manage'
+  | 'fleet.trip.create'
+  | 'fleet.trip.submit'
+  | 'fleet.trip.approve' 
+  | 'fleet.trip.reject' 
+  | 'fleet.trip.post' 
+  | 'fleet.fuel.manage' 
+  | 'fleet.fuel.approve'
+  | 'fleet.fuel.post' 
+  | 'fleet.maintenance.manage'
+  | 'fleet.maintenance.submit'
+  | 'fleet.maintenance.approve'
+  | 'fleet.maintenance.reject'
+  | 'fleet.maintenance.post'
+  | 'fleet.policy.manage'
+  | 'fleet.reports.view';
+
 
 const rolePermissions: Record<UserRole, AppPermission[]> = {
   PlatformAdmin: [
@@ -161,11 +197,47 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
     'fixedassets.manage',
     'fixedassets.depreciation.run',
     'fixedassets.disposal.post',
+    'eam.view',
+    'eam.request.create',
+    'eam.request.update',
+    'eam.request.delete',
+    'eam.request.submit',
+    'eam.request.approve',
+    'eam.request.reject',
+    'eam.disburse',
+    'eam.retirement.create',
+    'eam.retirement.update',
+    'eam.retirement.submit',
+    'eam.retirement.approve',
+    'eam.retirement.reject',
+    'eam.refund.record',
+    'eam.recovery.manage',
+    'eam.policy.manage',
+    'eam.reports.view',
     'workflow.approve',
     'workflow.reject',
     'workflow.reopen',
     'reports.view',
     'reports.export',
+    'fleet.view',
+    'fleet.vehicle.manage',
+    'fleet.driver.manage',
+    'fleet.trip.create',
+    'fleet.trip.submit',
+    'fleet.trip.approve',
+    'fleet.trip.reject',
+    'fleet.trip.post',
+    'fleet.fuel.manage',
+    'fleet.fuel.approve',
+    'fleet.fuel.post',
+    'fleet.maintenance.manage',
+    'fleet.maintenance.submit',
+    'fleet.maintenance.approve',
+    'fleet.maintenance.reject',
+    'fleet.maintenance.post',
+    'fleet.policy.manage',
+    'fleet.reports.view',
+
   ],
   TenantAdmin: [
     'admin.access',
@@ -243,11 +315,47 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
     'fixedassets.manage',
     'fixedassets.depreciation.run',
     'fixedassets.disposal.post',
+    'eam.view',
+    'eam.request.create',
+    'eam.request.update',
+    'eam.request.delete',
+    'eam.request.submit',
+    'eam.request.approve',
+    'eam.request.reject',
+    'eam.disburse',
+    'eam.retirement.create',
+    'eam.retirement.update',
+    'eam.retirement.submit',
+    'eam.retirement.approve',
+    'eam.retirement.reject',
+    'eam.refund.record',
+    'eam.recovery.manage',
+    'eam.policy.manage',
+    'eam.reports.view',
     'workflow.approve',
     'workflow.reject',
     'workflow.reopen',
     'reports.view',
     'reports.export',
+    'fleet.view',
+    'fleet.vehicle.manage',
+    'fleet.driver.manage',
+    'fleet.trip.create',
+    'fleet.trip.submit',
+    'fleet.trip.approve',
+    'fleet.trip.reject',
+    'fleet.trip.post',
+    'fleet.fuel.manage',
+    'fleet.fuel.approve',
+    'fleet.fuel.post',
+    'fleet.maintenance.manage',
+    'fleet.maintenance.submit',
+    'fleet.maintenance.approve',
+    'fleet.maintenance.reject',
+    'fleet.maintenance.post',
+    'fleet.policy.manage',
+    'fleet.reports.view',
+
   ],
   FinanceController: [
     'finance.view',
@@ -302,6 +410,22 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
     'fixedassets.manage',
     'fixedassets.depreciation.run',
     'fixedassets.disposal.post',
+    'eam.view',
+    'eam.request.create',
+    'eam.request.update',
+    'eam.request.submit',
+    'eam.request.approve',
+    'eam.request.reject',
+    'eam.disburse',
+    'eam.retirement.create',
+    'eam.retirement.update',
+    'eam.retirement.submit',
+    'eam.retirement.approve',
+    'eam.retirement.reject',
+    'eam.refund.record',
+    'eam.recovery.manage',
+    'eam.policy.manage',
+    'eam.reports.view',
     'workflow.approve',
     'workflow.reject',
     'workflow.reopen',
@@ -340,6 +464,17 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
     'fixedassets.view',
     'fixedassets.manage',
     'fixedassets.depreciation.run',
+    'eam.view',
+    'eam.request.create',
+    'eam.request.update',
+    'eam.request.submit',
+    'eam.disburse',
+    'eam.retirement.create',
+    'eam.retirement.update',
+    'eam.retirement.submit',
+    'eam.refund.record',
+    'eam.recovery.manage',
+    'eam.reports.view',
     'reports.view',
     'reports.export',
   ],
@@ -371,6 +506,12 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
     'ar.invoice.reject',
     'ar.receipt.approve',
     'ar.receipt.reject',
+    'eam.view',
+    'eam.request.approve',
+    'eam.request.reject',
+    'eam.retirement.approve',
+    'eam.retirement.reject',
+    'eam.reports.view',
     'workflow.approve',
     'workflow.reject',
     'reports.view',
@@ -388,6 +529,8 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
     'treasury.view',
     'inventory.view',
     'fixedassets.view',
+    'eam.view',
+    'eam.reports.view',
     'reports.view',
     'reports.export',
   ],
@@ -403,6 +546,8 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
     'treasury.view',
     'inventory.view',
     'fixedassets.view',
+    'eam.view',
+    'eam.reports.view',
     'reports.view',
     'reports.export',
   ],
@@ -494,6 +639,87 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
     'reports.view',
     'reports.export',
   ],
+  ExpenseAdvanceOfficer: [
+    'eam.view',
+    'eam.request.create',
+    'eam.request.update',
+    'eam.request.delete',
+    'eam.request.submit',
+    'eam.disburse',
+    'eam.retirement.create',
+    'eam.retirement.update',
+    'eam.retirement.submit',
+    'eam.refund.record',
+    'eam.recovery.manage',
+    'eam.reports.view',
+    'reports.view',
+    'reports.export',
+  ],
+  ExpenseAdvanceApprover: [
+    'eam.view',
+    'eam.request.approve',
+    'eam.request.reject',
+    'eam.retirement.approve',
+    'eam.retirement.reject',
+    'eam.disburse',
+    'eam.recovery.manage',
+    'eam.reports.view',
+    'workflow.approve',
+    'workflow.reject',
+    'reports.view',
+    'reports.export',
+  ],
+  ExpenseAdvanceReviewer: [
+    'eam.view',
+    'eam.request.approve',
+    'eam.request.reject',
+    'eam.retirement.approve',
+    'eam.retirement.reject',
+    'eam.reports.view',
+    'reports.view',
+    'reports.export',
+  ],
+  ExpenseAdvanceViewer: [
+    'eam.view',
+    'eam.reports.view',
+    'reports.view',
+    'reports.export',
+  ],
+
+  FleetOfficer: [
+    'fleet.view',
+    'fleet.vehicle.manage',
+    'fleet.driver.manage',
+    'fleet.trip.create',
+    'fleet.trip.submit',
+    'fleet.fuel.manage',
+    'fleet.maintenance.manage',
+    'fleet.maintenance.submit',
+    'fleet.policy.manage',
+    'fleet.reports.view',
+  ],
+  FleetApprover: [
+    'fleet.view',
+    'fleet.trip.approve',
+    'fleet.trip.reject',
+    'fleet.trip.post',
+    'fleet.fuel.approve',
+    'fleet.fuel.post',
+    'fleet.maintenance.approve',
+    'fleet.maintenance.reject',
+    'fleet.maintenance.post',
+    'fleet.reports.view',
+    'workflow.approve',
+    'workflow.reject',
+  ],
+  FleetReviewer: [
+    'fleet.view',
+    'fleet.reports.view',
+  ],
+  FleetViewer: [
+    'fleet.view',
+    'fleet.reports.view',
+  ],
 };
 
 export function getRolePermissions(role: UserRole | null | undefined): AppPermission[] {
@@ -531,6 +757,14 @@ export function getAssignableRolesForRole(role: UserRole | null | undefined): Us
       'ApOfficer',
       'ArOfficer',
       'FixedAssetOfficer',
+      'ExpenseAdvanceOfficer',
+      'ExpenseAdvanceApprover',
+      'ExpenseAdvanceReviewer',
+      'ExpenseAdvanceViewer',
+      'FleetOfficer',
+      'FleetApprover',
+      'FleetReviewer',
+      'FleetViewer',
     ];
   }
 
@@ -552,6 +786,14 @@ export function getAssignableRolesForRole(role: UserRole | null | undefined): Us
       'ApOfficer',
       'ArOfficer',
       'FixedAssetOfficer',
+      'ExpenseAdvanceOfficer',
+      'ExpenseAdvanceApprover',
+      'ExpenseAdvanceReviewer',
+      'ExpenseAdvanceViewer',
+      'FleetOfficer',
+      'FleetApprover',
+      'FleetReviewer',
+      'FleetViewer',
     ];
   }
 

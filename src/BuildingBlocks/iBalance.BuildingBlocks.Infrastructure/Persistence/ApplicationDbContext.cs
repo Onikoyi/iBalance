@@ -100,6 +100,19 @@ public class ApplicationDbContext : DbContext
     public DbSet<UserScopeAssignment> UserScopeAssignments => Set<UserScopeAssignment>();
     public DbSet<DepartmentWorkflowPolicy> DepartmentWorkflowPolicies => Set<DepartmentWorkflowPolicy>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+    public DbSet<ExpenseAdvanceType> ExpenseAdvanceTypes => Set<ExpenseAdvanceType>();
+    public DbSet<ExpenseCategory> ExpenseCategories => Set<ExpenseCategory>();
+    public DbSet<ExpenseAdvancePolicy> ExpenseAdvancePolicies => Set<ExpenseAdvancePolicy>();
+    public DbSet<ExpenseAdvancePostingSetup> ExpenseAdvancePostingSetups => Set<ExpenseAdvancePostingSetup>();
+    public DbSet<ExpenseAdvanceRequest> ExpenseAdvanceRequests => Set<ExpenseAdvanceRequest>();
+    public DbSet<ExpenseAdvanceRetirement> ExpenseAdvanceRetirements => Set<ExpenseAdvanceRetirement>();
+    public DbSet<ExpenseAdvanceRetirementLine> ExpenseAdvanceRetirementLines => Set<ExpenseAdvanceRetirementLine>();
+    public DbSet<FleetVehicle> FleetVehicles => Set<FleetVehicle>();
+    public DbSet<FleetDriver> FleetDrivers => Set<FleetDriver>();
+    public DbSet<FleetPolicySetting> FleetPolicySettings => Set<FleetPolicySetting>();
+    public DbSet<FleetTrip> FleetTrips => Set<FleetTrip>();
+    public DbSet<FleetFuelLog> FleetFuelLogs => Set<FleetFuelLog>();
+    public DbSet<FleetMaintenanceWorkOrder> FleetMaintenanceWorkOrders => Set<FleetMaintenanceWorkOrder>();
 
 
 
@@ -1250,6 +1263,89 @@ modelBuilder.Entity<PurchaseOrderLine>(entity =>
         .WithMany()
         .HasForeignKey(x => x.InventoryItemId)
         .OnDelete(DeleteBehavior.Restrict);
+    entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+});
+
+
+
+modelBuilder.Entity<FleetVehicle>(entity =>
+{
+    entity.ToTable("FleetVehicles", "finance");
+    entity.HasKey(x => x.Id);
+    entity.Property(x => x.VehicleCode).HasMaxLength(50).IsRequired();
+    entity.Property(x => x.RegistrationNumber).HasMaxLength(50).IsRequired();
+    entity.Property(x => x.VehicleName).HasMaxLength(200).IsRequired();
+    entity.Property(x => x.VehicleType).HasMaxLength(100).IsRequired();
+    entity.Property(x => x.Make).HasMaxLength(100);
+    entity.Property(x => x.Model).HasMaxLength(100);
+    entity.Property(x => x.ChassisNumber).HasMaxLength(100);
+    entity.Property(x => x.EngineNumber).HasMaxLength(100);
+    entity.Property(x => x.FuelType).HasMaxLength(50);
+    entity.Property(x => x.CurrentOdometerKm).HasPrecision(18, 2);
+    entity.HasIndex(x => new { x.TenantId, x.VehicleCode }).IsUnique();
+    entity.HasIndex(x => new { x.TenantId, x.RegistrationNumber }).IsUnique();
+    entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+});
+
+modelBuilder.Entity<FleetDriver>(entity =>
+{
+    entity.ToTable("FleetDrivers", "finance");
+    entity.HasKey(x => x.Id);
+    entity.Property(x => x.DriverCode).HasMaxLength(50).IsRequired();
+    entity.Property(x => x.FullName).HasMaxLength(200).IsRequired();
+    entity.Property(x => x.LicenseNumber).HasMaxLength(100);
+    entity.Property(x => x.PhoneNumber).HasMaxLength(50);
+    entity.HasIndex(x => new { x.TenantId, x.DriverCode }).IsUnique();
+    entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+});
+
+modelBuilder.Entity<FleetPolicySetting>(entity =>
+{
+    entity.ToTable("FleetPolicySettings", "finance");
+    entity.HasKey(x => x.Id);
+    entity.Property(x => x.MaxFuelAmountPerEntry).HasPrecision(18, 2);
+    entity.HasIndex(x => x.TenantId).IsUnique();
+    entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+});
+
+modelBuilder.Entity<FleetTrip>(entity =>
+{
+    entity.ToTable("FleetTrips", "finance");
+    entity.HasKey(x => x.Id);
+    entity.Property(x => x.TripNumber).HasMaxLength(80).IsRequired();
+    entity.Property(x => x.Origin).HasMaxLength(200).IsRequired();
+    entity.Property(x => x.Destination).HasMaxLength(200).IsRequired();
+    entity.Property(x => x.Purpose).HasMaxLength(500).IsRequired();
+    entity.Property(x => x.StartOdometerKm).HasPrecision(18, 2);
+    entity.Property(x => x.EndOdometerKm).HasPrecision(18, 2);
+    entity.Property(x => x.RejectionReason).HasMaxLength(1000);
+    entity.HasIndex(x => new { x.TenantId, x.TripNumber }).IsUnique();
+    entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+});
+
+modelBuilder.Entity<FleetFuelLog>(entity =>
+{
+    entity.ToTable("FleetFuelLogs", "finance");
+    entity.HasKey(x => x.Id);
+    entity.Property(x => x.FuelLogNumber).HasMaxLength(80).IsRequired();
+    entity.Property(x => x.QuantityLitres).HasPrecision(18, 3);
+    entity.Property(x => x.UnitPrice).HasPrecision(18, 2);
+    entity.Property(x => x.OdometerKm).HasPrecision(18, 2);
+    entity.Property(x => x.RejectionReason).HasMaxLength(1000);
+    entity.HasIndex(x => new { x.TenantId, x.FuelLogNumber }).IsUnique();
+    entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+});
+
+modelBuilder.Entity<FleetMaintenanceWorkOrder>(entity =>
+{
+    entity.ToTable("FleetMaintenanceWorkOrders", "finance");
+    entity.HasKey(x => x.Id);
+    entity.Property(x => x.WorkOrderNumber).HasMaxLength(80).IsRequired();
+    entity.Property(x => x.IssueDescription).HasMaxLength(1000).IsRequired();
+    entity.Property(x => x.EstimatedAmount).HasPrecision(18, 2);
+    entity.Property(x => x.ActualAmount).HasPrecision(18, 2);
+    entity.Property(x => x.RejectionReason).HasMaxLength(1000);
+    entity.HasIndex(x => new { x.TenantId, x.WorkOrderNumber }).IsUnique();
     entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
 });
 

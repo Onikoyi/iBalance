@@ -16,7 +16,7 @@ import {
   updateSubscriptionPackage,
   type UpsertSubscriptionPackageRequest,
 } from '../../lib/api';
-import { canManagePlatformCommercials } from '../../lib/auth';
+import { canManagePlatformCommercials, isPlatformAdmin } from '../../lib/auth';
 
 async function fileToDataUrl(file: File) {
   return await new Promise<string>((resolve, reject) => {
@@ -82,10 +82,19 @@ type ExtendedByRole = {
   apOfficer?: number;
   arOfficer?: number;
   fixedAssetOfficer?: number;
+  expenseAdvanceOfficer?: number;
+  expenseAdvanceApprover?: number;
+  expenseAdvanceReviewer?: number;
+  expenseAdvanceViewer?: number;
+  fleetOfficer?: number;
+  fleetApprover?: number;
+  fleetReviewer?: number;
+  fleetViewer?: number;
 };
 
 export function AdminSettingsPage() {
   const qc = useQueryClient();
+  const isPlatformCommercialAdmin = isPlatformAdmin();
   const canManageCommercials = canManagePlatformCommercials();
 
   const [tenantKeyInput, setTenantKeyInput] = useState(getTenantKey());
@@ -108,19 +117,19 @@ export function AdminSettingsPage() {
   const billingQ = useQuery({
     queryKey: ['admin-billing-settings'],
     queryFn: getAdminBillingSettings,
-    enabled: canManageCommercials,
+    enabled: isPlatformCommercialAdmin,
   });
 
   const packagesQ = useQuery({
     queryKey: ['admin-subscription-packages'],
     queryFn: getAdminSubscriptionPackages,
-    enabled: canManageCommercials,
+    enabled: isPlatformCommercialAdmin,
   });
 
   const tenantOverviewQ = useQuery({
     queryKey: ['admin-tenant-overview'],
     queryFn: getAdminTenantOverview,
-    enabled: canManageCommercials,
+    enabled: isPlatformCommercialAdmin,
   });
 
   useEffect(() => {
@@ -244,6 +253,22 @@ export function AdminSettingsPage() {
     );
   }
 
+  if (!isPlatformCommercialAdmin) {
+    return (
+      <div className="page-grid">
+        <section className="panel">
+          <div className="section-heading">
+            <h2>Administration</h2>
+            <span className="muted">Tenant administration</span>
+          </div>
+          <div className="muted">
+            Billing Settings and Subscription Packages are hidden for Tenant Administrators.
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   const byRole = (tenantOverviewQ.data?.users.byRole ?? {}) as ExtendedByRole;
 
   return (
@@ -289,6 +314,14 @@ export function AdminSettingsPage() {
             <div className="kv-row"><span>AP Officers</span><span>{byRole.apOfficer ?? 0}</span></div>
             <div className="kv-row"><span>AR Officers</span><span>{byRole.arOfficer ?? 0}</span></div>
             <div className="kv-row"><span>Fixed Asset Officers</span><span>{byRole.fixedAssetOfficer ?? 0}</span></div>
+            <div className="kv-row"><span>EAM Officers</span><span>{byRole.expenseAdvanceOfficer ?? 0}</span></div>
+            <div className="kv-row"><span>EAM Approvers</span><span>{byRole.expenseAdvanceApprover ?? 0}</span></div>
+            <div className="kv-row"><span>EAM Reviewers</span><span>{byRole.expenseAdvanceReviewer ?? 0}</span></div>
+            <div className="kv-row"><span>EAM Viewers</span><span>{byRole.expenseAdvanceViewer ?? 0}</span></div>
+            <div className="kv-row"><span>Fleet Officers</span><span>{byRole.fleetOfficer ?? 0}</span></div>
+            <div className="kv-row"><span>Fleet Approvers</span><span>{byRole.fleetApprover ?? 0}</span></div>
+            <div className="kv-row"><span>Fleet Reviewers</span><span>{byRole.fleetReviewer ?? 0}</span></div>
+            <div className="kv-row"><span>Fleet Viewers</span><span>{byRole.fleetViewer ?? 0}</span></div>
             <div className="kv-row"><span>Support Warning</span><span>{tenantOverviewQ.data.renewalWarning}</span></div>
           </div>
         ) : null}
