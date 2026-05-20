@@ -10,9 +10,9 @@ import {
   canManageTenantUsers,
   canViewAccountsPayable,
   canViewAccountsReceivable,
+  canViewBilling,
   canViewBudget,
   canViewExpenseAdvances,
-  canViewExpenseAdvanceReports,
   canViewFinance,
   canViewFleet,
   canViewFixedAssets,
@@ -78,6 +78,7 @@ export function Sidebar() {
 
   const canViewFinanceModule = canViewFinance();
   const canViewBudgetModule = canViewBudget();
+  const canViewBillingModule = canViewBilling();
   const canViewPayrollModule = canViewPayroll();
   const canViewProcurementModule = canViewProcurement();
   const canViewApModule = canViewAccountsPayable();
@@ -89,8 +90,7 @@ export function Sidebar() {
   const canViewWorkingCapitalModule = canViewWorkingCapital();
   const canViewFleetModule = canViewFleet();
 
-  const canViewEamModule =
-    canViewExpenseAdvances() || canViewExpenseAdvanceReports();
+  const canViewEamModule = canViewExpenseAdvances();
 
   const canManageSetup = canManageFinanceSetup();
   const canCreate = canCreateJournals();
@@ -115,6 +115,7 @@ export function Sidebar() {
     if (path.startsWith('/working-capital')) return 'working-capital';
     if (path.startsWith('/eam')) return 'eam';
     if (path.startsWith('/fleet')) return 'fleet';
+    if (path.startsWith('/billing')) return 'billing';
     if (path.startsWith('/payroll')) return 'payroll';
     return 'overview';
   }, [location.pathname]);
@@ -137,6 +138,7 @@ export function Sidebar() {
           canViewInventoryModule ||
           canViewFixedAssetsModule ||
           canViewFleetModule ||
+          canViewBillingModule ||
           canViewEamModule ||
           canViewWorkingCapitalModule) ? (
           <>
@@ -268,6 +270,42 @@ export function Sidebar() {
                 </NavLink>
                 <NavLink to="/fleet/reports" className={({ isActive }) => linkClassName(isActive)}>
                   Reports
+                </NavLink>
+              </SidebarSection>
+            ) : null}
+
+
+            {canViewBillingModule ? (
+              <SidebarSection title="Billing & Invoicing" sectionKey="billing" defaultOpen={activeSection === 'billing'}>
+                <NavLink to="/billing" className={({ isActive }) => linkClassName(isActive)}>
+                  Dashboard
+                </NavLink>
+                <NavLink to="/billing/invoices" className={({ isActive }) => linkClassName(isActive)}>
+                  Invoices
+                </NavLink>
+                <NavLink to="/billing/invoices/rejected" className={({ isActive }) => linkClassName(isActive)}>
+                  Rejected Invoices
+                </NavLink>
+                <NavLink to="/billing/approval-queue" className={({ isActive }) => linkClassName(isActive)}>
+                  Approval Queue
+                </NavLink>
+                <NavLink to="/billing/credit-notes" className={({ isActive }) => linkClassName(isActive)}>
+                  Credit Notes
+                </NavLink>
+                <NavLink to="/billing/credit-notes/rejected" className={({ isActive }) => linkClassName(isActive)}>
+                  Rejected Credit Notes
+                </NavLink>
+                <NavLink to="/billing/payments/allocate" className={({ isActive }) => linkClassName(isActive)}>
+                  Payment Allocation
+                </NavLink>
+                <NavLink to="/billing/outstanding" className={({ isActive }) => linkClassName(isActive)}>
+                  Outstanding
+                </NavLink>
+                <NavLink to="/billing/reports" className={({ isActive }) => linkClassName(isActive)}>
+                  Reports
+                </NavLink>
+                <NavLink to="/billing/setup" className={({ isActive }) => linkClassName(isActive)}>
+                  Setup
                 </NavLink>
               </SidebarSection>
             ) : null}

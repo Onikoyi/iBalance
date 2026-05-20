@@ -89,7 +89,7 @@ export function RequireAuth({
   }
 
   if (licenseQ.isLoading) {
-    return <div className="panel">Checking access status...</div>;
+    return <div className="panel">Checking access status.....</div>;
   }
 
   if (licenseQ.isError || !licenseQ.data) {
@@ -105,3 +105,4 @@ export function RequireAuth({
 
   return <>{children}</>;
 }
+

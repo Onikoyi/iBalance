@@ -59,6 +59,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<SalesInvoice> SalesInvoices => Set<SalesInvoice>();
     public DbSet<SalesInvoiceLine> SalesInvoiceLines => Set<SalesInvoiceLine>();
+    public DbSet<SalesCreditNote> SalesCreditNotes => Set<SalesCreditNote>();
     public DbSet<CustomerReceipt> CustomerReceipts => Set<CustomerReceipt>();
     public DbSet<Vendor> Vendors => Set<Vendor>();
     public DbSet<PurchaseInvoice> PurchaseInvoices => Set<PurchaseInvoice>();
@@ -113,6 +114,12 @@ public class ApplicationDbContext : DbContext
     public DbSet<FleetTrip> FleetTrips => Set<FleetTrip>();
     public DbSet<FleetFuelLog> FleetFuelLogs => Set<FleetFuelLog>();
     public DbSet<FleetMaintenanceWorkOrder> FleetMaintenanceWorkOrders => Set<FleetMaintenanceWorkOrder>();
+    public DbSet<BillingPolicy> BillingPolicies => Set<BillingPolicy>();
+    public DbSet<BillingInvoice> BillingInvoices => Set<BillingInvoice>();
+    public DbSet<BillingInvoiceLine> BillingInvoiceLines => Set<BillingInvoiceLine>();
+    public DbSet<BillingCreditNote> BillingCreditNotes => Set<BillingCreditNote>();
+    public DbSet<BillingPaymentAllocation> BillingPaymentAllocations => Set<BillingPaymentAllocation>();
+    public DbSet<BillingNumberSequence> BillingNumberSequences => Set<BillingNumberSequence>();
 
 
 
@@ -515,6 +522,9 @@ public class ApplicationDbContext : DbContext
             entity.Property(x => x.AmountPaid)
                 .HasPrecision(18, 2);
 
+            entity.Property(x => x.CreditNoteAmount)
+                .HasPrecision(18, 2);
+
             entity.Property(x => x.BalanceAmount)
                 .HasPrecision(18, 2);
 
@@ -552,6 +562,57 @@ public class ApplicationDbContext : DbContext
                 .WithMany(x => x.Lines)
                 .HasForeignKey(x => x.SalesInvoiceId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
+        });
+
+        modelBuilder.Entity<SalesCreditNote>(entity =>
+        {
+            entity.ToTable("SalesCreditNotes", "finance");
+
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.CreditNoteNumber)
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(x => x.Description)
+                .HasMaxLength(500)
+                .IsRequired();
+
+            entity.Property(x => x.Amount)
+                .HasPrecision(18, 2);
+
+            entity.Property(x => x.SubmittedBy)
+                .HasMaxLength(100);
+
+            entity.Property(x => x.ApprovedBy)
+                .HasMaxLength(100);
+
+            entity.Property(x => x.RejectedBy)
+                .HasMaxLength(100);
+
+            entity.Property(x => x.RejectionReason)
+                .HasMaxLength(1000);
+
+            entity.Property(x => x.CreatedBy)
+                .HasMaxLength(100);
+
+            entity.Property(x => x.LastModifiedBy)
+                .HasMaxLength(100);
+
+            entity.HasIndex(x => new { x.TenantId, x.CreditNoteNumber })
+                .IsUnique();
+
+            entity.HasOne(x => x.Customer)
+                .WithMany()
+                .HasForeignKey(x => x.CustomerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.SalesInvoice)
+                .WithMany()
+                .HasForeignKey(x => x.SalesInvoiceId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasQueryFilter(x => x.TenantId == _tenantContextAccessor.Current.TenantId);
         });
@@ -622,6 +683,7 @@ public class ApplicationDbContext : DbContext
 
             entity.Property(x => x.AmountPaid)
                 .HasPrecision(18, 2);
+
 
             entity.Property(x => x.BalanceAmount)
                 .HasPrecision(18, 2);
@@ -1369,6 +1431,93 @@ modelBuilder.Entity<AuditEvent>(entity =>
             entity.HasIndex(x => x.Reference);
         });
 
+
+
+
+        modelBuilder.Entity<BillingPolicy>(entity =>
+        {
+            entity.ToTable("BillingPolicies", "finance");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.InvoicePrefix).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.CurrencyCode).HasMaxLength(10).IsRequired();
+            entity.Property(x => x.DefaultTaxRate).HasPrecision(18, 4);
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+            entity.HasIndex(x => x.TenantId).IsUnique();
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<BillingInvoice>(entity =>
+        {
+            entity.ToTable("BillingInvoices", "finance");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.InvoiceNumber).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.CustomerName).HasMaxLength(250).IsRequired();
+            entity.Property(x => x.CustomerEmail).HasMaxLength(250);
+            entity.Property(x => x.CurrencyCode).HasMaxLength(10).IsRequired();
+            entity.Property(x => x.SubtotalAmount).HasPrecision(18, 2);
+            entity.Property(x => x.TaxAmount).HasPrecision(18, 2);
+            entity.Property(x => x.DiscountAmount).HasPrecision(18, 2);
+            entity.Property(x => x.TotalAmount).HasPrecision(18, 2);
+            entity.Property(x => x.AmountPaid).HasPrecision(18, 2);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.Property(x => x.RejectionReason).HasMaxLength(1000);
+            entity.Property(x => x.CancelReason).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.TenantId, x.InvoiceNumber }).IsUnique();
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<BillingInvoiceLine>(entity =>
+        {
+            entity.ToTable("BillingInvoiceLines", "finance");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.Description).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.Quantity).HasPrecision(18, 4);
+            entity.Property(x => x.UnitPrice).HasPrecision(18, 2);
+            entity.Property(x => x.TaxRate).HasPrecision(18, 4);
+            entity.Property(x => x.LineSubtotal).HasPrecision(18, 2);
+            entity.Property(x => x.LineTax).HasPrecision(18, 2);
+            entity.Property(x => x.LineTotal).HasPrecision(18, 2);
+            entity.HasIndex(x => x.BillingInvoiceId);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<BillingCreditNote>(entity =>
+        {
+            entity.ToTable("BillingCreditNotes", "finance");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.CreditNoteNumber).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Reason).HasMaxLength(1000).IsRequired();
+            entity.Property(x => x.Amount).HasPrecision(18, 2);
+            entity.Property(x => x.ApprovalComment).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.TenantId, x.CreditNoteNumber }).IsUnique();
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<BillingPaymentAllocation>(entity =>
+        {
+            entity.ToTable("BillingPaymentAllocations", "finance");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.PaymentReference).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.Amount).HasPrecision(18, 2);
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+            entity.HasIndex(x => x.BillingInvoiceId);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<BillingNumberSequence>(entity =>
+        {
+            entity.ToTable("BillingNumberSequences", "finance");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.SequenceCode).HasMaxLength(50).IsRequired();
+            entity.HasIndex(x => new { x.TenantId, x.SequenceCode }).IsUnique();
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
 
 
 }

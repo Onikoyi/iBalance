@@ -99,6 +99,21 @@ export type AppPermission =
   | 'workflow.reopen'
   | 'reports.view'
   | 'reports.export'
+  | 'billing.view'
+  | 'billing.setup.manage'
+  | 'billing.invoice.create'
+  | 'billing.invoice.update'
+  | 'billing.invoice.submit'
+  | 'billing.invoice.approve'
+  | 'billing.invoice.reject'
+  | 'billing.invoice.post'
+  | 'billing.invoice.cancel'
+  | 'billing.creditnote.create'
+  | 'billing.creditnote.approve'
+  | 'billing.payment.allocate'
+  | 'billing.reports.view'
+  | 'billing.export'
+  | 'billing.price.manage'
   | 'fleet.view' 
   | 'fleet.vehicle.manage' 
   | 'fleet.driver.manage'
@@ -219,6 +234,21 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
     'workflow.reopen',
     'reports.view',
     'reports.export',
+    'billing.view',
+    'billing.setup.manage',
+    'billing.invoice.create',
+    'billing.invoice.update',
+    'billing.invoice.submit',
+    'billing.invoice.approve',
+    'billing.invoice.reject',
+    'billing.invoice.post',
+    'billing.invoice.cancel',
+    'billing.creditnote.create',
+    'billing.creditnote.approve',
+    'billing.payment.allocate',
+    'billing.reports.view',
+    'billing.export',
+    'billing.price.manage',
     'fleet.view',
     'fleet.vehicle.manage',
     'fleet.driver.manage',
@@ -241,7 +271,6 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
   ],
   TenantAdmin: [
     'admin.access',
-    'admin.settings.manage',
     'admin.users.manage',
     'admin.roles.manage',
     'admin.permissions.manage',
@@ -337,6 +366,21 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
     'workflow.reopen',
     'reports.view',
     'reports.export',
+    'billing.view',
+    'billing.setup.manage',
+    'billing.invoice.create',
+    'billing.invoice.update',
+    'billing.invoice.submit',
+    'billing.invoice.approve',
+    'billing.invoice.reject',
+    'billing.invoice.post',
+    'billing.invoice.cancel',
+    'billing.creditnote.create',
+    'billing.creditnote.approve',
+    'billing.payment.allocate',
+    'billing.reports.view',
+    'billing.export',
+    'billing.price.manage',
     'fleet.view',
     'fleet.vehicle.manage',
     'fleet.driver.manage',
@@ -431,6 +475,22 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
     'workflow.reopen',
     'reports.view',
     'reports.export',
+    'billing.view',
+    'billing.setup.manage',
+    'billing.invoice.create',
+    'billing.invoice.update',
+    'billing.invoice.submit',
+    'billing.invoice.approve',
+    'billing.invoice.reject',
+    'billing.invoice.post',
+    'billing.invoice.cancel',
+    'billing.creditnote.create',
+    'billing.creditnote.approve',
+    'billing.payment.allocate',
+    'billing.reports.view',
+    'billing.export',
+    'billing.price.manage',
+
   ],
   Accountant: [
     'finance.view',
@@ -477,6 +537,16 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
     'eam.reports.view',
     'reports.view',
     'reports.export',
+    'billing.view',
+    'billing.invoice.create',
+    'billing.invoice.update',
+    'billing.invoice.submit',
+    'billing.invoice.post',
+    'billing.creditnote.create',
+    'billing.payment.allocate',
+    'billing.reports.view',
+    'billing.export',
+
   ],
   Approver: [
     'finance.view',
@@ -516,6 +586,13 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
     'workflow.reject',
     'reports.view',
     'reports.export',
+    'billing.view',
+    'billing.invoice.approve',
+    'billing.invoice.reject',
+    'billing.creditnote.approve',
+    'billing.reports.view',
+    'billing.export',
+
   ],
   Viewer: [
     'finance.view',
@@ -533,6 +610,10 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
     'eam.reports.view',
     'reports.view',
     'reports.export',
+    'billing.view',
+    'billing.reports.view',
+    'billing.export',
+
   ],
   Auditor: [
     'finance.view',
@@ -550,6 +631,10 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
     'eam.reports.view',
     'reports.view',
     'reports.export',
+    'billing.view',
+    'billing.reports.view',
+    'billing.export',
+
   ],
   BudgetOfficer: [
     'finance.view',
@@ -686,6 +771,35 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
     'reports.export',
   ],
 
+  BillingOfficer: [
+    'billing.view',
+    'billing.setup.manage',
+    'billing.invoice.create',
+    'billing.invoice.update',
+    'billing.invoice.submit',
+    'billing.invoice.post',
+    'billing.creditnote.create',
+    'billing.payment.allocate',
+    'billing.reports.view',
+    'billing.export',
+    'billing.price.manage',
+  ],
+  BillingApprover: [
+    'billing.view',
+    'billing.invoice.approve',
+    'billing.invoice.reject',
+    'billing.creditnote.approve',
+    'billing.reports.view',
+    'billing.export',
+    'workflow.approve',
+    'workflow.reject',
+  ],
+  BillingViewer: [
+    'billing.view',
+    'billing.reports.view',
+    'billing.export',
+  ],
+
   FleetOfficer: [
     'fleet.view',
     'fleet.vehicle.manage',
@@ -761,6 +875,9 @@ export function getAssignableRolesForRole(role: UserRole | null | undefined): Us
       'ExpenseAdvanceApprover',
       'ExpenseAdvanceReviewer',
       'ExpenseAdvanceViewer',
+      'BillingOfficer',
+      'BillingApprover',
+      'BillingViewer',
       'FleetOfficer',
       'FleetApprover',
       'FleetReviewer',
@@ -790,6 +907,9 @@ export function getAssignableRolesForRole(role: UserRole | null | undefined): Us
       'ExpenseAdvanceApprover',
       'ExpenseAdvanceReviewer',
       'ExpenseAdvanceViewer',
+      'BillingOfficer',
+      'BillingApprover',
+      'BillingViewer',
       'FleetOfficer',
       'FleetApprover',
       'FleetReviewer',

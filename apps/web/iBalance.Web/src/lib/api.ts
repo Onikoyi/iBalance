@@ -684,6 +684,41 @@ export type IncomeStatementResponse = {
   expenses: ReportLineDto[];
 };
 
+
+export type CashFlowStatementLineDto = {
+  id: string;
+  journalEntryId: string;
+  movementDateUtc: string;
+  reference: string;
+  description: string;
+  cashLedgerAccountId: string;
+  cashLedgerAccountCode: string;
+  cashLedgerAccountName: string;
+  sectionOrder: number;
+  sectionName: string;
+  counterpartySummary: string;
+  cashInflow: number;
+  cashOutflow: number;
+  netCashMovement: number;
+};
+
+export type CashFlowStatementResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  fromUtc: string | null;
+  toUtc: string | null;
+  openingCashBalance: number;
+  operatingActivities: number;
+  investingActivities: number;
+  financingActivities: number;
+  netCashMovement: number;
+  closingCashBalance: number;
+  count: number;
+  items: CashFlowStatementLineDto[];
+  note?: string | null;
+};
+
 export type TrialBalanceRowDto = {
   ledgerAccountId: string;
   code: string;
@@ -2807,8 +2842,23 @@ export async function getFiscalPeriods() {
   return response.data;
 }
 
-export async function getBalanceSheet() {
-  const response = await api.get<BalanceSheetResponse>('/api/finance/reports/balance-sheet');
+export async function getBalanceSheet(asOfUtc?: string | null) {
+  const response = await api.get<BalanceSheetResponse>('/api/finance/reports/balance-sheet', {
+    params: {
+      ...(asOfUtc ? { asOfUtc } : {}),
+    },
+  });
+  return response.data;
+}
+
+
+export async function getCashFlowStatement(fromUtc?: string | null, toUtc?: string | null) {
+  const response = await api.get<CashFlowStatementResponse>('/api/finance/reports/cash-flow', {
+    params: {
+      ...(fromUtc ? { fromUtc } : {}),
+      ...(toUtc ? { toUtc } : {}),
+    },
+  });
   return response.data;
 }
 

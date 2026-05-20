@@ -54,6 +54,7 @@ public sealed class SalesInvoice
         GrossAmount = 0m;
         NetReceivableAmount = 0m;
         AmountPaid = 0m;
+        CreditNoteAmount = 0m;
         BalanceAmount = 0m;
         CreatedOnUtc = DateTime.UtcNow;
     }
@@ -86,6 +87,8 @@ public sealed class SalesInvoice
     public decimal NetReceivableAmount { get; private set; }
 
     public decimal AmountPaid { get; private set; }
+
+    public decimal CreditNoteAmount { get; private set; }
 
     public decimal BalanceAmount { get; private set; }
 
@@ -207,7 +210,7 @@ public sealed class SalesInvoice
         TaxDeductionAmount = taxDeductionAmount;
         GrossAmount = TotalAmount + TaxAdditionAmount;
         NetReceivableAmount = GrossAmount - TaxDeductionAmount;
-        BalanceAmount = NetReceivableAmount - AmountPaid;
+        BalanceAmount = NetReceivableAmount - AmountPaid - CreditNoteAmount;
 
         if (NetReceivableAmount < 0m)
         {
@@ -338,7 +341,7 @@ public void Reject(string rejectedBy, string reason)
         }
 
         AmountPaid += amount;
-        BalanceAmount = NetReceivableAmount - AmountPaid;
+        BalanceAmount = NetReceivableAmount - AmountPaid - CreditNoteAmount;
 
         if (BalanceAmount < 0m)
         {
@@ -352,6 +355,48 @@ public void Reject(string rejectedBy, string reason)
         else if (AmountPaid > 0m)
         {
             Status = SalesInvoiceStatus.PartPaid;
+        }
+
+        Touch();
+    }
+
+
+    public void ApplyCreditNote(decimal amount)
+    {
+        if (Status != SalesInvoiceStatus.Posted && Status != SalesInvoiceStatus.PartPaid)
+        {
+            throw new InvalidOperationException("Credit notes can only be applied to posted or part-paid invoices.");
+        }
+
+        if (amount <= 0m)
+        {
+            throw new ArgumentException("Credit note amount must be greater than zero.", nameof(amount));
+        }
+
+        if (amount > BalanceAmount)
+        {
+            throw new InvalidOperationException("Credit note amount cannot exceed the outstanding invoice balance.");
+        }
+
+        CreditNoteAmount += amount;
+        BalanceAmount = NetReceivableAmount - AmountPaid - CreditNoteAmount;
+
+        if (BalanceAmount < 0m)
+        {
+            throw new InvalidOperationException("Sales invoice balance cannot be negative.");
+        }
+
+        if (BalanceAmount == 0m)
+        {
+            Status = SalesInvoiceStatus.Paid;
+        }
+        else if (AmountPaid > 0m)
+        {
+            Status = SalesInvoiceStatus.PartPaid;
+        }
+        else
+        {
+            Status = SalesInvoiceStatus.Posted;
         }
 
         Touch();

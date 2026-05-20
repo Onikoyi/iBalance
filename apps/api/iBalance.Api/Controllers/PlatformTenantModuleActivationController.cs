@@ -28,6 +28,7 @@ public sealed class PlatformTenantModuleActivationController : ControllerBase
         new("reports", "Reports", 110),
         new("workingcapital", "Working Capital", 120),
         new("fleet", "Fleet Management", 95),
+        new("billing", "Billing & Invoicing", 130),
     ];
 
 

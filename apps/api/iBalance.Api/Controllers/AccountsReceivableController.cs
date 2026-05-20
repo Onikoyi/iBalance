@@ -1692,6 +1692,1132 @@ if (BudgetEvaluationSupport.IsBudgetConsumableAccountCategory(revenueLedgerAccou
         });
     }
 
+
+    [Authorize(Policy = AuthorizationPolicies.BillingCreditNoteCreate)]
+    [HttpGet("sales-credit-notes")]
+    public async Task<IActionResult> GetSalesCreditNotes(
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        var items = await dbContext.Set<SalesCreditNote>()
+            .AsNoTracking()
+            .Include(x => x.Customer)
+            .Include(x => x.SalesInvoice)
+            .OrderByDescending(x => x.CreditNoteDateUtc)
+            .ThenByDescending(x => x.CreatedOnUtc)
+            .Select(x => new
+            {
+                x.Id,
+                x.TenantId,
+                x.CustomerId,
+                CustomerCode = x.Customer != null ? x.Customer.CustomerCode : string.Empty,
+                CustomerName = x.Customer != null ? x.Customer.CustomerName : string.Empty,
+                x.SalesInvoiceId,
+                InvoiceNumber = x.SalesInvoice != null ? x.SalesInvoice.InvoiceNumber : string.Empty,
+                x.CreditNoteDateUtc,
+                x.CreditNoteNumber,
+                x.Description,
+                x.Amount,
+                x.Status,
+                StatusName = x.Status.ToString(),
+                x.SubmittedBy,
+                x.SubmittedOnUtc,
+                x.ApprovedBy,
+                x.ApprovedOnUtc,
+                x.RejectedBy,
+                x.RejectedOnUtc,
+                x.RejectionReason,
+                x.JournalEntryId,
+                x.PostedOnUtc,
+                x.CreatedOnUtc,
+                x.CreatedBy,
+                x.LastModifiedOnUtc,
+                x.LastModifiedBy
+            })
+            .ToListAsync(cancellationToken);
+
+        return Ok(new
+        {
+            TenantContextAvailable = true,
+            TenantId = tenantContext.TenantId,
+            TenantKey = tenantContext.TenantKey,
+            Count = items.Count,
+            Items = items
+        });
+    }
+
+
+    [Authorize(Policy = AuthorizationPolicies.BillingCreditNoteCreate)]
+    [HttpGet("sales-credit-notes/rejected")]
+    public async Task<IActionResult> GetRejectedSalesCreditNotes(
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        var items = await dbContext.Set<SalesCreditNote>()
+            .AsNoTracking()
+            .Include(x => x.Customer)
+            .Include(x => x.SalesInvoice)
+            .Where(x => x.Status == SalesCreditNoteStatus.Rejected)
+            .OrderByDescending(x => x.RejectedOnUtc)
+            .ThenByDescending(x => x.CreatedOnUtc)
+            .Select(x => new
+            {
+                x.Id,
+                x.TenantId,
+                x.CustomerId,
+                CustomerCode = x.Customer != null ? x.Customer.CustomerCode : string.Empty,
+                CustomerName = x.Customer != null ? x.Customer.CustomerName : string.Empty,
+                x.SalesInvoiceId,
+                InvoiceNumber = x.SalesInvoice != null ? x.SalesInvoice.InvoiceNumber : string.Empty,
+                x.CreditNoteDateUtc,
+                x.CreditNoteNumber,
+                x.Description,
+                x.Amount,
+                x.Status,
+                StatusName = x.Status.ToString(),
+                x.SubmittedBy,
+                x.SubmittedOnUtc,
+                x.ApprovedBy,
+                x.ApprovedOnUtc,
+                x.RejectedBy,
+                x.RejectedOnUtc,
+                x.RejectionReason,
+                x.JournalEntryId,
+                x.PostedOnUtc,
+                x.CreatedOnUtc,
+                x.CreatedBy,
+                x.LastModifiedOnUtc,
+                x.LastModifiedBy
+            })
+            .ToListAsync(cancellationToken);
+
+        return Ok(new
+        {
+            TenantContextAvailable = true,
+            TenantId = tenantContext.TenantId,
+            TenantKey = tenantContext.TenantKey,
+            Count = items.Count,
+            Items = items
+        });
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.BillingCreditNoteCreate)]
+    [HttpPost("sales-credit-notes")]
+    public async Task<IActionResult> CreateSalesCreditNote(
+        [FromBody] CreateSalesCreditNoteRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        if (request.SalesInvoiceId == Guid.Empty)
+        {
+            return BadRequest(new { Message = "Sales invoice is required." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.CreditNoteNumber))
+        {
+            return BadRequest(new { Message = "Credit note number is required." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Description))
+        {
+            return BadRequest(new { Message = "Credit note description is required." });
+        }
+
+        if (request.Amount <= 0m)
+        {
+            return BadRequest(new { Message = "Credit note amount must be greater than zero." });
+        }
+
+        var invoice = await dbContext.SalesInvoices
+            .Include(x => x.Customer)
+            .FirstOrDefaultAsync(x => x.Id == request.SalesInvoiceId, cancellationToken);
+
+        if (invoice is null)
+        {
+            return NotFound(new
+            {
+                Message = "Sales invoice was not found for the current tenant.",
+                request.SalesInvoiceId
+            });
+        }
+
+        if (invoice.Status != SalesInvoiceStatus.Posted && invoice.Status != SalesInvoiceStatus.PartPaid)
+        {
+            return Conflict(new
+            {
+                Message = "Credit notes can only be created for posted or part-paid sales invoices.",
+                invoice.Id,
+                invoice.InvoiceNumber,
+                invoice.Status
+            });
+        }
+
+        if (request.Amount > invoice.BalanceAmount)
+        {
+            return Conflict(new
+            {
+                Message = "Credit note amount cannot exceed the outstanding invoice balance.",
+                invoice.Id,
+                invoice.InvoiceNumber,
+                invoice.BalanceAmount,
+                request.Amount
+            });
+        }
+
+        var normalizedCreditNoteNumber = request.CreditNoteNumber.Trim().ToUpperInvariant();
+
+        var duplicateExists = await dbContext.Set<SalesCreditNote>()
+            .AsNoTracking()
+            .AnyAsync(x => x.CreditNoteNumber == normalizedCreditNoteNumber, cancellationToken);
+
+        if (duplicateExists)
+        {
+            return Conflict(new
+            {
+                Message = "A sales credit note with the same number already exists for the current tenant.",
+                CreditNoteNumber = normalizedCreditNoteNumber
+            });
+        }
+
+        var userId = EnsureAuthenticatedUserId(currentUserService);
+
+        var creditNote = new SalesCreditNote(
+            Guid.NewGuid(),
+            tenantContext.TenantId,
+            invoice.CustomerId,
+            invoice.Id,
+            request.CreditNoteDateUtc,
+            normalizedCreditNoteNumber,
+            request.Description,
+            request.Amount);
+
+        creditNote.SetAudit(userId, userId);
+
+        dbContext.Set<SalesCreditNote>().Add(creditNote);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "ar",
+            "SalesCreditNote",
+            "Created",
+            creditNote.Id,
+            creditNote.CreditNoteNumber,
+            $"Sales credit note '{creditNote.CreditNoteNumber}' created for invoice '{invoice.InvoiceNumber}'.",
+            userId,
+            tenantContext.TenantId,
+            new
+            {
+                creditNote.CreditNoteNumber,
+                creditNote.SalesInvoiceId,
+                invoice.InvoiceNumber,
+                creditNote.Amount,
+                creditNote.Status
+            },
+            cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Sales credit note created successfully.",
+            CreditNote = new
+            {
+                creditNote.Id,
+                creditNote.CustomerId,
+                CustomerCode = invoice.Customer?.CustomerCode ?? string.Empty,
+                CustomerName = invoice.Customer?.CustomerName ?? string.Empty,
+                creditNote.SalesInvoiceId,
+                invoice.InvoiceNumber,
+                creditNote.CreditNoteDateUtc,
+                creditNote.CreditNoteNumber,
+                creditNote.Description,
+                creditNote.Amount,
+                creditNote.Status,
+                StatusName = creditNote.Status.ToString()
+            }
+        });
+    }
+
+
+    [Authorize(Policy = AuthorizationPolicies.BillingCreditNoteCreate)]
+    [HttpPut("sales-credit-notes/{creditNoteId:guid}")]
+    public async Task<IActionResult> UpdateRejectedSalesCreditNote(
+        Guid creditNoteId,
+        [FromBody] UpdateSalesCreditNoteRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.CreditNoteNumber))
+        {
+            return BadRequest(new { Message = "Credit note number is required." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Description))
+        {
+            return BadRequest(new { Message = "Credit note description is required." });
+        }
+
+        if (request.Amount <= 0m)
+        {
+            return BadRequest(new { Message = "Credit note amount must be greater than zero." });
+        }
+
+        var creditNote = await dbContext.Set<SalesCreditNote>()
+            .Include(x => x.Customer)
+            .Include(x => x.SalesInvoice)
+            .FirstOrDefaultAsync(x => x.Id == creditNoteId, cancellationToken);
+
+        if (creditNote is null)
+        {
+            return NotFound(new
+            {
+                Message = "Sales credit note was not found for the current tenant.",
+                CreditNoteId = creditNoteId
+            });
+        }
+
+        if (creditNote.Status != SalesCreditNoteStatus.Rejected)
+        {
+            return Conflict(new
+            {
+                Message = "Only rejected sales credit notes can be corrected from the rejected queue.",
+                CreditNoteId = creditNoteId,
+                creditNote.Status
+            });
+        }
+
+        var invoice = await dbContext.SalesInvoices
+            .FirstOrDefaultAsync(x => x.Id == creditNote.SalesInvoiceId, cancellationToken);
+
+        if (invoice is null)
+        {
+            return NotFound(new
+            {
+                Message = "The linked sales invoice was not found for the current tenant.",
+                creditNote.SalesInvoiceId
+            });
+        }
+
+        if (invoice.Status != SalesInvoiceStatus.Posted &&
+            invoice.Status != SalesInvoiceStatus.PartPaid)
+        {
+            return Conflict(new
+            {
+                Message = "Credit notes can only be corrected while the linked invoice is posted or part-paid.",
+                invoice.Id,
+                invoice.InvoiceNumber,
+                invoice.Status
+            });
+        }
+
+        if (request.Amount > invoice.BalanceAmount)
+        {
+            return Conflict(new
+            {
+                Message = "Credit note amount cannot exceed the outstanding invoice balance.",
+                invoice.Id,
+                invoice.InvoiceNumber,
+                invoice.BalanceAmount,
+                request.Amount
+            });
+        }
+
+        var normalizedCreditNoteNumber = request.CreditNoteNumber.Trim().ToUpperInvariant();
+
+        var duplicateExists = await dbContext.Set<SalesCreditNote>()
+            .AsNoTracking()
+            .AnyAsync(x => x.Id != creditNoteId && x.CreditNoteNumber == normalizedCreditNoteNumber, cancellationToken);
+
+        if (duplicateExists)
+        {
+            return Conflict(new
+            {
+                Message = "Another sales credit note with the same number already exists for the current tenant.",
+                CreditNoteNumber = normalizedCreditNoteNumber
+            });
+        }
+
+        var userId = EnsureAuthenticatedUserId(currentUserService);
+
+        try
+        {
+            creditNote.UpdateDraft(
+                request.CreditNoteDateUtc,
+                normalizedCreditNoteNumber,
+                request.Description,
+                request.Amount);
+
+            creditNote.SetAudit(creditNote.CreatedBy, userId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { Message = ex.Message, CreditNoteId = creditNoteId, creditNote.Status });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "ar",
+            "SalesCreditNote",
+            "RejectedCreditNoteCorrected",
+            creditNote.Id,
+            creditNote.CreditNoteNumber,
+            $"Rejected sales credit note '{creditNote.CreditNoteNumber}' corrected.",
+            userId,
+            tenantContext.TenantId,
+            new
+            {
+                creditNote.CreditNoteNumber,
+                creditNote.SalesInvoiceId,
+                creditNote.Amount,
+                creditNote.Status
+            },
+            cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Rejected sales credit note corrected successfully.",
+            CreditNote = new
+            {
+                creditNote.Id,
+                creditNote.TenantId,
+                creditNote.CustomerId,
+                CustomerCode = creditNote.Customer != null ? creditNote.Customer.CustomerCode : string.Empty,
+                CustomerName = creditNote.Customer != null ? creditNote.Customer.CustomerName : string.Empty,
+                creditNote.SalesInvoiceId,
+                InvoiceNumber = creditNote.SalesInvoice != null ? creditNote.SalesInvoice.InvoiceNumber : string.Empty,
+                creditNote.CreditNoteDateUtc,
+                creditNote.CreditNoteNumber,
+                creditNote.Description,
+                creditNote.Amount,
+                creditNote.Status,
+                StatusName = creditNote.Status.ToString(),
+                creditNote.RejectedBy,
+                creditNote.RejectedOnUtc,
+                creditNote.RejectionReason,
+                creditNote.LastModifiedOnUtc,
+                creditNote.LastModifiedBy
+            }
+        });
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.BillingCreditNoteCreate)]
+    [HttpDelete("sales-credit-notes/{creditNoteId:guid}")]
+    public async Task<IActionResult> CancelRejectedSalesCreditNote(
+        Guid creditNoteId,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        var creditNote = await dbContext.Set<SalesCreditNote>()
+            .FirstOrDefaultAsync(x => x.Id == creditNoteId, cancellationToken);
+
+        if (creditNote is null)
+        {
+            return NotFound(new
+            {
+                Message = "Sales credit note was not found for the current tenant.",
+                CreditNoteId = creditNoteId
+            });
+        }
+
+        if (creditNote.Status != SalesCreditNoteStatus.Rejected &&
+            creditNote.Status != SalesCreditNoteStatus.Draft)
+        {
+            return Conflict(new
+            {
+                Message = "Only draft or rejected unposted sales credit notes can be cancelled from this action.",
+                CreditNoteId = creditNoteId,
+                creditNote.Status
+            });
+        }
+
+        var userId = EnsureAuthenticatedUserId(currentUserService);
+
+        try
+        {
+            creditNote.Cancel();
+            creditNote.SetAudit(creditNote.CreatedBy, userId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { Message = ex.Message, CreditNoteId = creditNoteId, creditNote.Status });
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "ar",
+            "SalesCreditNote",
+            "Cancelled",
+            creditNote.Id,
+            creditNote.CreditNoteNumber,
+            $"Sales credit note '{creditNote.CreditNoteNumber}' cancelled.",
+            userId,
+            tenantContext.TenantId,
+            new
+            {
+                creditNote.CreditNoteNumber,
+                creditNote.Status,
+                creditNote.CancelledOnUtc
+            },
+            cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Sales credit note cancelled successfully.",
+            CreditNote = new
+            {
+                creditNote.Id,
+                creditNote.CreditNoteNumber,
+                creditNote.Status,
+                StatusName = creditNote.Status.ToString(),
+                creditNote.CancelledOnUtc
+            }
+        });
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.BillingCreditNoteCreate)]
+    [HttpPost("sales-credit-notes/{creditNoteId:guid}/submit")]
+    public async Task<IActionResult> SubmitSalesCreditNote(
+        Guid creditNoteId,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        var creditNote = await dbContext.Set<SalesCreditNote>()
+            .FirstOrDefaultAsync(x => x.Id == creditNoteId, cancellationToken);
+
+        if (creditNote is null)
+        {
+            return NotFound(new
+            {
+                Message = "Sales credit note was not found for the current tenant.",
+                CreditNoteId = creditNoteId
+            });
+        }
+
+        var userId = EnsureAuthenticatedUserId(currentUserService);
+
+        try
+        {
+            creditNote.SubmitForApproval(userId);
+            creditNote.SetAudit(creditNote.CreatedBy, userId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { Message = ex.Message, CreditNoteId = creditNoteId, creditNote.Status });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "ar",
+            "SalesCreditNote",
+            "SubmittedForApproval",
+            creditNote.Id,
+            creditNote.CreditNoteNumber,
+            $"Sales credit note '{creditNote.CreditNoteNumber}' submitted for approval.",
+            userId,
+            tenantContext.TenantId,
+            new { creditNote.CreditNoteNumber, creditNote.Status },
+            cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Sales credit note submitted for approval successfully.",
+            CreditNote = new
+            {
+                creditNote.Id,
+                creditNote.CreditNoteNumber,
+                creditNote.Status,
+                StatusName = creditNote.Status.ToString(),
+                creditNote.SubmittedBy,
+                creditNote.SubmittedOnUtc
+            }
+        });
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.BillingCreditNoteApprove)]
+    [HttpPost("sales-credit-notes/{creditNoteId:guid}/approve")]
+    public async Task<IActionResult> ApproveSalesCreditNote(
+        Guid creditNoteId,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        var creditNote = await dbContext.Set<SalesCreditNote>()
+            .FirstOrDefaultAsync(x => x.Id == creditNoteId, cancellationToken);
+
+        if (creditNote is null)
+        {
+            return NotFound(new
+            {
+                Message = "Sales credit note was not found for the current tenant.",
+                CreditNoteId = creditNoteId
+            });
+        }
+
+        var userId = EnsureAuthenticatedUserId(currentUserService);
+
+        try
+        {
+            creditNote.Approve(userId);
+            creditNote.SetAudit(creditNote.CreatedBy, userId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { Message = ex.Message, CreditNoteId = creditNoteId, creditNote.Status });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "ar",
+            "SalesCreditNote",
+            "Approved",
+            creditNote.Id,
+            creditNote.CreditNoteNumber,
+            $"Sales credit note '{creditNote.CreditNoteNumber}' approved.",
+            userId,
+            tenantContext.TenantId,
+            new { creditNote.CreditNoteNumber, creditNote.Status },
+            cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Sales credit note approved successfully.",
+            CreditNote = new
+            {
+                creditNote.Id,
+                creditNote.CreditNoteNumber,
+                creditNote.Status,
+                StatusName = creditNote.Status.ToString(),
+                creditNote.ApprovedBy,
+                creditNote.ApprovedOnUtc
+            }
+        });
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.BillingCreditNoteApprove)]
+    [HttpPost("sales-credit-notes/{creditNoteId:guid}/reject")]
+    public async Task<IActionResult> RejectSalesCreditNote(
+        Guid creditNoteId,
+        [FromBody] RejectSalesCreditNoteRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        var creditNote = await dbContext.Set<SalesCreditNote>()
+            .FirstOrDefaultAsync(x => x.Id == creditNoteId, cancellationToken);
+
+        if (creditNote is null)
+        {
+            return NotFound(new
+            {
+                Message = "Sales credit note was not found for the current tenant.",
+                CreditNoteId = creditNoteId
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            return BadRequest(new { Message = "Reason for rejection is required." });
+        }
+
+        var userId = EnsureAuthenticatedUserId(currentUserService);
+
+        try
+        {
+            creditNote.Reject(userId, request.Reason.Trim());
+            creditNote.SetAudit(creditNote.CreatedBy, userId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { Message = ex.Message, CreditNoteId = creditNoteId, creditNote.Status });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "ar",
+            "SalesCreditNote",
+            "Rejected",
+            creditNote.Id,
+            creditNote.CreditNoteNumber,
+            $"Sales credit note '{creditNote.CreditNoteNumber}' rejected.",
+            userId,
+            tenantContext.TenantId,
+            new { creditNote.CreditNoteNumber, creditNote.Status, creditNote.RejectionReason },
+            cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Sales credit note rejected successfully.",
+            CreditNote = new
+            {
+                creditNote.Id,
+                creditNote.CreditNoteNumber,
+                creditNote.Status,
+                StatusName = creditNote.Status.ToString(),
+                creditNote.RejectedBy,
+                creditNote.RejectedOnUtc,
+                creditNote.RejectionReason
+            }
+        });
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.BillingInvoicePost)]
+    [HttpPost("sales-credit-notes/{creditNoteId:guid}/post")]
+    public async Task<IActionResult> PostSalesCreditNote(
+        Guid creditNoteId,
+        [FromBody] PostSalesCreditNoteRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] ICurrentUserService currentUserService,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+
+        if (!tenantContext.IsAvailable)
+        {
+            return BadRequest(new
+            {
+                Message = "Tenant context is required.",
+                RequiredHeader = "X-Tenant-Key"
+            });
+        }
+
+        if (request.ReceivableLedgerAccountId == Guid.Empty)
+        {
+            return BadRequest(new { Message = "Receivable ledger account is required." });
+        }
+
+        if (request.RevenueLedgerAccountId == Guid.Empty)
+        {
+            return BadRequest(new { Message = "Revenue ledger account is required." });
+        }
+
+        if (request.TaxAmount < 0m)
+        {
+            return BadRequest(new { Message = "Tax amount cannot be negative." });
+        }
+
+        var creditNote = await dbContext.Set<SalesCreditNote>()
+            .Include(x => x.Customer)
+            .Include(x => x.SalesInvoice)
+            .FirstOrDefaultAsync(x => x.Id == creditNoteId, cancellationToken);
+
+        if (creditNote is null)
+        {
+            return NotFound(new
+            {
+                Message = "Sales credit note was not found for the current tenant.",
+                CreditNoteId = creditNoteId
+            });
+        }
+
+        if (creditNote.Status != SalesCreditNoteStatus.Approved)
+        {
+            return Conflict(new
+            {
+                Message = "Only approved sales credit notes can be posted.",
+                creditNote.Id,
+                creditNote.CreditNoteNumber,
+                creditNote.Status
+            });
+        }
+
+        var invoice = creditNote.SalesInvoice;
+
+        if (invoice is null)
+        {
+            return NotFound(new
+            {
+                Message = "The source sales invoice was not found for the current tenant.",
+                creditNote.SalesInvoiceId
+            });
+        }
+
+        if (request.TaxAmount >= creditNote.Amount)
+        {
+            return BadRequest(new
+            {
+                Message = "Tax amount must be less than the total credit note amount.",
+                creditNote.Amount,
+                request.TaxAmount
+            });
+        }
+
+        if (request.TaxAmount > 0m && (!request.TaxLedgerAccountId.HasValue || request.TaxLedgerAccountId.Value == Guid.Empty))
+        {
+            return BadRequest(new { Message = "Tax ledger account is required when tax amount is greater than zero." });
+        }
+
+        if (creditNote.Amount > invoice.BalanceAmount)
+        {
+            return Conflict(new
+            {
+                Message = "Credit note amount cannot exceed the current outstanding invoice balance.",
+                invoice.Id,
+                invoice.InvoiceNumber,
+                invoice.BalanceAmount,
+                creditNote.Amount
+            });
+        }
+
+        var postingGuard = await FiscalPeriodPostingGuard.EnsureOpenPeriodAsync(
+            dbContext,
+            creditNote.CreditNoteDateUtc,
+            "Sales Credit Note Posting",
+            cancellationToken);
+
+        if (!postingGuard.Allowed)
+        {
+            return Conflict(postingGuard.ToProblem());
+        }
+
+        var requestedLedgerAccountIds = new List<Guid>
+        {
+            request.ReceivableLedgerAccountId,
+            request.RevenueLedgerAccountId
+        };
+
+        if (request.TaxLedgerAccountId.HasValue && request.TaxLedgerAccountId.Value != Guid.Empty)
+        {
+            requestedLedgerAccountIds.Add(request.TaxLedgerAccountId.Value);
+        }
+
+        requestedLedgerAccountIds = requestedLedgerAccountIds.Distinct().ToList();
+
+        var ledgerAccounts = await dbContext.LedgerAccounts
+            .Where(x => requestedLedgerAccountIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, cancellationToken);
+
+        if (ledgerAccounts.Count != requestedLedgerAccountIds.Count)
+        {
+            return BadRequest(new
+            {
+                Message = "One or more selected ledger accounts were not found for the current tenant."
+            });
+        }
+
+        var receivableAccount = ledgerAccounts[request.ReceivableLedgerAccountId];
+        var revenueAccount = ledgerAccounts[request.RevenueLedgerAccountId];
+
+        if (!IsPostingReady(receivableAccount))
+        {
+            return BadRequest(new
+            {
+                Message = "The receivable ledger account must be active, non-header, and posting-enabled.",
+                receivableAccount.Id,
+                receivableAccount.Code
+            });
+        }
+
+        if (!IsPostingReady(revenueAccount))
+        {
+            return BadRequest(new
+            {
+                Message = "The revenue ledger account must be active, non-header, and posting-enabled.",
+                revenueAccount.Id,
+                revenueAccount.Code
+            });
+        }
+
+        if (request.TaxLedgerAccountId.HasValue && request.TaxLedgerAccountId.Value != Guid.Empty)
+        {
+            var taxAccount = ledgerAccounts[request.TaxLedgerAccountId.Value];
+
+            if (!IsPostingReady(taxAccount))
+            {
+                return BadRequest(new
+                {
+                    Message = "The tax ledger account must be active, non-header, and posting-enabled.",
+                    taxAccount.Id,
+                    taxAccount.Code
+                });
+            }
+        }
+
+        var reference = $"AR-CN-{creditNote.CreditNoteNumber}";
+
+        var referenceExists = await dbContext.JournalEntries
+            .AsNoTracking()
+            .AnyAsync(x => x.Reference == reference, cancellationToken);
+
+        if (referenceExists)
+        {
+            return Conflict(new
+            {
+                Message = "A journal entry with the generated credit note reference already exists.",
+                Reference = reference
+            });
+        }
+
+        var revenueReductionAmount = creditNote.Amount - request.TaxAmount;
+
+        var journalLines = new List<JournalEntryLine>
+        {
+            new(
+                Guid.NewGuid(),
+                revenueAccount.Id,
+                $"Revenue reversal - {creditNote.CreditNoteNumber} for invoice {invoice.InvoiceNumber}",
+                revenueReductionAmount,
+                0m)
+        };
+
+        if (request.TaxAmount > 0m && request.TaxLedgerAccountId.HasValue)
+        {
+            journalLines.Add(new JournalEntryLine(
+                Guid.NewGuid(),
+                request.TaxLedgerAccountId.Value,
+                $"Tax reversal - {creditNote.CreditNoteNumber} for invoice {invoice.InvoiceNumber}",
+                request.TaxAmount,
+                0m));
+        }
+
+        journalLines.Add(new JournalEntryLine(
+            Guid.NewGuid(),
+            receivableAccount.Id,
+            $"Accounts receivable reduction - {creditNote.CreditNoteNumber} for invoice {invoice.InvoiceNumber}",
+            0m,
+            creditNote.Amount));
+
+        var journalEntry = new JournalEntry(
+            Guid.NewGuid(),
+            tenantContext.TenantId,
+            creditNote.CreditNoteDateUtc,
+            reference,
+            $"Sales credit note posting - {creditNote.CreditNoteNumber} - {invoice.InvoiceNumber}",
+            JournalEntryStatus.Approved,
+            JournalEntryType.Normal,
+            journalLines);
+
+        var postedAtUtc = DateTime.UtcNow;
+        journalEntry.MarkPosted(postedAtUtc);
+
+        var movements = journalEntry.Lines
+            .Select(line => new LedgerMovement(
+                Guid.NewGuid(),
+                tenantContext.TenantId,
+                journalEntry.Id,
+                line.Id,
+                line.LedgerAccountId,
+                journalEntry.EntryDateUtc,
+                journalEntry.Reference,
+                line.Description,
+                line.DebitAmount,
+                line.CreditAmount))
+            .ToList();
+
+        var userId = EnsureAuthenticatedUserId(currentUserService);
+
+        try
+        {
+            invoice.ApplyCreditNote(creditNote.Amount);
+            creditNote.MarkPosted(journalEntry.Id);
+            creditNote.SetAudit(creditNote.CreatedBy, userId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new
+            {
+                Message = ex.Message,
+                CreditNoteId = creditNote.Id,
+                creditNote.CreditNoteNumber,
+                SalesInvoiceId = invoice.Id,
+                invoice.InvoiceNumber,
+                invoice.BalanceAmount
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
+
+        dbContext.JournalEntries.Add(journalEntry);
+        dbContext.LedgerMovements.AddRange(movements);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditTrailWriter.WriteAsync(
+            "ar",
+            "SalesCreditNote",
+            "Posted",
+            creditNote.Id,
+            creditNote.CreditNoteNumber,
+            $"Sales credit note '{creditNote.CreditNoteNumber}' posted against invoice '{invoice.InvoiceNumber}'.",
+            userId,
+            tenantContext.TenantId,
+            new
+            {
+                creditNote.CreditNoteNumber,
+                creditNote.Amount,
+                creditNote.Status,
+                invoice.InvoiceNumber,
+                invoice.AmountPaid,
+                invoice.CreditNoteAmount,
+                invoice.BalanceAmount,
+                creditNote.JournalEntryId
+            },
+            cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Sales credit note posted successfully.",
+            CreditNote = new
+            {
+                creditNote.Id,
+                creditNote.CreditNoteNumber,
+                creditNote.Status,
+                StatusName = creditNote.Status.ToString(),
+                creditNote.Amount,
+                creditNote.JournalEntryId,
+                creditNote.PostedOnUtc
+            },
+            Invoice = new
+            {
+                invoice.Id,
+                invoice.InvoiceNumber,
+                invoice.Status,
+                invoice.AmountPaid,
+                invoice.CreditNoteAmount,
+                invoice.BalanceAmount
+            },
+            JournalEntry = new
+            {
+                journalEntry.Id,
+                journalEntry.Reference,
+                journalEntry.Status,
+                journalEntry.Type,
+                journalEntry.PostedAtUtc,
+                journalEntry.TotalDebit,
+                journalEntry.TotalCredit
+            }
+        });
+    }
+
+
     [Authorize(Policy = AuthorizationPolicies.ArView)]
     [HttpGet("customer-receipts")]
     public async Task<IActionResult> GetCustomerReceipts(
@@ -3105,6 +4231,28 @@ public async Task<IActionResult> DeleteRejectedCustomerReceipt(
     string Description,
     List<CreateSalesInvoiceLineRequest> Lines,
     List<Guid>? TaxCodeIds);
+
+    public sealed record CreateSalesCreditNoteRequest(
+        Guid SalesInvoiceId,
+        DateTime CreditNoteDateUtc,
+        string CreditNoteNumber,
+        string Description,
+        decimal Amount);
+
+    public sealed record UpdateSalesCreditNoteRequest(
+        DateTime CreditNoteDateUtc,
+        string CreditNoteNumber,
+        string Description,
+        decimal Amount);
+
+    public sealed record RejectSalesCreditNoteRequest(
+        string Reason);
+
+    public sealed record PostSalesCreditNoteRequest(
+        Guid ReceivableLedgerAccountId,
+        Guid RevenueLedgerAccountId,
+        Guid? TaxLedgerAccountId,
+        decimal TaxAmount);
 
     public sealed record PostSalesInvoiceRequest(
         Guid ReceivableLedgerAccountId,

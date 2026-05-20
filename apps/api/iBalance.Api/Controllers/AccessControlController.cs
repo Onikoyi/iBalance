@@ -114,6 +114,24 @@ public sealed class AccessControlController : ControllerBase
             new { Code = "ar.receipt.post", Module = "ar", Action = "post", Name = "Post Customer Receipts", Description = "Post customer receipts." },
 
 
+
+            new { Code = "billing.view", Module = "billing", Action = "view", Name = "View Billing", Description = "Access billing and invoicing workspace." },
+            new { Code = "billing.setup.manage", Module = "billing", Action = "manage", Name = "Manage Billing Setup", Description = "Maintain billing policy, numbering, GL account mapping, and posting setup." },
+            new { Code = "billing.invoice.create", Module = "billing", Action = "create", Name = "Create Billing Invoices", Description = "Create customer billing invoices." },
+            new { Code = "billing.invoice.update", Module = "billing", Action = "update", Name = "Update Billing Invoices", Description = "Update draft or rejected billing invoices." },
+            new { Code = "billing.invoice.submit", Module = "billing", Action = "submit", Name = "Submit Billing Invoices", Description = "Submit billing invoices for approval." },
+            new { Code = "billing.invoice.approve", Module = "billing", Action = "approve", Name = "Approve Billing Invoices", Description = "Approve billing invoices." },
+            new { Code = "billing.invoice.reject", Module = "billing", Action = "reject", Name = "Reject Billing Invoices", Description = "Reject billing invoices." },
+            new { Code = "billing.invoice.post", Module = "billing", Action = "post", Name = "Post Billing Invoices", Description = "Post approved billing invoices to the general ledger." },
+            new { Code = "billing.invoice.cancel", Module = "billing", Action = "cancel", Name = "Cancel Billing Invoices", Description = "Cancel draft, submitted, approved, or rejected billing invoices." },
+            new { Code = "billing.creditnote.create", Module = "billing", Action = "create", Name = "Create Billing Credit Notes", Description = "Create billing credit notes." },
+            new { Code = "billing.creditnote.approve", Module = "billing", Action = "approve", Name = "Approve Billing Credit Notes", Description = "Approve billing credit notes." },
+            new { Code = "billing.payment.allocate", Module = "billing", Action = "allocate", Name = "Allocate Billing Payments", Description = "Allocate payments against billing invoices." },
+            new { Code = "billing.reports.view", Module = "billing", Action = "report", Name = "View Billing Reports", Description = "View billing and invoicing reports." },
+            new { Code = "billing.export", Module = "billing", Action = "export", Name = "Export Billing Reports", Description = "Export billing and invoicing data." },
+
+            
+        
             new { Code = "fleet.view", Module = "fleet", Action = "view", Name = "View Fleet", Description = "Access fleet management workspace." },
             new { Code = "fleet.vehicle.manage", Module = "fleet", Action = "manage", Name = "Manage Fleet Vehicles", Description = "Create and maintain fleet vehicles." },
             new { Code = "fleet.driver.manage", Module = "fleet", Action = "manage", Name = "Manage Fleet Drivers", Description = "Create and maintain fleet drivers." },
@@ -247,6 +265,22 @@ public sealed class AccessControlController : ControllerBase
         "fleet.maintenance.post",
         "fleet.policy.manage",
         "fleet.reports.view",
+
+        "billing.view",
+        "billing.setup.manage",
+        "billing.invoice.create",
+        "billing.invoice.update",
+        "billing.invoice.submit",
+        "billing.invoice.approve",
+        "billing.invoice.reject",
+        "billing.invoice.post",
+        "billing.invoice.cancel",
+        "billing.creditnote.create",
+        "billing.creditnote.approve",
+        "billing.payment.allocate",
+        "billing.reports.view",
+        "billing.export",
+
         "workingcapital.view",
     }
 },
@@ -264,6 +298,7 @@ public sealed class AccessControlController : ControllerBase
                     "ar.view","ar.invoice.create","ar.invoice.submit","ar.invoice.approve","ar.invoice.reject","ar.invoice.post","ar.receipt.create","ar.receipt.submit","ar.receipt.approve","ar.receipt.reject","ar.receipt.post",
                     "treasury.view","treasury.manage","treasury.bankaccounts.manage","treasury.reconciliation.manage",
                     "fixedassets.view","fixedassets.manage","fixedassets.depreciation.run","fixedassets.disposal.post",
+                    "billing.view","billing.setup.manage","billing.invoice.create","billing.invoice.update","billing.invoice.submit","billing.invoice.approve","billing.invoice.reject","billing.invoice.post","billing.invoice.cancel","billing.creditnote.create","billing.creditnote.approve","billing.payment.allocate","billing.reports.view","billing.export",
                     "reports.view","reports.export","workflow.approve","workflow.reject","workflow.reopen"
                 }
             },
@@ -280,6 +315,7 @@ public sealed class AccessControlController : ControllerBase
                     "ap.view","ap.invoice.create","ap.invoice.submit","ap.invoice.post","ap.payment.create","ap.payment.submit","ap.payment.post",
                     "ar.view","ar.invoice.create","ar.invoice.submit","ar.invoice.post","ar.receipt.create","ar.receipt.submit","ar.receipt.post",
                     "fixedassets.view","fixedassets.manage","fixedassets.depreciation.run",
+                    "billing.view","billing.invoice.create","billing.invoice.update","billing.invoice.submit","billing.invoice.post","billing.creditnote.create","billing.payment.allocate","billing.reports.view","billing.export",
                     "reports.view","reports.export"
                 }
             },
@@ -297,6 +333,7 @@ public sealed class AccessControlController : ControllerBase
                     "ap.view","ap.invoice.approve","ap.invoice.reject","ap.payment.approve","ap.payment.reject",
                     "ar.view","ar.invoice.approve","ar.invoice.reject","ar.receipt.approve","ar.receipt.reject",
                     "workflow.approve","workflow.reject",
+                    "billing.view","billing.invoice.approve","billing.invoice.reject","billing.creditnote.approve","billing.reports.view","billing.export",
                     "reports.view","reports.export"
                 }
             },
@@ -316,6 +353,7 @@ public sealed class AccessControlController : ControllerBase
                     "treasury.view",
                     "inventory.view",
                     "fixedassets.view",
+                    "billing.view","billing.reports.view","billing.export",
                     "reports.view","reports.export"
                 }
             },
@@ -335,6 +373,7 @@ public sealed class AccessControlController : ControllerBase
                     "treasury.view",
                     "inventory.view",
                     "fixedassets.view",
+                    "billing.view","billing.reports.view","billing.export",
                     "reports.view","reports.export"
                 }
             },
@@ -394,6 +433,55 @@ public sealed class AccessControlController : ControllerBase
                 }
             },
 
+            new
+            {
+                Code = "BILLING_OFFICER",
+                Name = "Billing Officer",
+                Description = "Billing and invoicing operational role.",
+                PermissionCodes = new[]
+                {
+                    "billing.view",
+                    "billing.setup.manage",
+                    "billing.invoice.create",
+                    "billing.invoice.update",
+                    "billing.invoice.submit",
+                    "billing.invoice.post",
+                    "billing.invoice.cancel",
+                    "billing.creditnote.create",
+                    "billing.payment.allocate",
+                    "billing.reports.view",
+                    "billing.export"
+                }
+            },
+            new
+            {
+                Code = "BILLING_APPROVER",
+                Name = "Billing Approver",
+                Description = "Billing and invoicing approval role.",
+                PermissionCodes = new[]
+                {
+                    "billing.view",
+                    "billing.invoice.approve",
+                    "billing.invoice.reject",
+                    "billing.creditnote.approve",
+                    "billing.reports.view",
+                    "billing.export",
+                    "workflow.approve",
+                    "workflow.reject"
+                }
+            },
+            new
+            {
+                Code = "BILLING_VIEWER",
+                Name = "Billing Viewer",
+                Description = "Read-only billing and invoicing role.",
+                PermissionCodes = new[]
+                {
+                    "billing.view",
+                    "billing.reports.view",
+                    "billing.export"
+                }
+            },
             new
             {
                 Code = "FLEET_OFFICER",

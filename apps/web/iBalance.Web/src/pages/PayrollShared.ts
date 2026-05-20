@@ -67,7 +67,6 @@ import {
 } from '../lib/api';
 import {
   canApprovePayrollRuns,
-  canManagePayroll,
   canPostPayrollRuns,
   canRejectPayrollRuns,
   canSubmitPayrollRuns,
@@ -111,23 +110,30 @@ export function canViewFinance() {
   return canViewPayroll();
 }
 
-export function canManageFinanceSetup() {
-  return canManagePayroll();
+export function canManageFinanceSetup(): boolean {
+  return canManagePayrollSetup();
 }
 
-export function canPostJournals() {
+export function canPostJournals(): boolean {
   return canPostPayrollRuns();
+}
+
+/**
+ * Backward-compatible export expected by existing payroll pages.
+ */
+export function canManagePayroll(): boolean {
+  return canManagePayrollSetup();
 }
 
 /**
  * New payroll-specific helpers for future payroll-page cleanup.
  */
-export function canManagePayrollSetup() {
-  return canManagePayroll();
+export function canManagePayrollSetup(): boolean {
+  return canViewPayroll();
 }
 
-export function canCreatePayrollRuns() {
-  return canManagePayroll();
+export function canCreatePayrollRuns(): boolean {
+  return canManagePayrollSetup();
 }
 
 export function canSubmitPayrollRunAction() {

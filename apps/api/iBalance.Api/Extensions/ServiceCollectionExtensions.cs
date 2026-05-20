@@ -152,6 +152,23 @@ public static class ServiceCollectionExtensions
             AddPermissionPolicy(AuthorizationPolicies.ReportsExport, "reports.export");
 
 
+
+            AddPermissionPolicy(AuthorizationPolicies.BillingView, "billing.view");
+            AddPermissionPolicy(AuthorizationPolicies.BillingSetupManage, "billing.setup.manage");
+            AddPermissionPolicy(AuthorizationPolicies.BillingInvoiceCreate, "billing.invoice.create");
+            AddPermissionPolicy(AuthorizationPolicies.BillingInvoiceUpdate, "billing.invoice.update");
+            AddPermissionPolicy(AuthorizationPolicies.BillingInvoiceSubmit, "billing.invoice.submit");
+            AddPermissionPolicy(AuthorizationPolicies.BillingInvoiceApprove, "billing.invoice.approve", "workflow.approve");
+            AddPermissionPolicy(AuthorizationPolicies.BillingInvoiceReject, "billing.invoice.reject", "workflow.reject");
+            AddPermissionPolicy(AuthorizationPolicies.BillingInvoicePost, "billing.invoice.post");
+            AddPermissionPolicy(AuthorizationPolicies.BillingInvoiceCancel, "billing.invoice.cancel");
+            AddPermissionPolicy(AuthorizationPolicies.BillingCreditNoteCreate, "billing.creditnote.create");
+            AddPermissionPolicy(AuthorizationPolicies.BillingCreditNoteApprove, "billing.creditnote.approve", "workflow.approve");
+            AddPermissionPolicy(AuthorizationPolicies.BillingPaymentAllocate, "billing.payment.allocate");
+            AddPermissionPolicy(AuthorizationPolicies.BillingReportsView, "billing.reports.view", "billing.view");
+            AddPermissionPolicy(AuthorizationPolicies.BillingExport, "billing.export", "reports.export");
+            AddPermissionPolicy(AuthorizationPolicies.BillingPriceManage, "billing.price.manage");
+
             AddPermissionPolicy(AuthorizationPolicies.FleetView, "fleet.view");
             AddPermissionPolicy(AuthorizationPolicies.FleetVehicleManage, "fleet.vehicle.manage");
             AddPermissionPolicy(AuthorizationPolicies.FleetDriverManage, "fleet.driver.manage");

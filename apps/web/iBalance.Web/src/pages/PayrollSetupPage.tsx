@@ -47,14 +47,14 @@ import {
   type UpdatePayrollSalaryStructureRequest,
   type PayrollPolicySettingDto,
   type UpdatePayrollPolicySettingRequest,
-  canManageFinanceSetup,
-  canViewFinance,
+  canManagePayroll,
+  canViewPayroll,
 } from './PayrollShared';
 
 export function PayrollSetupPage() {
   const queryClient = useQueryClient();
-  const canView = canViewFinance();
-  const canManage = canManageFinanceSetup();
+  const canView = canViewPayroll();
+  const canManage = canManagePayroll();
 
   const [message, setMessage] = useState('');
   const [errorText, setErrorText] = useState('');

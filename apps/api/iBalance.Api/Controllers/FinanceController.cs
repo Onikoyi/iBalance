@@ -3547,6 +3547,221 @@ if (budgetResult is not null && !budgetResult.Allowed)
         });
     }
 
+
+    [Authorize(Policy = AuthorizationPolicies.FinanceReportsView)]
+    [HttpGet("reports/cash-flow")]
+    public async Task<IActionResult> GetCashFlowStatement(
+        [FromQuery] DateTime? fromUtc,
+        [FromQuery] DateTime? toUtc,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        CancellationToken cancellationToken)
+    {
+        var tenantContext = tenantContextAccessor.Current;
+        var effectiveToUtc = toUtc ?? DateTime.UtcNow;
+
+        var ledgerAccounts = await dbContext.LedgerAccounts
+            .AsNoTracking()
+            .Where(x => x.IsActive && !x.IsHeader)
+            .Select(x => new
+            {
+                x.Id,
+                x.Code,
+                x.Name,
+                x.Category,
+                x.NormalBalance,
+                x.IsCashOrBankAccount
+            })
+            .ToListAsync(cancellationToken);
+
+        var accountById = ledgerAccounts.ToDictionary(x => x.Id);
+        var cashAccountIds = ledgerAccounts
+            .Where(x => x.IsCashOrBankAccount)
+            .Select(x => x.Id)
+            .ToHashSet();
+
+        if (cashAccountIds.Count == 0)
+        {
+            return Ok(new
+            {
+                TenantContextAvailable = tenantContext.IsAvailable,
+                TenantId = tenantContext.IsAvailable ? tenantContext.TenantId : (Guid?)null,
+                TenantKey = tenantContext.IsAvailable ? tenantContext.TenantKey : null,
+                FromUtc = fromUtc,
+                ToUtc = effectiveToUtc,
+                OpeningCashBalance = 0m,
+                OperatingActivities = 0m,
+                InvestingActivities = 0m,
+                FinancingActivities = 0m,
+                NetCashMovement = 0m,
+                ClosingCashBalance = 0m,
+                Count = 0,
+                Items = Array.Empty<object>(),
+                Note = "No active cash or bank ledger accounts are configured."
+            });
+        }
+
+        var openingQuery = dbContext.LedgerMovements
+            .AsNoTracking()
+            .Where(x => cashAccountIds.Contains(x.LedgerAccountId));
+
+        if (fromUtc.HasValue)
+        {
+            openingQuery = openingQuery.Where(x => x.MovementDateUtc < fromUtc.Value);
+        }
+        else
+        {
+            openingQuery = openingQuery.Where(x => false);
+        }
+
+        var openingRows = await openingQuery
+            .Select(x => new
+            {
+                x.LedgerAccountId,
+                x.DebitAmount,
+                x.CreditAmount
+            })
+            .ToListAsync(cancellationToken);
+
+        var openingCashBalance = openingRows.Sum(x => x.DebitAmount - x.CreditAmount);
+
+        var periodCashQuery = dbContext.LedgerMovements
+            .AsNoTracking()
+            .Where(x => cashAccountIds.Contains(x.LedgerAccountId));
+
+        if (fromUtc.HasValue)
+        {
+            periodCashQuery = periodCashQuery.Where(x => x.MovementDateUtc >= fromUtc.Value);
+        }
+
+        periodCashQuery = periodCashQuery.Where(x => x.MovementDateUtc <= effectiveToUtc);
+
+        var cashRows = await periodCashQuery
+            .Select(x => new
+            {
+                x.Id,
+                x.JournalEntryId,
+                x.LedgerAccountId,
+                x.MovementDateUtc,
+                x.Reference,
+                x.Description,
+                x.DebitAmount,
+                x.CreditAmount
+            })
+            .ToListAsync(cancellationToken);
+
+        var journalEntryIds = cashRows
+            .Select(x => x.JournalEntryId)
+            .Distinct()
+            .ToList();
+
+        var counterpartRows = await dbContext.LedgerMovements
+            .AsNoTracking()
+            .Where(x => journalEntryIds.Contains(x.JournalEntryId) && !cashAccountIds.Contains(x.LedgerAccountId))
+            .Join(
+                dbContext.LedgerAccounts.AsNoTracking(),
+                movement => movement.LedgerAccountId,
+                account => account.Id,
+                (movement, account) => new
+                {
+                    movement.JournalEntryId,
+                    movement.LedgerAccountId,
+                    account.Code,
+                    account.Name,
+                    account.Category,
+                    movement.DebitAmount,
+                    movement.CreditAmount
+                })
+            .ToListAsync(cancellationToken);
+
+        (int SectionOrder, string SectionName) ClassifyCashFlowSection(IReadOnlyCollection<AccountCategory> categories)
+        {
+            if (categories.Any(x => x == AccountCategory.Asset))
+            {
+                return (2, "Investing Activities");
+            }
+
+            if (categories.Any(x => x == AccountCategory.Liability || x == AccountCategory.Equity))
+            {
+                return (3, "Financing Activities");
+            }
+
+            return (1, "Operating Activities");
+        }
+
+        var items = cashRows
+            .Select(row =>
+            {
+                var account = accountById[row.LedgerAccountId];
+                var counterparties = counterpartRows
+                    .Where(x => x.JournalEntryId == row.JournalEntryId)
+                    .ToList();
+
+                var classification = ClassifyCashFlowSection(counterparties.Select(x => x.Category).Distinct().ToList());
+                var cashMovement = row.DebitAmount - row.CreditAmount;
+                var counterpartySummary = counterparties.Count == 0
+                    ? "Cash / bank transfer or unmatched journal"
+                    : string.Join(", ", counterparties
+                        .GroupBy(x => new { x.Code, x.Name })
+                        .OrderBy(x => x.Key.Code)
+                        .Select(x => $"{x.Key.Code} - {x.Key.Name}"));
+
+                return new
+                {
+                    row.Id,
+                    row.JournalEntryId,
+                    row.MovementDateUtc,
+                    row.Reference,
+                    row.Description,
+                    CashLedgerAccountId = row.LedgerAccountId,
+                    CashLedgerAccountCode = account.Code,
+                    CashLedgerAccountName = account.Name,
+                    SectionOrder = classification.SectionOrder,
+                    SectionName = classification.SectionName,
+                    CounterpartySummary = counterpartySummary,
+                    CashInflow = cashMovement > 0m ? cashMovement : 0m,
+                    CashOutflow = cashMovement < 0m ? Math.Abs(cashMovement) : 0m,
+                    NetCashMovement = cashMovement
+                };
+            })
+            .OrderBy(x => x.SectionOrder)
+            .ThenBy(x => x.MovementDateUtc)
+            .ThenBy(x => x.Reference)
+            .ToList();
+
+        var operatingActivities = items
+            .Where(x => x.SectionName == "Operating Activities")
+            .Sum(x => x.NetCashMovement);
+
+        var investingActivities = items
+            .Where(x => x.SectionName == "Investing Activities")
+            .Sum(x => x.NetCashMovement);
+
+        var financingActivities = items
+            .Where(x => x.SectionName == "Financing Activities")
+            .Sum(x => x.NetCashMovement);
+
+        var netCashMovement = operatingActivities + investingActivities + financingActivities;
+        var closingCashBalance = openingCashBalance + netCashMovement;
+
+        return Ok(new
+        {
+            TenantContextAvailable = tenantContext.IsAvailable,
+            TenantId = tenantContext.IsAvailable ? tenantContext.TenantId : (Guid?)null,
+            TenantKey = tenantContext.IsAvailable ? tenantContext.TenantKey : null,
+            FromUtc = fromUtc,
+            ToUtc = effectiveToUtc,
+            OpeningCashBalance = openingCashBalance,
+            OperatingActivities = operatingActivities,
+            InvestingActivities = investingActivities,
+            FinancingActivities = financingActivities,
+            NetCashMovement = netCashMovement,
+            ClosingCashBalance = closingCashBalance,
+            Count = items.Count,
+            Items = items
+        });
+    }
+
     [Authorize(Policy = AuthorizationPolicies.TreasuryView)]
     [HttpGet("reports/cashbook")]
     public async Task<IActionResult> GetCashbook(

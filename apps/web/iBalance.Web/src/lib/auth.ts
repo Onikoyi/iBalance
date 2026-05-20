@@ -26,6 +26,9 @@ export type UserRole =
   | 'ExpenseAdvanceApprover'
   | 'ExpenseAdvanceReviewer'
   | 'ExpenseAdvanceViewer'
+  | 'BillingOfficer'
+  | 'BillingApprover'
+  | 'BillingViewer'
   | 'FleetOfficer'
   | 'FleetApprover'
   | 'FleetReviewer'
@@ -585,30 +588,85 @@ export function canSubmitExpenseAdvances(): boolean {
 
 export function canApproveExpenseAdvances(): boolean {
   return (
-    hasPermission('eam.view') &&
-    (
-      hasPermission('eam.approve') ||
-      hasPermission('workflow.approve')
-    )
+    hasPermission('eam.request.approve') ||
+    hasPermission('workflow.approve')
   );
 }
 
 export function canRejectExpenseAdvances(): boolean {
-  return canApproveExpenseAdvances();
+  return (
+    hasPermission('eam.request.reject') ||
+    hasPermission('workflow.reject') ||
+    canApproveExpenseAdvances()
+  );
 }
 
 export function canManageExpenseAdvancePolicies(): boolean {
   return (
-    hasPermission('eam.view') &&
-    (
-      hasPermission('eam.policy.manage') ||
-      hasPermission('finance.setup.manage')
-    )
+    hasPermission('eam.policy.manage') ||
+    hasPermission('finance.setup.manage')
   );
 }
 
 export function canViewExpenseAdvanceReports(): boolean {
   return hasPermission('eam.view');
+}
+
+
+export function canViewBilling(): boolean {
+  return hasPermission('billing.view');
+}
+
+export function canManageBillingSetup(): boolean {
+  return hasPermission('billing.setup.manage');
+}
+
+export function canCreateBillingInvoices(): boolean {
+  return hasPermission('billing.invoice.create');
+}
+
+export function canUpdateBillingInvoices(): boolean {
+  return hasPermission('billing.invoice.update');
+}
+
+export function canSubmitBillingInvoices(): boolean {
+  return hasPermission('billing.invoice.submit');
+}
+
+export function canApproveBillingInvoices(): boolean {
+  return hasPermission('billing.invoice.approve') || hasPermission('workflow.approve');
+}
+
+export function canRejectBillingInvoices(): boolean {
+  return hasPermission('billing.invoice.reject') || hasPermission('workflow.reject');
+}
+
+export function canPostBillingInvoices(): boolean {
+  return hasPermission('billing.invoice.post');
+}
+
+export function canCancelBillingInvoices(): boolean {
+  return hasPermission('billing.invoice.cancel');
+}
+
+export function canCreateBillingCreditNotes(): boolean {
+  return hasPermission('billing.creditnote.create');
+}
+
+export function canApproveBillingCreditNotes(): boolean {
+  return hasPermission('billing.creditnote.approve') || hasPermission('workflow.approve');
+}
+
+export function canAllocateBillingPayments(): boolean {
+  return hasPermission('billing.payment.allocate');
+}
+
+export function canViewBillingReports(): boolean {
+  return hasPermission('billing.view');
+}
+
+export function canExportBillingReports(): boolean {
+  return hasPermission('billing.export') || hasPermission('reports.export');
 }
 
 export function canViewFleet(): boolean {
@@ -795,6 +853,7 @@ export function hasAnyWorkspaceAccess(): boolean {
     canViewTreasury() ||
     canViewExpenseAdvances() ||
     canViewFleet() ||
+    canViewBilling() ||
     canViewWorkingCapital() ||
     canAccessAdmin()
   );
@@ -817,6 +876,7 @@ export function getFirstAccessibleWorkspaceRoute(): string {
   if (canViewTreasury()) return '/reconciliation';
   if (canViewExpenseAdvances()) return '/eam';
   if (canViewFleet()) return '/fleet';
+  if (canViewBilling()) return '/billing';
   if (canViewWorkingCapital()) return '/working-capital';
   if (canAccessAdmin()) return '/admin';
   return '/dashboard';

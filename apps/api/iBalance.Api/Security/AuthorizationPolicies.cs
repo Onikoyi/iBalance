@@ -105,11 +105,28 @@ public static class AuthorizationPolicies
     public const string ReportsView = "ReportsView";
     public const string ReportsExport = "ReportsExport";
 
+
+    public const string BillingView = "billing.view";
+    public const string BillingSetupManage = "billing.setup.manage";
+    public const string BillingInvoiceCreate = "billing.invoice.create";
+    public const string BillingInvoiceUpdate = "billing.invoice.update";
+    public const string BillingInvoiceSubmit = "billing.invoice.submit";
+    public const string BillingInvoiceApprove = "billing.invoice.approve";
+    public const string BillingInvoiceReject = "billing.invoice.reject";
+    public const string BillingInvoicePost = "billing.invoice.post";
+    public const string BillingInvoiceCancel = "billing.invoice.cancel";
+    public const string BillingCreditNoteCreate = "billing.creditnote.create";
+    public const string BillingCreditNoteApprove = "billing.creditnote.approve";
+    public const string BillingPaymentAllocate = "billing.payment.allocate";
+    public const string BillingReportsView = "billing.reports.view";
+    public const string BillingExport = "billing.export";
+    public const string BillingPriceManage = "billing.price.manage";
+
     public const string FleetView = "fleet.view";
     public const string FleetVehicleManage = "fleet.vehicle.manage";
     public const string FleetDriverManage = "fleet.driver.manage";
     public const string FleetTripCreate = "fleet.trip.create";
-    public const string FleetTripSubmit = "FleetTripSubmit";
+    public const string FleetTripSubmit = "fleet.trip.submit";
     public const string FleetTripApprove = "fleet.trip.approve";
     public const string FleetTripReject = "fleet.trip.reject";
     public const string FleetTripPost = "fleet.trip.post";

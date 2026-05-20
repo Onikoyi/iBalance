@@ -73,6 +73,16 @@ import { FleetFuelLogsPage } from './pages/fleet/FleetFuelLogsPage';
 import { FleetMaintenancePage } from './pages/fleet/FleetMaintenancePage';
 import { FleetPolicySetupPage } from './pages/fleet/FleetPolicySetupPage';
 import { FleetReportsPage } from './pages/fleet/FleetReportsPage';
+import { BillingDashboardPage } from './pages/billing/BillingDashboardPage';
+import { BillingInvoicesPage } from './pages/billing/BillingInvoicesPage';
+import { RejectedBillingInvoicesPage } from './pages/billing/RejectedBillingInvoicesPage';
+import { BillingApprovalQueuePage } from './pages/billing/BillingApprovalQueuePage';
+import { BillingSetupPage } from './pages/billing/BillingSetupPage';
+import { BillingReportsPage } from './pages/billing/BillingReportsPage';
+import { BillingOutstandingPage } from './pages/billing/BillingOutstandingPage';
+import { BillingCreditNotesPage } from './pages/billing/BillingCreditNotesPage';
+import { RejectedBillingCreditNotesPage } from './pages/billing/RejectedBillingCreditNotesPage';
+import { BillingPaymentAllocationPage } from './pages/billing/BillingPaymentAllocationPage';
 
 import { LoginPage } from './pages/auth/LoginPage';
 import { SignUpPage } from './pages/auth/SignUpPage';
@@ -164,6 +174,9 @@ export default function App() {
               'ExpenseAdvanceApprover',
               'ExpenseAdvanceReviewer',
               'ExpenseAdvanceViewer',
+              'BillingOfficer',
+              'BillingApprover',
+              'BillingViewer',
               'FleetOfficer',
               'FleetApprover',
               'FleetReviewer',
@@ -201,6 +214,9 @@ export default function App() {
               'ExpenseAdvanceApprover',
               'ExpenseAdvanceReviewer',
               'ExpenseAdvanceViewer',
+              'BillingOfficer',
+              'BillingApprover',
+              'BillingViewer',
               'FleetOfficer',
               'FleetApprover',
               'FleetReviewer',
@@ -723,7 +739,7 @@ export default function App() {
               'FinanceController',
               'Accountant',
             ]}
-            requiredPermissions={['finance.fiscal-periods.manage']}
+            requiredPermissions={['finance.view']}
           >
             <AppShell>
               <FiscalPeriodsPage />
@@ -1271,6 +1287,244 @@ export default function App() {
       />
 
       <Route
+        path="/billing"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              'PlatformAdmin',
+              'TenantAdmin',
+              'FinanceController',
+              'Accountant',
+              'Approver',
+              'Viewer',
+              'Auditor',
+              'BillingOfficer',
+              'BillingApprover',
+              'BillingViewer',
+            ]}
+            requiredPermissions={['billing.view']}
+          >
+            <AppShell>
+              <BillingDashboardPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/billing/invoices"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              'PlatformAdmin',
+              'TenantAdmin',
+              'FinanceController',
+              'Accountant',
+              'Approver',
+              'Viewer',
+              'Auditor',
+              'BillingOfficer',
+              'BillingApprover',
+              'BillingViewer',
+            ]}
+            requiredPermissions={['billing.view']}
+          >
+            <AppShell>
+              <BillingInvoicesPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/billing/invoices/rejected"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              'PlatformAdmin',
+              'TenantAdmin',
+              'FinanceController',
+              'Accountant',
+              'Approver',
+              'Viewer',
+              'Auditor',
+              'BillingOfficer',
+              'BillingApprover',
+              'BillingViewer',
+            ]}
+            requiredPermissions={['billing.view']}
+          >
+            <AppShell>
+              <RejectedBillingInvoicesPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/billing/approval-queue"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              'PlatformAdmin',
+              'TenantAdmin',
+              'FinanceController',
+              'Accountant',
+              'Approver',
+              'Auditor',
+              'BillingOfficer',
+              'BillingApprover',
+            ]}
+            requiredPermissions={['billing.view']}
+          >
+            <AppShell>
+              <BillingApprovalQueuePage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/billing/setup"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              'PlatformAdmin',
+              'TenantAdmin',
+              'FinanceController',
+              'Accountant',
+              'BillingOfficer',
+            ]}
+            requiredPermissions={['billing.view']}
+          >
+            <AppShell>
+              <BillingSetupPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/billing/reports"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              'PlatformAdmin',
+              'TenantAdmin',
+              'FinanceController',
+              'Accountant',
+              'Approver',
+              'Viewer',
+              'Auditor',
+              'BillingOfficer',
+              'BillingApprover',
+              'BillingViewer',
+            ]}
+            requiredPermissions={['billing.view']}
+          >
+            <AppShell>
+              <BillingReportsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/billing/outstanding"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              'PlatformAdmin',
+              'TenantAdmin',
+              'FinanceController',
+              'Accountant',
+              'Approver',
+              'Viewer',
+              'Auditor',
+              'BillingOfficer',
+              'BillingApprover',
+              'BillingViewer',
+            ]}
+            requiredPermissions={['billing.view']}
+          >
+            <AppShell>
+              <BillingOutstandingPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/billing/credit-notes"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              'PlatformAdmin',
+              'TenantAdmin',
+              'FinanceController',
+              'Accountant',
+              'Approver',
+              'Viewer',
+              'Auditor',
+              'BillingOfficer',
+              'BillingApprover',
+              'BillingViewer',
+            ]}
+            requiredPermissions={['billing.view']}
+          >
+            <AppShell>
+              <BillingCreditNotesPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/billing/credit-notes/rejected"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              'PlatformAdmin',
+              'TenantAdmin',
+              'FinanceController',
+              'Accountant',
+              'Approver',
+              'Viewer',
+              'Auditor',
+              'BillingOfficer',
+              'BillingApprover',
+              'BillingViewer',
+            ]}
+            requiredPermissions={['billing.view']}
+          >
+            <AppShell>
+              <RejectedBillingCreditNotesPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/billing/payments/allocate"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              'PlatformAdmin',
+              'TenantAdmin',
+              'FinanceController',
+              'Accountant',
+              'BillingOfficer',
+            ]}
+            requiredPermissions={['billing.view']}
+          >
+            <AppShell>
+              <BillingPaymentAllocationPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
         path="/reports"
         element={
           <RequireAuth
@@ -1363,7 +1617,7 @@ export default function App() {
               'PayrollOfficer',
               'HrOfficer',
             ]}
-            requiredPermissions={['finance.view']}
+            requiredPermissions={['payroll.view']}
           >
             <AppShell>
               <PayrollSetupPage />
@@ -1447,7 +1701,7 @@ export default function App() {
             'FleetApprover',
             'FleetReviewer'
           ]}
-            requiredPermissions={['fleet.vehicle.manage']}>
+            requiredPermissions={['fleet.view']}>
             <AppShell>
               <FleetVehiclesPage />
             </AppShell>
@@ -1462,8 +1716,7 @@ export default function App() {
           'FleetOfficer',
           'FleetApprover',
           'FleetReviewer']}
-          requiredPermissions={['fleet.driver.manage'
-          ]}>
+          requiredPermissions={['fleet.view']}>
           <AppShell>
             <FleetDriversPage />
           </AppShell>
@@ -1480,8 +1733,7 @@ export default function App() {
             'FleetApprover',
             'FleetReviewer'
           ]}
-            requiredPermissions={['fleet.trip.create'
-            ]}>
+            requiredPermissions={['fleet.view']}>
             <AppShell>
               <FleetTripsPage />
             </AppShell>
@@ -1496,7 +1748,7 @@ export default function App() {
           'FleetOfficer',
           'FleetApprover',
           'FleetReviewer']}
-          requiredPermissions={['fleet.fuel.manage']}>
+          requiredPermissions={['fleet.view']}>
           <AppShell>
             <FleetFuelLogsPage />
           </AppShell>
@@ -1512,7 +1764,7 @@ export default function App() {
             'FleetOfficer',
             'FleetApprover',
             'FleetReviewer']}
-          requiredPermissions={['fleet.maintenance.manage']}>
+          requiredPermissions={['fleet.view']}>
           <AppShell>
             <FleetMaintenancePage />
           </AppShell>
@@ -1527,7 +1779,7 @@ export default function App() {
             'TenantAdmin',
             'FleetOfficer',
             'FleetApprover']}
-          requiredPermissions={['fleet.policy.manage']}>
+          requiredPermissions={['fleet.view']}>
           <AppShell>
             <FleetPolicySetupPage />
           </AppShell>
@@ -1544,7 +1796,7 @@ export default function App() {
             'FleetApprover',
             'FleetReviewer',
             'FleetViewer']}
-          requiredPermissions={['fleet.reports.view']}>
+          requiredPermissions={['fleet.view']}>
           <AppShell>
             <FleetReportsPage />
           </AppShell>
@@ -1680,7 +1932,7 @@ export default function App() {
         path="/admin/settings"
         element={
           <RequireAuth
-            allowedRoles={['PlatformAdmin', 'TenantAdmin']}
+            allowedRoles={['PlatformAdmin']}
             requiredPermissions={['admin.settings.manage']}
           >
             <AdminShell>

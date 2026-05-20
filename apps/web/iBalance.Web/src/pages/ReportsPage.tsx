@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   getBalanceSheet,
+  getCashFlowStatement,
   getCompanyLogoDataUrl,
   getCustomerReceipts,
   getIncomeStatement,
@@ -273,13 +274,19 @@ export function ReportsPage() {
 
   const balanceSheetQ = useQuery({
     queryKey: ['balance-sheet', balanceSheetAsAtDate],
-    queryFn: () => getBalanceSheet(),
+    queryFn: () => getBalanceSheet(toUtcEnd(balanceSheetAsAtDate)),
     enabled: canView,
   });
 
   const incomeStatementQ = useQuery({
     queryKey: ['income-statement', fromUtc ?? null, toUtc ?? null],
     queryFn: () => getIncomeStatement(fromUtc, toUtc),
+    enabled: canView && !!fromDate && !!toDate,
+  });
+
+  const cashFlowStatementQ = useQuery({
+    queryKey: ['cash-flow-statement', fromUtc ?? null, toUtc ?? null],
+    queryFn: () => getCashFlowStatement(fromUtc, toUtc),
     enabled: canView && !!fromDate && !!toDate,
   });
 
@@ -322,6 +329,7 @@ export function ReportsPage() {
   const trialBalance = trialBalanceQ.data as any;
   const balanceSheet = balanceSheetQ.data as any;
   const incomeStatement = incomeStatementQ.data as any;
+  const cashFlowStatement = cashFlowStatementQ.data as any;
   const taxReport = taxReportQ.data as any;
 
   const salesInvoices = useMemo(() => {
@@ -368,6 +376,7 @@ export function ReportsPage() {
     trialBalanceQ.isError ||
     balanceSheetQ.isError ||
     incomeStatementQ.isError ||
+    cashFlowStatementQ.isError ||
     taxReportQ.isError ||
     salesInvoicesQ.isError ||
     customerReceiptsQ.isError ||
@@ -378,6 +387,7 @@ export function ReportsPage() {
     trialBalanceQ.isLoading &&
     balanceSheetQ.isLoading &&
     incomeStatementQ.isLoading &&
+    cashFlowStatementQ.isLoading &&
     taxReportQ.isLoading &&
     salesInvoicesQ.isLoading &&
     customerReceiptsQ.isLoading &&
@@ -402,7 +412,7 @@ export function ReportsPage() {
           <div>
             <h2>Financial Reports</h2>
             <div className="muted">
-              Reports now contains only financial and operational reporting. Bank reconciliation has been moved into the standalone Reconciliation module.
+              Professional financial statements and operational finance reports. Bank reconciliation remains in the standalone Reconciliation module.
             </div>
           </div>
           <Link to="/reconciliation" className="button">Open Reconciliation Module</Link>
@@ -420,7 +430,7 @@ export function ReportsPage() {
           </div>
 
           <div className="form-row">
-            <label>Balance Sheet As At Date</label>
+            <label>Statement of Financial Position (Balance Sheet) As At Date</label>
             <input type="date" className="input" value={balanceSheetAsAtDate} onChange={(e) => setBalanceSheetAsAtDate(e.target.value)} />
           </div>
 
@@ -436,7 +446,7 @@ export function ReportsPage() {
 
       <ReportSectionDivider
         title="Core Financial Statements"
-        subtitle="Trial Balance, Balance Sheet, and Income Statement with company and tenant report headers."
+        subtitle="Trial Balance, Statement of Financial Position (Balance Sheet), Statement of Profit or Loss (Income Statement), and Cash Flow Statement with company and tenant report headers."
       />
 
       <section id="print-trial-balance" className="panel printable-report">
@@ -488,13 +498,13 @@ export function ReportsPage() {
       <section id="print-balance-sheet" className="panel printable-report">
         <div className="section-heading no-print">
           <div>
-            <h2>Balance Sheet</h2>
+            <h2>Statement of Financial Position (Balance Sheet)</h2>
             <span className="muted">{asAtText}</span>
           </div>
-          <button className="button" onClick={() => printSection('print-balance-sheet', 'Balance Sheet')}>Print Balance Sheet</button>
+          <button className="button" onClick={() => printSection('print-balance-sheet', 'Statement of Financial Position (Balance Sheet)')}>Print Statement of Financial Position</button>
         </div>
 
-        <ReportPrintHeader title="Balance Sheet" subtitle={asAtText} tenantKey={tenantKey} tenantLogo={tenantLogo} companyLogo={companyLogo} />
+        <ReportPrintHeader title="Statement of Financial Position (Balance Sheet)" subtitle={asAtText} tenantKey={tenantKey} tenantLogo={tenantLogo} companyLogo={companyLogo} />
 
         <div className="kv">
           <div className="kv-row"><span>Total Assets</span><span>{formatAmount(balanceSheet?.totalAssets)}</span></div>
@@ -541,13 +551,13 @@ export function ReportsPage() {
       <section id="print-income-statement" className="panel printable-report">
         <div className="section-heading no-print">
           <div>
-            <h2>Income Statement</h2>
+            <h2>Statement of Profit or Loss (Income Statement)</h2>
             <span className="muted">{periodText}</span>
           </div>
-          <button className="button" onClick={() => printSection('print-income-statement', 'Income Statement')}>Print Income Statement</button>
+          <button className="button" onClick={() => printSection('print-income-statement', 'Statement of Profit or Loss (Income Statement)')}>Print Statement of Profit or Loss</button>
         </div>
 
-        <ReportPrintHeader title="Income Statement" subtitle={periodText} tenantKey={tenantKey} tenantLogo={tenantLogo} companyLogo={companyLogo} />
+        <ReportPrintHeader title="Statement of Profit or Loss (Income Statement)" subtitle={periodText} tenantKey={tenantKey} tenantLogo={tenantLogo} companyLogo={companyLogo} />
 
         <div className="kv">
           <div className="kv-row"><span>Total Income</span><span>{formatAmount(incomeStatement?.totalIncome)}</span></div>
@@ -588,6 +598,88 @@ export function ReportsPage() {
             </div>
           </div>
         ))}
+      </section>
+
+
+      <section id="print-cash-flow-statement" className="panel printable-report">
+        <div className="section-heading no-print">
+          <div>
+            <h2>Cash Flow Statement</h2>
+            <span className="muted">Cash and bank movements · {periodText}</span>
+          </div>
+          <button className="button" onClick={() => printSection('print-cash-flow-statement', 'Cash Flow Statement')}>Print Cash Flow Statement</button>
+        </div>
+
+        <ReportPrintHeader title="Cash Flow Statement" subtitle={periodText} tenantKey={tenantKey} tenantLogo={tenantLogo} companyLogo={companyLogo} />
+
+        <div className="kv">
+          <div className="kv-row"><span>Opening Cash / Bank</span><span>{formatAmount(cashFlowStatement?.openingCashBalance)}</span></div>
+          <div className="kv-row"><span>Operating Activities</span><span>{formatAmount(cashFlowStatement?.operatingActivities)}</span></div>
+          <div className="kv-row"><span>Investing Activities</span><span>{formatAmount(cashFlowStatement?.investingActivities)}</span></div>
+          <div className="kv-row"><span>Financing Activities</span><span>{formatAmount(cashFlowStatement?.financingActivities)}</span></div>
+          <div className="kv-row"><span>Net Cash Movement</span><span>{formatAmount(cashFlowStatement?.netCashMovement)}</span></div>
+          <div className="kv-row"><span>Closing Cash / Bank</span><span>{formatAmount(cashFlowStatement?.closingCashBalance)}</span></div>
+        </div>
+
+        {cashFlowStatement?.note ? (
+          <div className="muted" style={{ marginBottom: 12 }}>{cashFlowStatement.note}</div>
+        ) : null}
+
+        <h3>Cash Flow by Activity</h3>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Activity</th>
+                <th style={{ textAlign: 'right' }}>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Net cash from operating activities</td><td style={{ textAlign: 'right' }}>{formatAmount(cashFlowStatement?.operatingActivities)}</td></tr>
+              <tr><td>Net cash from investing activities</td><td style={{ textAlign: 'right' }}>{formatAmount(cashFlowStatement?.investingActivities)}</td></tr>
+              <tr><td>Net cash from financing activities</td><td style={{ textAlign: 'right' }}>{formatAmount(cashFlowStatement?.financingActivities)}</td></tr>
+              <tr><th>Net increase / decrease in cash and cash equivalents</th><th style={{ textAlign: 'right' }}>{formatAmount(cashFlowStatement?.netCashMovement)}</th></tr>
+              <tr><td>Cash and cash equivalents at beginning of period</td><td style={{ textAlign: 'right' }}>{formatAmount(cashFlowStatement?.openingCashBalance)}</td></tr>
+              <tr><th>Cash and cash equivalents at end of period</th><th style={{ textAlign: 'right' }}>{formatAmount(cashFlowStatement?.closingCashBalance)}</th></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Cash Movement Detail</h3>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Reference</th>
+                <th>Cash / Bank Account</th>
+                <th>Activity</th>
+                <th>Counterparty</th>
+                <th style={{ textAlign: 'right' }}>Inflow</th>
+                <th style={{ textAlign: 'right' }}>Outflow</th>
+                <th style={{ textAlign: 'right' }}>Net</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(cashFlowStatement?.items ?? []).length === 0 ? (
+                <tr><td colSpan={8} className="muted">No cash or bank movements found for the selected period.</td></tr>
+              ) : (
+                (cashFlowStatement?.items ?? []).map((row: any) => (
+                  <tr key={row.id}>
+                    <td>{formatDateTime(row.movementDateUtc)}</td>
+                    <td>{row.reference}</td>
+                    <td>{row.cashLedgerAccountCode} - {row.cashLedgerAccountName}</td>
+                    <td>{row.sectionName}</td>
+                    <td>{row.counterpartySummary}</td>
+                    <td style={{ textAlign: 'right' }}>{formatAmount(row.cashInflow)}</td>
+                    <td style={{ textAlign: 'right' }}>{formatAmount(row.cashOutflow)}</td>
+                    <td style={{ textAlign: 'right' }}>{formatAmount(row.netCashMovement)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <ReportSectionDivider
