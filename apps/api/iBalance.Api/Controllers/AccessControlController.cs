@@ -73,6 +73,26 @@ public sealed class AccessControlController : ControllerBase
             new { Code = "budget.transfer", Module = "budget", Action = "transfer", Name = "Transfer Budget Amounts", Description = "Transfer budget amounts." },
             new { Code = "budget.reports.view", Module = "budget", Action = "report", Name = "View Budget Reports", Description = "View budget reports." },
 
+
+            new { Code = "approval.inbox.view", Module = "workflow", Action = "view", Name = "View Central Approval Inbox", Description = "Access the central approval inbox and workflow dashboard." },
+            new { Code = "hr.view", Module = "hr", Action = "view", Name = "View Human Resources", Description = "Access Human Resources Management workspace." },
+            new { Code = "hr.setup.manage", Module = "hr", Action = "manage", Name = "Manage HR Setup", Description = "Maintain HR departments, designations, grades, and HR setup." },
+            new { Code = "hr.employee.create", Module = "hr", Action = "create", Name = "Create Employees", Description = "Create HR employee records." },
+            new { Code = "hr.employee.update", Module = "hr", Action = "update", Name = "Update Employees", Description = "Update HR employee records." },
+            new { Code = "hr.employee.terminate", Module = "hr", Action = "terminate", Name = "Terminate Employees", Description = "Terminate HR employee records." },
+            new { Code = "hr.employee.view.sensitive", Module = "hr", Action = "view-sensitive", Name = "View Sensitive Employee Data", Description = "View employee bank, tax, pension, and sensitive personnel fields." },
+            new { Code = "hr.department.manage", Module = "hr", Action = "manage", Name = "Manage Departments", Description = "Create and maintain HR departments." },
+            new { Code = "hr.designation.manage", Module = "hr", Action = "manage", Name = "Manage Designations", Description = "Create and maintain HR designations and job titles." },
+            new { Code = "hr.grade.manage", Module = "hr", Action = "manage", Name = "Manage Grades", Description = "Create and maintain HR grades or levels." },
+            new { Code = "hr.leave.view", Module = "hr", Action = "view", Name = "View Leave Requests", Description = "View employee leave records." },
+            new { Code = "hr.leave.create", Module = "hr", Action = "create", Name = "Create Leave Requests", Description = "Create and submit leave requests." },
+            new { Code = "hr.leave.approve", Module = "hr", Action = "approve", Name = "Approve Leave Requests", Description = "Approve leave requests." },
+            new { Code = "hr.leave.reject", Module = "hr", Action = "reject", Name = "Reject Leave Requests", Description = "Reject leave requests." },
+            new { Code = "hr.training.manage", Module = "hr", Action = "manage", Name = "Manage Training Records", Description = "Create and maintain training records." },
+            new { Code = "hr.disciplinary.manage", Module = "hr", Action = "manage", Name = "Manage Disciplinary Records", Description = "Create and maintain disciplinary records." },
+            new { Code = "hr.reports.view", Module = "hr", Action = "report", Name = "View HR Reports", Description = "View HR reports and dashboards." },
+            new { Code = "hr.export", Module = "hr", Action = "export", Name = "Export HR Reports", Description = "Export HR reports and employee lists." },
+
             new { Code = "payroll.view", Module = "payroll", Action = "view", Name = "View Payroll", Description = "Access payroll workspace." },
             new { Code = "payroll.manage", Module = "payroll", Action = "manage", Name = "Manage Payroll Setup", Description = "Manage payroll masters and setup." },
             new { Code = "payroll.run.submit", Module = "payroll", Action = "submit", Name = "Submit Payroll Runs", Description = "Submit payroll runs." },
@@ -130,8 +150,6 @@ public sealed class AccessControlController : ControllerBase
             new { Code = "billing.reports.view", Module = "billing", Action = "report", Name = "View Billing Reports", Description = "View billing and invoicing reports." },
             new { Code = "billing.export", Module = "billing", Action = "export", Name = "Export Billing Reports", Description = "Export billing and invoicing data." },
 
-            
-        
             new { Code = "fleet.view", Module = "fleet", Action = "view", Name = "View Fleet", Description = "Access fleet management workspace." },
             new { Code = "fleet.vehicle.manage", Module = "fleet", Action = "manage", Name = "Manage Fleet Vehicles", Description = "Create and maintain fleet vehicles." },
             new { Code = "fleet.driver.manage", Module = "fleet", Action = "manage", Name = "Manage Fleet Drivers", Description = "Create and maintain fleet drivers." },
@@ -235,6 +253,7 @@ public sealed class AccessControlController : ControllerBase
     Description = "Tenant administrative access with module visibility bound to tenant subscription.",
     PermissionCodes = new[]
     {
+                    "approval.inbox.view",
         "admin.access",
         "admin.users.manage",
         "admin.roles.manage",
@@ -247,6 +266,24 @@ public sealed class AccessControlController : ControllerBase
         "procurement.view",
         "ap.view",
         "ar.view",
+        "hr.view",
+        "hr.setup.manage",
+        "hr.employee.create",
+        "hr.employee.update",
+        "hr.employee.terminate",
+        "hr.employee.view.sensitive",
+        "hr.department.manage",
+        "hr.designation.manage",
+        "hr.grade.manage",
+        "hr.leave.view",
+        "hr.leave.create",
+        "hr.leave.approve",
+        "hr.leave.reject",
+        "hr.training.manage",
+        "hr.disciplinary.manage",
+        "hr.reports.view",
+        "hr.export",
+
         "payroll.view",
         "inventory.view",
         "fixedassets.view",
@@ -291,6 +328,7 @@ public sealed class AccessControlController : ControllerBase
                 Description = "Cross-finance controlling and approval authority.",
                 PermissionCodes = new[]
                 {
+                    "approval.inbox.view",
                     "finance.view","finance.setup.manage","finance.transactions.create","finance.transactions.submit","finance.transactions.approve","finance.transactions.reject","finance.transactions.post","finance.reports.view",
                     "finance.journals.create","finance.journals.post","finance.journals.reverse","finance.fiscal-periods.manage",
                     "budget.view","budget.manage","budget.create","budget.submit","budget.approve","budget.reject","budget.lock","budget.close","budget.transfer","budget.reports.view",
@@ -309,6 +347,7 @@ public sealed class AccessControlController : ControllerBase
                 Description = "Core finance operational role.",
                 PermissionCodes = new[]
                 {
+                    "approval.inbox.view",
                     "finance.view","finance.setup.manage","finance.transactions.create","finance.transactions.submit","finance.transactions.post","finance.reports.view",
                     "finance.journals.create","finance.journals.post","finance.journals.reverse","finance.fiscal-periods.manage",
                     "budget.view","budget.create","budget.submit","budget.reports.view",
@@ -408,6 +447,8 @@ public sealed class AccessControlController : ControllerBase
                 Description = "Departmental payroll processing.",
                 PermissionCodes = new[]
                 {
+                    "approval.inbox.view",
+                    "hr.view",
                     "payroll.view","payroll.manage","payroll.run.submit","reports.view","reports.export"
                 }
             },
@@ -433,6 +474,70 @@ public sealed class AccessControlController : ControllerBase
                 }
             },
 
+
+            new
+            {
+                Code = "HR_MANAGER",
+                Name = "HR Manager",
+                Description = "Human Resources manager with employee, setup, leave, training, disciplinary, and report access.",
+                PermissionCodes = new[]
+                {
+                    "approval.inbox.view",
+                    "hr.view",
+                    "hr.setup.manage",
+                    "hr.employee.create",
+                    "hr.employee.update",
+                    "hr.employee.terminate",
+                    "hr.employee.view.sensitive",
+                    "hr.department.manage",
+                    "hr.designation.manage",
+                    "hr.grade.manage",
+                    "hr.leave.view",
+                    "hr.leave.create",
+                    "hr.leave.approve",
+                    "hr.leave.reject",
+                    "hr.training.manage",
+                    "hr.disciplinary.manage",
+                    "hr.reports.view",
+                    "hr.export",
+                    "reports.view",
+                    "reports.export"
+                }
+            },
+            new
+            {
+                Code = "HR_OFFICER",
+                Name = "HR Officer",
+                Description = "Human Resources operational role for employee records and HR activities.",
+                PermissionCodes = new[]
+                {
+                    "hr.view",
+                    "hr.employee.create",
+                    "hr.employee.update",
+                    "hr.department.manage",
+                    "hr.designation.manage",
+                    "hr.grade.manage",
+                    "hr.leave.view",
+                    "hr.leave.create",
+                    "hr.training.manage",
+                    "hr.disciplinary.manage",
+                    "hr.reports.view"
+                }
+            },
+            new
+            {
+                Code = "HR_VIEWER",
+                Name = "HR Viewer",
+                Description = "Human Resources read-only and reporting role.",
+                PermissionCodes = new[]
+                {
+                    "hr.view",
+                    "hr.leave.view",
+                    "hr.reports.view",
+                    "reports.view"
+                }
+            },
+
             new
             {
                 Code = "BILLING_OFFICER",
@@ -440,6 +545,7 @@ public sealed class AccessControlController : ControllerBase
                 Description = "Billing and invoicing operational role.",
                 PermissionCodes = new[]
                 {
+                    "approval.inbox.view",
                     "billing.view",
                     "billing.setup.manage",
                     "billing.invoice.create",

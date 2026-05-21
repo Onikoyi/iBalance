@@ -45,6 +45,14 @@ import { FixedAssetRegisterPrintPage } from './pages/FixedAssetRegisterPrintPage
 import { PayrollDashboardPage } from './pages/PayrollDashboardPage';
 import { PayrollEmployeesPage } from './pages/PayrollEmployeesPage';
 import { PayrollSetupPage } from './pages/PayrollSetupPage';
+import { ApprovalInboxPage } from './pages/ApprovalInboxPage';
+import { HrDashboardPage } from './pages/hr/HrDashboardPage';
+import { HrEmployeesPage } from './pages/hr/HrEmployeesPage';
+import { HrSetupPage } from './pages/hr/HrSetupPage';
+import { HrLeavePage } from './pages/hr/HrLeavePage';
+import { HrTrainingPage } from './pages/hr/HrTrainingPage';
+import { HrDisciplinaryPage } from './pages/hr/HrDisciplinaryPage';
+import { HrReportsPage } from './pages/hr/HrReportsPage';
 import { PayrollRunsPage } from './pages/PayrollRunsPage';
 import { PayrollPayslipsPage } from './pages/PayrollPayslipsPage';
 import { PayrollReportsPage } from './pages/PayrollReportsPage';
@@ -1551,6 +1559,199 @@ export default function App() {
           >
             <AppShell>
               <ReportsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+
+
+      <Route
+        path="/approvals"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              'PlatformAdmin',
+              'TenantAdmin',
+              'HrManager',
+              'PayrollOfficer',
+              'FinanceController',
+              'Accountant',
+              'BillingOfficer',
+              'Auditor',
+            ]}
+            requiredPermissions={['approval.inbox.view']}
+          >
+            <AppShell>
+              <ApprovalInboxPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/hr"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              'PlatformAdmin',
+              'TenantAdmin',
+              'HrManager',
+              'HrOfficer',
+              'HrViewer',
+              'PayrollOfficer',
+              'FinanceController',
+              'Viewer',
+              'Auditor',
+            ]}
+            requiredPermissions={['hr.view']}
+          >
+            <AppShell>
+              <HrDashboardPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/hr/employees"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              'PlatformAdmin',
+              'TenantAdmin',
+              'HrManager',
+              'HrOfficer',
+              'HrViewer',
+              'PayrollOfficer',
+              'FinanceController',
+              'Viewer',
+              'Auditor',
+            ]}
+            requiredPermissions={['hr.view']}
+          >
+            <AppShell>
+              <HrEmployeesPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/hr/setup"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              'PlatformAdmin',
+              'TenantAdmin',
+              'HrManager',
+              'HrOfficer',
+              'HrViewer',
+              'PayrollOfficer',
+              'FinanceController',
+              'Viewer',
+              'Auditor',
+            ]}
+            requiredPermissions={['hr.view']}
+          >
+            <AppShell>
+              <HrSetupPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/hr/leave"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              'PlatformAdmin',
+              'TenantAdmin',
+              'HrManager',
+              'HrOfficer',
+              'HrViewer',
+              'PayrollOfficer',
+              'FinanceController',
+              'Viewer',
+              'Auditor',
+            ]}
+            requiredPermissions={['hr.view']}
+          >
+            <AppShell>
+              <HrLeavePage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/hr/training"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              'PlatformAdmin',
+              'TenantAdmin',
+              'HrManager',
+              'HrOfficer',
+              'HrViewer',
+              'PayrollOfficer',
+              'FinanceController',
+              'Viewer',
+              'Auditor',
+            ]}
+            requiredPermissions={['hr.view']}
+          >
+            <AppShell>
+              <HrTrainingPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/hr/disciplinary"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              'PlatformAdmin',
+              'TenantAdmin',
+              'HrManager',
+              'HrOfficer',
+              'HrViewer',
+              'PayrollOfficer',
+              'FinanceController',
+              'Viewer',
+              'Auditor',
+            ]}
+            requiredPermissions={['hr.view']}
+          >
+            <AppShell>
+              <HrDisciplinaryPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/hr/reports"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              'PlatformAdmin',
+              'TenantAdmin',
+              'HrManager',
+              'HrOfficer',
+              'HrViewer',
+              'PayrollOfficer',
+              'FinanceController',
+              'Viewer',
+              'Auditor',
+            ]}
+            requiredPermissions={['hr.view']}
+          >
+            <AppShell>
+              <HrReportsPage />
             </AppShell>
           </RequireAuth>
         }

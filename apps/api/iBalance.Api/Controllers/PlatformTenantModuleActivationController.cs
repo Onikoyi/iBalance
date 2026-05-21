@@ -17,6 +17,7 @@ public sealed class PlatformTenantModuleActivationController : ControllerBase
         new("admin", "Administration", 5),
         new("finance", "General Ledger & Finance", 10),
         new("budget", "Budget", 20),
+        new("hr", "Human Resources Management", 25),
         new("payroll", "Payroll", 30),
         new("procurement", "Procurement", 40),
         new("ap", "Accounts Payable", 50),

@@ -9,6 +9,12 @@ import {
   dateInputToUtc,
   getAccounts,
   getPayrollEmployees,
+  syncPayrollEmployeeFromHr,
+  syncAllLinkedPayrollEmployeesFromHr,
+  linkPayrollEmployeeToHr,
+  bulkLinkPayrollEmployeesToHr,
+  getAvailableHrEmployeesForPayroll,
+  createPayrollEmployeesFromHr,
   getPayrollPayElements,
   getPayrollPayGroups,
   getPayrollSalaryStructures,
@@ -39,6 +45,7 @@ import {
   type CreatePayrollPayGroupElementRequest,
   type UpdatePayrollPayGroupElementRequest,
   type PayrollEmployeeDto,
+  type PayrollAvailableHrEmployeeDto,
   type PayrollPayElementDto,
   type PayrollPayGroupDto,
   type PayrollSalaryStructureDto,
@@ -89,6 +96,15 @@ export function PayrollSetupPage() {
     notes: '',
   });
   const [salaryEmployeeSearch, setSalaryEmployeeSearch] = useState('');
+  const [availableHrEmployeeSearch, setAvailableHrEmployeeSearch] = useState('');
+  const [selectedHrEmployeeIds, setSelectedHrEmployeeIds] = useState<string[]>([]);
+  const [linkPayrollEmployeeId, setLinkPayrollEmployeeId] = useState('');
+  const [linkHrEmployeeId, setLinkHrEmployeeId] = useState('');
+  const [selectedLinkPayrollEmployeeIds, setSelectedLinkPayrollEmployeeIds] = useState<string[]>([]);
+  const [selectedLinkHrEmployeeIds, setSelectedLinkHrEmployeeIds] = useState<string[]>([]);
+  const [linkPayrollSearch, setLinkPayrollSearch] = useState('');
+  const [linkHrSearch, setLinkHrSearch] = useState('');
+  const [payrollLinkFilter, setPayrollLinkFilter] = useState('all');
   const [salaryStructureSearch, setSalaryStructureSearch] = useState('');
 
   const [showEditPayGroup, setShowEditPayGroup] = useState(false);
@@ -177,6 +193,7 @@ export function PayrollSetupPage() {
   });
 
   const employeesQ = useQuery({ queryKey: ['payroll-employees'], queryFn: getPayrollEmployees, enabled: canView });
+  const availableHrEmployeesQ = useQuery({ queryKey: ['payroll-available-hr-employees'], queryFn: getAvailableHrEmployeesForPayroll, enabled: canView });
   const payGroupsQ = useQuery({ queryKey: ['payroll-pay-groups'], queryFn: getPayrollPayGroups, enabled: canView });
   const payElementsQ = useQuery({ queryKey: ['payroll-pay-elements'], queryFn: getPayrollPayElements, enabled: canView });
   const salaryQ = useQuery({ queryKey: ['payroll-salary-structures'], queryFn: getPayrollSalaryStructures, enabled: canView });
@@ -206,8 +223,55 @@ export function PayrollSetupPage() {
 
   const filteredSalaryEmployees = useMemo(() => {
     const term = salaryEmployeeSearch.trim().toLowerCase();
-    const items = ((employeesQ.data?.items ?? []) as PayrollEmployeeDto[]);
+    const items = ((employeesQ.data?.items ?? []) as PayrollEmployeeDto[])
+      .filter((employee) => {
+        if (payrollLinkFilter === 'linked') return !!employee.isLinkedToHr;
+        if (payrollLinkFilter === 'unlinked') return !employee.isLinkedToHr;
+        return true;
+      });
+
     if (!term) return items;
+    return items.filter((employee) =>
+      [employee.employeeNumber, employee.displayName, employee.department, employee.jobTitle, employee.hrSyncStatus]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(term)
+    );
+  }, [employeesQ.data, salaryEmployeeSearch, payrollLinkFilter]);
+
+  const filteredAvailableHrEmployees = useMemo(() => {
+    const term = availableHrEmployeeSearch.trim().toLowerCase();
+    const items = ((availableHrEmployeesQ.data?.items ?? []) as PayrollAvailableHrEmployeeDto[]);
+
+    if (!term) return items;
+
+    return items.filter((employee) =>
+      [
+        employee.employeeNumber,
+        employee.fullName,
+        employee.email,
+        employee.departmentCode,
+        employee.departmentName,
+        employee.designationCode,
+        employee.designationName,
+        employee.gradeCode,
+        employee.gradeName,
+        employee.statusName,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(term)
+    );
+  }, [availableHrEmployeesQ.data, availableHrEmployeeSearch]);
+
+  const unlinkedPayrollEmployees = useMemo(() => {
+    const term = linkPayrollSearch.trim().toLowerCase();
+    const items = ((employeesQ.data?.items ?? []) as PayrollEmployeeDto[]).filter((employee) => !employee.isLinkedToHr);
+
+    if (!term) return items;
+
     return items.filter((employee) =>
       [employee.employeeNumber, employee.displayName, employee.department, employee.jobTitle]
         .filter(Boolean)
@@ -215,7 +279,32 @@ export function PayrollSetupPage() {
         .toLowerCase()
         .includes(term)
     );
-  }, [employeesQ.data, salaryEmployeeSearch]);
+  }, [employeesQ.data, linkPayrollSearch]);
+
+  const linkableHrEmployees = useMemo(() => {
+    const term = linkHrSearch.trim().toLowerCase();
+    const items = ((availableHrEmployeesQ.data?.items ?? []) as PayrollAvailableHrEmployeeDto[]);
+
+    if (!term) return items;
+
+    return items.filter((employee) =>
+      [
+        employee.employeeNumber,
+        employee.fullName,
+        employee.email,
+        employee.departmentCode,
+        employee.departmentName,
+        employee.designationCode,
+        employee.designationName,
+        employee.gradeCode,
+        employee.gradeName,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(term)
+    );
+  }, [availableHrEmployeesQ.data, linkHrSearch]);
 
   const filteredSalaryStructures = useMemo(() => {
     const term = salaryStructureSearch.trim().toLowerCase();
@@ -250,6 +339,118 @@ export function PayrollSetupPage() {
   function clearSalaryEmployeeSelection() {
     setSalaryForm((current) => ({ ...current, employeeIds: [] }));
   }
+
+  function toggleHrEmployeeSelection(hrEmployeeId: string) {
+    setSelectedHrEmployeeIds((current) =>
+      current.includes(hrEmployeeId)
+        ? current.filter((id) => id !== hrEmployeeId)
+        : [...current, hrEmployeeId]
+    );
+  }
+
+  function selectAllFilteredHrEmployees() {
+    const ids = filteredAvailableHrEmployees.map((employee) => employee.id);
+    setSelectedHrEmployeeIds((current) => Array.from(new Set([...current, ...ids])));
+  }
+
+  function clearHrEmployeeSelection() {
+    setSelectedHrEmployeeIds([]);
+  }
+
+  function toggleBulkPayrollLinkSelection(employeeId: string) {
+    setSelectedLinkPayrollEmployeeIds((current) =>
+      current.includes(employeeId)
+        ? current.filter((id) => id !== employeeId)
+        : [...current, employeeId]
+    );
+  }
+
+  function toggleBulkHrLinkSelection(hrEmployeeId: string) {
+    setSelectedLinkHrEmployeeIds((current) =>
+      current.includes(hrEmployeeId)
+        ? current.filter((id) => id !== hrEmployeeId)
+        : [...current, hrEmployeeId]
+    );
+  }
+
+  function selectAllFilteredPayrollForLinking() {
+    const ids = unlinkedPayrollEmployees.map((employee) => employee.id);
+    setSelectedLinkPayrollEmployeeIds((current) => Array.from(new Set([...current, ...ids])));
+  }
+
+  function selectAllFilteredHrForLinking() {
+    const ids = linkableHrEmployees.map((employee) => employee.id);
+    setSelectedLinkHrEmployeeIds((current) => Array.from(new Set([...current, ...ids])));
+  }
+
+  function clearBulkLinkSelections() {
+    setSelectedLinkPayrollEmployeeIds([]);
+    setSelectedLinkHrEmployeeIds([]);
+  }
+
+  function refreshPayrollBridgeQueries() {
+    queryClient.invalidateQueries({ queryKey: ['payroll-employees'] });
+    queryClient.invalidateQueries({ queryKey: ['payroll-available-hr-employees'] });
+    queryClient.invalidateQueries({ queryKey: ['payroll-salary-structures'] });
+  }
+
+  const createFromHrMut = useMutation({
+    mutationFn: () => createPayrollEmployeesFromHr({ hrEmployeeIds: selectedHrEmployeeIds }),
+    onSuccess: (response: any) => {
+      setMessage(response.message || 'Payroll employee profile(s) created from HR.');
+      setErrorText('');
+      setSelectedHrEmployeeIds([]);
+      refreshPayrollBridgeQueries();
+    },
+    onError: (error) => setErrorText(getTenantReadableError(error, 'Unable to create payroll employees from HR.')),
+  });
+
+  const linkToHrMut = useMutation({
+    mutationFn: () => linkPayrollEmployeeToHr(linkPayrollEmployeeId, linkHrEmployeeId),
+    onSuccess: (response: any) => {
+      setMessage(response.message || 'Payroll employee linked to HR.');
+      setErrorText('');
+      setLinkPayrollEmployeeId('');
+      setLinkHrEmployeeId('');
+      refreshPayrollBridgeQueries();
+    },
+    onError: (error) => setErrorText(getTenantReadableError(error, 'Unable to link payroll employee to HR.')),
+  });
+
+  const bulkLinkToHrMut = useMutation({
+    mutationFn: () =>
+      bulkLinkPayrollEmployeesToHr({
+        payrollEmployeeIds: selectedLinkPayrollEmployeeIds,
+        hrEmployeeIds: selectedLinkHrEmployeeIds,
+      }),
+    onSuccess: (response: any) => {
+      setMessage(response.message || 'Bulk HR link completed.');
+      setErrorText('');
+      clearBulkLinkSelections();
+      refreshPayrollBridgeQueries();
+    },
+    onError: (error) => setErrorText(getTenantReadableError(error, 'Unable to bulk link Payroll employees to HR.')),
+  });
+
+  const syncOneMut = useMutation({
+    mutationFn: (employeeId: string) => syncPayrollEmployeeFromHr(employeeId),
+    onSuccess: (response: any) => {
+      setMessage(response.message || 'Payroll employee synced from HR.');
+      setErrorText('');
+      refreshPayrollBridgeQueries();
+    },
+    onError: (error) => setErrorText(getTenantReadableError(error, 'Unable to sync payroll employee from HR.')),
+  });
+
+  const syncAllMut = useMutation({
+    mutationFn: syncAllLinkedPayrollEmployeesFromHr,
+    onSuccess: (response: any) => {
+      setMessage(response.message || 'Linked payroll employees synced from HR.');
+      setErrorText('');
+      refreshPayrollBridgeQueries();
+    },
+    onError: (error) => setErrorText(getTenantReadableError(error, 'Unable to sync linked payroll employees from HR.')),
+  });
 
   async function createSalaryStructuresForSelectedEmployees() {
     clearFeedback();
@@ -1195,6 +1396,226 @@ export function PayrollSetupPage() {
 
       {canManage ? (
         <section className="panel">
+          <h3>HRM → Payroll Employee Bridge</h3>
+          <div className="muted">
+            Create payroll employee profiles from active HR employees, link existing payroll employees to HR records, and sync safe employee master data from HR without touching salary structures or payroll history.
+          </div>
+
+          <div className="form-grid three" style={{ marginTop: 12 }}>
+            <div className="form-row">
+              <label>Available HR Employees Search</label>
+              <input
+                className="input"
+                value={availableHrEmployeeSearch}
+                onChange={(e) => setAvailableHrEmployeeSearch(e.target.value)}
+                placeholder="Search HR employee number, name, department, designation, grade"
+              />
+            </div>
+            <div className="form-row">
+              <label>Selected HR Employees</label>
+              <div className="input" style={{ minHeight: 42, display: 'flex', alignItems: 'center' }}>
+                {selectedHrEmployeeIds.length} selected
+              </div>
+            </div>
+            <div className="form-row">
+              <label>Linked Payroll Filter</label>
+              <select className="input" value={payrollLinkFilter} onChange={(e) => setPayrollLinkFilter(e.target.value)}>
+                <option value="all">All payroll employees</option>
+                <option value="linked">Linked to HR</option>
+                <option value="unlinked">Unlinked only</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="inline-actions" style={{ marginTop: 8, marginBottom: 8 }}>
+            <button className="button" type="button" onClick={selectAllFilteredHrEmployees}>Select All Filtered HR</button>
+            <button className="button" type="button" onClick={clearHrEmployeeSelection}>Clear HR Selection</button>
+            <button
+              className="button primary"
+              type="button"
+              disabled={selectedHrEmployeeIds.length === 0 || createFromHrMut.isPending}
+              onClick={() => createFromHrMut.mutate()}
+            >
+              {createFromHrMut.isPending ? 'Creating...' : 'Create Payroll Profiles from HR'}
+            </button>
+            <button
+              className="button secondary"
+              type="button"
+              disabled={syncAllMut.isPending}
+              onClick={() => syncAllMut.mutate()}
+            >
+              {syncAllMut.isPending ? 'Syncing...' : 'Sync All Linked from HR'}
+            </button>
+          </div>
+
+          <div className="panel" style={{ maxHeight: 260, overflowY: 'auto', padding: 12 }}>
+            {filteredAvailableHrEmployees.length === 0 ? (
+              <div className="muted">No available HR employees. HR employees already linked to Payroll are excluded.</div>
+            ) : (
+              filteredAvailableHrEmployees.map((employee: PayrollAvailableHrEmployeeDto) => (
+                <label key={employee.id} className="checkbox-row" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '6px 0' }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedHrEmployeeIds.includes(employee.id)}
+                    onChange={() => toggleHrEmployeeSelection(employee.id)}
+                  />
+                  <span>
+                    <strong>{employee.employeeNumber} - {employee.fullName}</strong>
+                    <br />
+                    <span className="muted">
+                      {employee.departmentName || '—'} / {employee.designationName || '—'} / {employee.gradeName || '—'}
+                    </span>
+                  </span>
+                </label>
+              ))
+            )}
+          </div>
+
+          <div className="panel" style={{ marginTop: 16, padding: 12 }}>
+            <h4>Bulk Link Existing Payroll Employees to HR</h4>
+            <div className="muted">
+              Select multiple unlinked Payroll employees and multiple HR employees. The system links records only where Employee Number matches exactly. Unmatched records are skipped and reported.
+            </div>
+
+            <div className="form-grid two" style={{ marginTop: 12 }}>
+              <div className="form-row">
+                <label>Search Unlinked Payroll Employees</label>
+                <input
+                  className="input"
+                  value={linkPayrollSearch}
+                  onChange={(e) => setLinkPayrollSearch(e.target.value)}
+                  placeholder="Search payroll employee number, name, department"
+                />
+              </div>
+              <div className="form-row">
+                <label>Search Available HR Employees</label>
+                <input
+                  className="input"
+                  value={linkHrSearch}
+                  onChange={(e) => setLinkHrSearch(e.target.value)}
+                  placeholder="Search HR employee number, name, department"
+                />
+              </div>
+            </div>
+
+            <div className="inline-actions" style={{ marginTop: 8, marginBottom: 8 }}>
+              <button className="button" type="button" onClick={selectAllFilteredPayrollForLinking}>
+                Select Filtered Payroll
+              </button>
+              <button className="button" type="button" onClick={selectAllFilteredHrForLinking}>
+                Select Filtered HR
+              </button>
+              <button className="button" type="button" onClick={clearBulkLinkSelections}>
+                Clear Link Selections
+              </button>
+              <button
+                className="button primary"
+                type="button"
+                disabled={
+                  selectedLinkPayrollEmployeeIds.length === 0 ||
+                  selectedLinkHrEmployeeIds.length === 0 ||
+                  bulkLinkToHrMut.isPending
+                }
+                onClick={() => bulkLinkToHrMut.mutate()}
+              >
+                {bulkLinkToHrMut.isPending
+                  ? 'Bulk Linking...'
+                  : `Bulk Link by Employee Number (${selectedLinkPayrollEmployeeIds.length} Payroll / ${selectedLinkHrEmployeeIds.length} HR)`}
+              </button>
+            </div>
+
+            <div className="form-grid two">
+              <div className="panel" style={{ maxHeight: 280, overflowY: 'auto', padding: 12 }}>
+                <strong>Unlinked Payroll Employees</strong>
+                {unlinkedPayrollEmployees.length === 0 ? (
+                  <div className="muted" style={{ marginTop: 8 }}>No unlinked Payroll employees match the current filter.</div>
+                ) : (
+                  unlinkedPayrollEmployees.map((employee: PayrollEmployeeDto) => (
+                    <label key={employee.id} className="checkbox-row" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '6px 0' }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedLinkPayrollEmployeeIds.includes(employee.id)}
+                        onChange={() => toggleBulkPayrollLinkSelection(employee.id)}
+                      />
+                      <span>
+                        <strong>{employee.employeeNumber} - {employee.displayName}</strong>
+                        <br />
+                        <span className="muted">{employee.department || '—'} / {employee.jobTitle || '—'}</span>
+                      </span>
+                    </label>
+                  ))
+                )}
+              </div>
+
+              <div className="panel" style={{ maxHeight: 280, overflowY: 'auto', padding: 12 }}>
+                <strong>Available HR Employees</strong>
+                {linkableHrEmployees.length === 0 ? (
+                  <div className="muted" style={{ marginTop: 8 }}>No available HR employees match the current filter.</div>
+                ) : (
+                  linkableHrEmployees.map((employee: PayrollAvailableHrEmployeeDto) => (
+                    <label key={employee.id} className="checkbox-row" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '6px 0' }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedLinkHrEmployeeIds.includes(employee.id)}
+                        onChange={() => toggleBulkHrLinkSelection(employee.id)}
+                      />
+                      <span>
+                        <strong>{employee.employeeNumber} - {employee.fullName}</strong>
+                        <br />
+                        <span className="muted">
+                          {employee.departmentName || '—'} / {employee.designationName || '—'} / {employee.gradeName || '—'}
+                        </span>
+                      </span>
+                    </label>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="panel" style={{ marginTop: 16, padding: 12 }}>
+            <h4>Manual One-to-One Link</h4>
+            <div className="muted">
+              Use this only where Payroll Employee Number and HR Employee Number are different and you intentionally want to link one specific pair.
+            </div>
+
+            <div className="form-grid two" style={{ marginTop: 12 }}>
+              <div className="form-row">
+                <label>Existing Payroll Employee</label>
+                <select className="input" value={linkPayrollEmployeeId} onChange={(e) => setLinkPayrollEmployeeId(e.target.value)}>
+                  <option value="">Select unlinked payroll employee</option>
+                  {((employeesQ.data?.items ?? []) as PayrollEmployeeDto[])
+                    .filter((employee) => !employee.isLinkedToHr)
+                    .map((employee) => (
+                      <option key={employee.id} value={employee.id}>{employee.employeeNumber} - {employee.displayName}</option>
+                    ))}
+                </select>
+              </div>
+              <div className="form-row">
+                <label>Available HR Employee</label>
+                <select className="input" value={linkHrEmployeeId} onChange={(e) => setLinkHrEmployeeId(e.target.value)}>
+                  <option value="">Select HR employee</option>
+                  {((availableHrEmployeesQ.data?.items ?? []) as PayrollAvailableHrEmployeeDto[]).map((employee) => (
+                    <option key={employee.id} value={employee.id}>{employee.employeeNumber} - {employee.fullName}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <button
+              className="button secondary"
+              type="button"
+              disabled={!linkPayrollEmployeeId || !linkHrEmployeeId || linkToHrMut.isPending}
+              onClick={() => linkToHrMut.mutate()}
+            >
+              {linkToHrMut.isPending ? 'Linking...' : 'Link One Payroll Employee to HR'}
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {canManage ? (
+        <section className="panel">
           <h3>Salary Structure</h3>
           <div className="muted">Pick one or many employees, then apply the same pay group and salary setup to all selected employees at once.</div>
           <div className="form-grid three">
@@ -1230,11 +1651,25 @@ export function PayrollSetupPage() {
                       checked={salaryForm.employeeIds.includes(employee.id)}
                       onChange={() => toggleSalaryEmployee(employee.id)}
                     />
-                    <span>
+                    <span style={{ flex: 1 }}>
                       <strong>{employee.employeeNumber} - {employee.displayName}</strong>
                       <br />
-                      <span className="muted">{employee.department || '—'} / {employee.jobTitle || '—'}</span>
+                      <span className="muted">
+                        {employee.department || '—'} / {employee.jobTitle || '—'} / {employee.isLinkedToHr ? `Linked to HR${employee.hrSyncStatus ? ` (${employee.hrSyncStatus})` : ''}` : 'Unlinked'}
+                      </span>
                     </span>
+                    {employee.isLinkedToHr ? (
+                      <button
+                        className="button secondary"
+                        type="button"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          syncOneMut.mutate(employee.id);
+                        }}
+                      >
+                        Sync
+                      </button>
+                    ) : null}
                   </label>
                 ))
               )}

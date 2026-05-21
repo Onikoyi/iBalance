@@ -18,6 +18,8 @@ import {
   canViewFixedAssets,
   canViewInventory,
   canViewPayroll,
+  canViewHumanResources,
+  canViewApprovalInbox,
   canViewPlatformTenantConsole,
   canViewProcurement,
   canViewWorkingCapital,
@@ -79,6 +81,8 @@ export function Sidebar() {
   const canViewFinanceModule = canViewFinance();
   const canViewBudgetModule = canViewBudget();
   const canViewBillingModule = canViewBilling();
+  const canViewApprovalInboxModule = canViewApprovalInbox();
+  const canViewHumanResourcesModule = canViewHumanResources();
   const canViewPayrollModule = canViewPayroll();
   const canViewProcurementModule = canViewProcurement();
   const canViewApModule = canViewAccountsPayable();
@@ -116,6 +120,8 @@ export function Sidebar() {
     if (path.startsWith('/eam')) return 'eam';
     if (path.startsWith('/fleet')) return 'fleet';
     if (path.startsWith('/billing')) return 'billing';
+    if (path.startsWith('/approvals')) return 'approvals';
+    if (path.startsWith('/hr')) return 'hr';
     if (path.startsWith('/payroll')) return 'payroll';
     return 'overview';
   }, [location.pathname]);
@@ -131,6 +137,8 @@ export function Sidebar() {
         {(canViewFinanceModule ||
           canViewBudgetModule ||
           canViewPayrollModule ||
+          canViewApprovalInboxModule ||
+          canViewHumanResourcesModule ||
           canViewProcurementModule ||
           canViewApModule ||
           canViewArModule ||
@@ -219,7 +227,41 @@ export function Sidebar() {
               </>
             ) : null}
 
-            {canViewPayrollModule ? (
+            {canViewApprovalInboxModule ? (
+              <SidebarSection title="Approvals" sectionKey="approvals" defaultOpen={activeSection === 'approvals'}>
+                <NavLink to="/approvals" className={({ isActive }) => linkClassName(isActive)}>
+                  Central Inbox
+                </NavLink>
+              </SidebarSection>
+            ) : null}
+
+            {canViewHumanResourcesModule ? (
+              <SidebarSection title="Human Resources" sectionKey="hr" defaultOpen={activeSection === 'hr'}>
+                <NavLink to="/hr" className={({ isActive }) => linkClassName(isActive)}>
+                  Dashboard
+                </NavLink>
+                <NavLink to="/hr/employees" className={({ isActive }) => linkClassName(isActive)}>
+                  Employees
+                </NavLink>
+                <NavLink to="/hr/setup" className={({ isActive }) => linkClassName(isActive)}>
+                  Setup
+                </NavLink>
+                <NavLink to="/hr/leave" className={({ isActive }) => linkClassName(isActive)}>
+                  Leave Management
+                </NavLink>
+                <NavLink to="/hr/training" className={({ isActive }) => linkClassName(isActive)}>
+                  Training
+                </NavLink>
+                <NavLink to="/hr/disciplinary" className={({ isActive }) => linkClassName(isActive)}>
+                  Disciplinary
+                </NavLink>
+                <NavLink to="/hr/reports" className={({ isActive }) => linkClassName(isActive)}>
+                  Reports
+                </NavLink>
+              </SidebarSection>
+            ) : null}
+
+{canViewPayrollModule ? (
               <SidebarSection title="Payroll" sectionKey="payroll" defaultOpen={activeSection === 'payroll'}>
                 <NavLink to="/payroll" className={({ isActive }) => linkClassName(isActive)}>
                   Payroll Dashboard

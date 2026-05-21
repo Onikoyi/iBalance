@@ -80,6 +80,26 @@ public static class ServiceCollectionExtensions
             AddPermissionPolicy(AuthorizationPolicies.BudgetTransfer, "budget.transfer");
             AddPermissionPolicy(AuthorizationPolicies.BudgetReportsView, "budget.reports.view");
 
+
+            AddPermissionPolicy(AuthorizationPolicies.ApprovalInboxView, "approval.inbox.view", "workflow.approve", "workflow.reject");
+            AddPermissionPolicy(AuthorizationPolicies.HrView, "hr.view");
+            AddPermissionPolicy(AuthorizationPolicies.HrSetupManage, "hr.setup.manage");
+            AddPermissionPolicy(AuthorizationPolicies.HrEmployeeCreate, "hr.employee.create");
+            AddPermissionPolicy(AuthorizationPolicies.HrEmployeeUpdate, "hr.employee.update");
+            AddPermissionPolicy(AuthorizationPolicies.HrEmployeeTerminate, "hr.employee.terminate");
+            AddPermissionPolicy(AuthorizationPolicies.HrEmployeeViewSensitive, "hr.employee.view.sensitive");
+            AddPermissionPolicy(AuthorizationPolicies.HrDepartmentManage, "hr.department.manage");
+            AddPermissionPolicy(AuthorizationPolicies.HrDesignationManage, "hr.designation.manage");
+            AddPermissionPolicy(AuthorizationPolicies.HrGradeManage, "hr.grade.manage");
+            AddPermissionPolicy(AuthorizationPolicies.HrLeaveView, "hr.leave.view");
+            AddPermissionPolicy(AuthorizationPolicies.HrLeaveCreate, "hr.leave.create");
+            AddPermissionPolicy(AuthorizationPolicies.HrLeaveApprove, "hr.leave.approve", "workflow.approve");
+            AddPermissionPolicy(AuthorizationPolicies.HrLeaveReject, "hr.leave.reject", "workflow.reject");
+            AddPermissionPolicy(AuthorizationPolicies.HrTrainingManage, "hr.training.manage");
+            AddPermissionPolicy(AuthorizationPolicies.HrDisciplinaryManage, "hr.disciplinary.manage");
+            AddPermissionPolicy(AuthorizationPolicies.HrReportsView, "hr.reports.view");
+            AddPermissionPolicy(AuthorizationPolicies.HrExport, "hr.export");
+
             AddPermissionPolicy(AuthorizationPolicies.PayrollView, "payroll.view");
             AddPermissionPolicy(AuthorizationPolicies.PayrollManage, "payroll.manage");
             AddPermissionPolicy(AuthorizationPolicies.PayrollRunSubmit, "payroll.run.submit");

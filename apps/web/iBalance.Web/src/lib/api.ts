@@ -1927,6 +1927,10 @@ export type PayrollSalaryStructureOverrideDto = {
   effectiveFromUtc?: string | null;
   effectiveToUtc?: string | null;
   notes?: string | null;
+  hrEmployeeId?: string | null;
+  syncedFromHrOnUtc?: string | null;
+  hrSyncStatus?: string | null;
+  isLinkedToHr?: boolean;
   createdOnUtc: string;
 };
 
@@ -4514,6 +4518,34 @@ export async function getWorkingCapitalOptimization(asOfUtc?: string | null) {
 // PAYROLL / SALARY MANAGEMENT — PHASE 1
 // ==========================================
 
+
+export type ApprovalInboxItemDto = {
+  id: string;
+  module: string;
+  itemType: string;
+  reference: string;
+  status: string;
+  requestedOnUtc: string;
+  rejectionReason?: string | null;
+  route: string;
+  employeeId?: string | null;
+  employeeNumber?: string | null;
+  amount?: number | null;
+  description?: string | null;
+  actionHint: string;
+};
+
+export type ApprovalInboxResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string;
+  tenantKey: string;
+  snapshotUtc: string;
+  count: number;
+  pendingCount: number;
+  rejectedCount: number;
+  items: ApprovalInboxItemDto[];
+};
+
 export type PayrollEmployeeDto = {
   id: string;
   tenantId: string;
@@ -4534,9 +4566,55 @@ export type PayrollEmployeeDto = {
   taxIdentificationNumber?: string | null;
   isActive: boolean;
   notes?: string | null;
+  hrEmployeeId?: string | null;
+  syncedFromHrOnUtc?: string | null;
+  hrSyncStatus?: string | null;
+  isLinkedToHr?: boolean;
   createdOnUtc: string;
 };
 
+
+
+export type PayrollAvailableHrEmployeeDto = {
+  id: string;
+  employeeNumber: string;
+  firstName: string;
+  middleName?: string | null;
+  lastName: string;
+  fullName: string;
+  email?: string | null;
+  phoneNumber?: string | null;
+  hireDateUtc: string;
+  bankName?: string | null;
+  bankAccountNumber?: string | null;
+  pensionNumber?: string | null;
+  taxIdentificationNumber?: string | null;
+  status: number;
+  statusName: string;
+  departmentCode?: string | null;
+  departmentName?: string | null;
+  designationCode?: string | null;
+  designationName?: string | null;
+  gradeCode?: string | null;
+  gradeName?: string | null;
+};
+
+export type PayrollAvailableHrEmployeesResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  count: number;
+  items: PayrollAvailableHrEmployeeDto[];
+};
+
+export type CreatePayrollEmployeesFromHrRequest = {
+  hrEmployeeIds: string[];
+};
+
+export type BulkLinkPayrollEmployeesToHrRequest = {
+  payrollEmployeeIds: string[];
+  hrEmployeeIds: string[];
+};
 
 export type PayrollEmployeesResponse = {
   tenantContextAvailable: boolean;
@@ -5148,6 +5226,47 @@ export async function deletePayrollPayGroupElement(payGroupElementId: string) {
 }
 
 
+
+
+export async function getApprovalInboxItems(state?: 'all' | 'pending' | 'rejected') {
+  const response = await api.get<ApprovalInboxResponse>('/api/approval-inbox/items', {
+    params: {
+      ...(state ? { state } : {}),
+    },
+  });
+  return response.data;
+}
+
+export async function getAvailableHrEmployeesForPayroll() {
+  const response = await api.get<PayrollAvailableHrEmployeesResponse>('/api/payroll/hr-employees/available');
+  return response.data;
+}
+
+export async function createPayrollEmployeesFromHr(payload: CreatePayrollEmployeesFromHrRequest) {
+  const response = await api.post('/api/payroll/employees/from-hr', payload);
+  return response.data;
+}
+
+export async function linkPayrollEmployeeToHr(payrollEmployeeId: string, hrEmployeeId: string) {
+  const response = await api.post(`/api/payroll/employees/${payrollEmployeeId}/link-hr/${hrEmployeeId}`);
+  return response.data;
+}
+
+export async function bulkLinkPayrollEmployeesToHr(payload: BulkLinkPayrollEmployeesToHrRequest) {
+  const response = await api.post('/api/payroll/employees/bulk-link-hr', payload);
+  return response.data;
+}
+
+export async function syncPayrollEmployeeFromHr(payrollEmployeeId: string) {
+  const response = await api.post(`/api/payroll/employees/${payrollEmployeeId}/sync-from-hr`);
+  return response.data;
+}
+
+export async function syncAllLinkedPayrollEmployeesFromHr() {
+  const response = await api.post('/api/payroll/employees/sync-all-from-hr');
+  return response.data;
+}
+
 export async function getPayrollEmployees() {
   const response = await api.get<PayrollEmployeesResponse>('/api/payroll/employees');
   return response.data;
@@ -5515,4 +5634,32 @@ export async function createDepartmentWorkflowPolicy(payload: { moduleCode: stri
   const { data } = await api.post('/api/admin/access-control/workflow-policies', payload);
   return data;
 }
+
+
+export type ApprovalInboxServerItemDto = {
+  id: string;
+  module: string;
+  itemType: string;
+  reference: string;
+  status: string;
+  requestedOnUtc: string;
+  rejectionReason?: string | null;
+  route: string;
+  employeeId?: string | null;
+  employeeNumber?: string | null;
+  amount?: number | null;
+  description?: string | null;
+  actionHint?: string | null;
+};
+
+export type ApprovalInboxServerResponse = {
+  tenantContextAvailable: boolean;
+  tenantId: string | null;
+  tenantKey: string | null;
+  snapshotUtc: string;
+  count: number;
+  pendingCount: number;
+  rejectedCount: number;
+  items: ApprovalInboxServerItemDto[];
+};
 

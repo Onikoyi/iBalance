@@ -15,7 +15,9 @@ export type UserRole =
   | 'BudgetOfficer'
   | 'BudgetOwner'
   | 'PayrollOfficer'
+  | 'HrManager'
   | 'HrOfficer'
+  | 'HrViewer'
   | 'ProcurementOfficer'
   | 'TreasuryOfficer'
   | 'InventoryOfficer'
@@ -388,6 +390,76 @@ export function canViewFinance(): boolean {
 
 export function canViewReports(): boolean {
   return hasPermission('reports.view') || hasPermission('finance.reports.view');
+}
+
+
+
+export function canViewApprovalInbox(): boolean {
+  return hasPermission('approval.inbox.view') || hasPermission('workflow.approve') || hasPermission('workflow.reject');
+}
+
+export function canViewHumanResources(): boolean {
+  return hasPermission('hr.view');
+}
+
+export function canManageHumanResourcesSetup(): boolean {
+  return hasPermission('hr.setup.manage');
+}
+
+export function canCreateHrEmployees(): boolean {
+  return hasPermission('hr.employee.create');
+}
+
+export function canUpdateHrEmployees(): boolean {
+  return hasPermission('hr.employee.update');
+}
+
+export function canTerminateHrEmployees(): boolean {
+  return hasPermission('hr.employee.terminate');
+}
+
+export function canViewSensitiveHrEmployeeData(): boolean {
+  return hasPermission('hr.employee.view.sensitive');
+}
+
+export function canManageHrDepartments(): boolean {
+  return hasPermission('hr.department.manage');
+}
+
+export function canManageHrDesignations(): boolean {
+  return hasPermission('hr.designation.manage');
+}
+
+export function canManageHrGrades(): boolean {
+  return hasPermission('hr.grade.manage');
+}
+
+export function canViewHrLeave(): boolean {
+  return hasPermission('hr.leave.view') || hasPermission('hr.view');
+}
+
+export function canCreateHrLeave(): boolean {
+  return hasPermission('hr.leave.create');
+}
+
+export function canApproveHrLeave(): boolean {
+  return hasPermission('hr.leave.approve') || hasPermission('workflow.approve');
+}
+
+export function canRejectHrLeave(): boolean {
+  return hasPermission('hr.leave.reject') || hasPermission('workflow.reject');
+}
+
+export function canManageHrTraining(): boolean {
+  return hasPermission('hr.training.manage');
+}
+
+export function canManageHrDisciplinary(): boolean {
+  return hasPermission('hr.disciplinary.manage');
+}
+
+export function canViewHrReports(): boolean {
+  return hasPermission('hr.reports.view') || hasPermission('reports.view');
 }
 
 export function canViewPayroll(): boolean {

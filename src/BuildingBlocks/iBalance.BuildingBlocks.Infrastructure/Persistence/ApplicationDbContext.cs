@@ -2,6 +2,8 @@ using iBalance.BuildingBlocks.Application.Security;
 using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Domain.Common;
 using iBalance.Modules.Finance.Domain.Entities;
+using iBalance.Modules.HumanResources.Domain.Entities;
+using iBalance.Modules.HumanResources.Domain.Enums;
 using iBalance.Modules.Finance.Persistence;
 using iBalance.Modules.Platform.Domain.Entities;
 using iBalance.Modules.Platform.Persistence;
@@ -75,6 +77,15 @@ public class ApplicationDbContext : DbContext
     public DbSet<FixedAssetDepreciationRun> FixedAssetDepreciationRuns => Set<FixedAssetDepreciationRun>();
     public DbSet<FixedAssetDepreciationLine> FixedAssetDepreciationLines => Set<FixedAssetDepreciationLine>();
     public DbSet<FixedAssetDisposal> FixedAssetDisposals => Set<FixedAssetDisposal>();
+
+    public DbSet<HrDepartment> HrDepartments => Set<HrDepartment>();
+    public DbSet<HrDesignation> HrDesignations => Set<HrDesignation>();
+    public DbSet<HrGrade> HrGrades => Set<HrGrade>();
+    public DbSet<HrEmployee> HrEmployees => Set<HrEmployee>();
+    public DbSet<HrLeaveRequest> HrLeaveRequests => Set<HrLeaveRequest>();
+    public DbSet<HrTrainingRecord> HrTrainingRecords => Set<HrTrainingRecord>();
+    public DbSet<HrDisciplinaryRecord> HrDisciplinaryRecords => Set<HrDisciplinaryRecord>();
+
     public DbSet<PayrollEmployee> PayrollEmployees => Set<PayrollEmployee>();
     public DbSet<PayrollPayGroup> PayrollPayGroups => Set<PayrollPayGroup>();
     public DbSet<PayrollPayElement> PayrollPayElements => Set<PayrollPayElement>();
@@ -1083,6 +1094,108 @@ modelBuilder.Entity<BudgetTransfer>(entity =>
         modelBuilder.Entity<FixedAssetDisposal>()
             .HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
     
+
+        modelBuilder.Entity<HrDepartment>(entity =>
+        {
+            entity.ToTable("HrDepartments", "hr");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.Code).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<HrDesignation>(entity =>
+        {
+            entity.ToTable("HrDesignations", "hr");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.Code).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<HrGrade>(entity =>
+        {
+            entity.ToTable("HrGrades", "hr");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.Code).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<HrEmployee>(entity =>
+        {
+            entity.ToTable("HrEmployees", "hr");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.EmployeeNumber).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.FirstName).HasMaxLength(150).IsRequired();
+            entity.Property(x => x.MiddleName).HasMaxLength(150);
+            entity.Property(x => x.LastName).HasMaxLength(150).IsRequired();
+            entity.Property(x => x.Email).HasMaxLength(256);
+            entity.Property(x => x.PhoneNumber).HasMaxLength(80);
+            entity.Property(x => x.BankName).HasMaxLength(200);
+            entity.Property(x => x.BankAccountNumber).HasMaxLength(80);
+            entity.Property(x => x.PensionNumber).HasMaxLength(100);
+            entity.Property(x => x.TaxIdentificationNumber).HasMaxLength(100);
+            entity.Property(x => x.Address).HasMaxLength(1000);
+            entity.Property(x => x.EmergencyContactName).HasMaxLength(200);
+            entity.Property(x => x.EmergencyContactPhone).HasMaxLength(80);
+            entity.Property(x => x.TerminationReason).HasMaxLength(1000);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.HasIndex(x => new { x.TenantId, x.EmployeeNumber }).IsUnique();
+            entity.HasOne(x => x.Department).WithMany().HasForeignKey(x => x.DepartmentId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(x => x.Designation).WithMany().HasForeignKey(x => x.DesignationId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(x => x.Grade).WithMany().HasForeignKey(x => x.GradeId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<HrLeaveRequest>(entity =>
+        {
+            entity.ToTable("HrLeaveRequests", "hr");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.LeaveType).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.Reason).HasMaxLength(1000).IsRequired();
+            entity.Property(x => x.RejectionReason).HasMaxLength(1000);
+            entity.HasOne(x => x.Employee).WithMany().HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<HrTrainingRecord>(entity =>
+        {
+            entity.ToTable("HrTrainingRecords", "hr");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.TrainingTitle).HasMaxLength(250).IsRequired();
+            entity.Property(x => x.Provider).HasMaxLength(250);
+            entity.Property(x => x.CostAmount).HasPrecision(18, 2);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.HasOne(x => x.Employee).WithMany().HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<HrDisciplinaryRecord>(entity =>
+        {
+            entity.ToTable("HrDisciplinaryRecords", "hr");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.Category).HasMaxLength(150).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(2000).IsRequired();
+            entity.Property(x => x.ActionTaken).HasMaxLength(1000);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.HasOne(x => x.Employee).WithMany().HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
         modelBuilder.Entity<PayrollEmployee>(entity =>
         {
             entity.ToTable("PayrollEmployees", "finance");
@@ -1100,7 +1213,11 @@ modelBuilder.Entity<BudgetTransfer>(entity =>
             entity.Property(x => x.PensionNumber).HasMaxLength(100);
             entity.Property(x => x.TaxIdentificationNumber).HasMaxLength(100);
             entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.Property<Guid?>("HrEmployeeId");
+            entity.Property<DateTime?>("SyncedFromHrOnUtc");
+            entity.Property<string>("HrSyncStatus").HasMaxLength(80);
             entity.HasIndex(x => new { x.TenantId, x.EmployeeNumber }).IsUnique();
+            entity.HasIndex("TenantId", "HrEmployeeId").IsUnique().HasFilter("\"HrEmployeeId\" IS NOT NULL");
             entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
         });
 

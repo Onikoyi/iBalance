@@ -33,6 +33,27 @@ public static class AuthorizationPolicies
     public const string BudgetTransfer = "BudgetTransfer";
     public const string BudgetReportsView = "BudgetReportsView";
 
+
+    public const string ApprovalInboxView = "approval.inbox.view";
+
+    public const string HrView = "hr.view";
+    public const string HrSetupManage = "hr.setup.manage";
+    public const string HrEmployeeCreate = "hr.employee.create";
+    public const string HrEmployeeUpdate = "hr.employee.update";
+    public const string HrEmployeeTerminate = "hr.employee.terminate";
+    public const string HrEmployeeViewSensitive = "hr.employee.view.sensitive";
+    public const string HrDepartmentManage = "hr.department.manage";
+    public const string HrDesignationManage = "hr.designation.manage";
+    public const string HrGradeManage = "hr.grade.manage";
+    public const string HrLeaveView = "hr.leave.view";
+    public const string HrLeaveCreate = "hr.leave.create";
+    public const string HrLeaveApprove = "hr.leave.approve";
+    public const string HrLeaveReject = "hr.leave.reject";
+    public const string HrTrainingManage = "hr.training.manage";
+    public const string HrDisciplinaryManage = "hr.disciplinary.manage";
+    public const string HrReportsView = "hr.reports.view";
+    public const string HrExport = "hr.export";
+
     public const string PayrollView = "PayrollView";
     public const string PayrollManage = "PayrollManage";
     public const string PayrollRunSubmit = "PayrollRunSubmit";

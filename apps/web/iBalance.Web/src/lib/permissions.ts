@@ -31,6 +31,24 @@ export type AppPermission =
   | 'budget.close'
   | 'budget.transfer'
   | 'budget.reports.view'
+  | 'approval.inbox.view'
+  | 'hr.view'
+  | 'hr.setup.manage'
+  | 'hr.employee.create'
+  | 'hr.employee.update'
+  | 'hr.employee.terminate'
+  | 'hr.employee.view.sensitive'
+  | 'hr.department.manage'
+  | 'hr.designation.manage'
+  | 'hr.grade.manage'
+  | 'hr.leave.view'
+  | 'hr.leave.create'
+  | 'hr.leave.approve'
+  | 'hr.leave.reject'
+  | 'hr.training.manage'
+  | 'hr.disciplinary.manage'
+  | 'hr.reports.view'
+  | 'hr.export'
   | 'payroll.view'
   | 'payroll.manage'
   | 'payroll.run.submit'
@@ -136,6 +154,7 @@ export type AppPermission =
 
 const rolePermissions: Record<UserRole, AppPermission[]> = {
   PlatformAdmin: [
+    'approval.inbox.view',
     'admin.access',
     'admin.settings.manage',
     'admin.users.manage',
@@ -166,6 +185,23 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
     'budget.close',
     'budget.transfer',
     'budget.reports.view',
+    'hr.view',
+    'hr.setup.manage',
+    'hr.employee.create',
+    'hr.employee.update',
+    'hr.employee.terminate',
+    'hr.employee.view.sensitive',
+    'hr.department.manage',
+    'hr.designation.manage',
+    'hr.grade.manage',
+    'hr.leave.view',
+    'hr.leave.create',
+    'hr.leave.approve',
+    'hr.leave.reject',
+    'hr.training.manage',
+    'hr.disciplinary.manage',
+    'hr.reports.view',
+    'hr.export',
     'payroll.view',
     'payroll.manage',
     'payroll.run.submit',
@@ -270,6 +306,7 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
 
   ],
   TenantAdmin: [
+    'approval.inbox.view',
     'admin.access',
     'admin.users.manage',
     'admin.roles.manage',
@@ -402,6 +439,7 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
 
   ],
   FinanceController: [
+    'approval.inbox.view',
     'finance.view',
     'finance.setup.manage',
     'finance.transactions.create',
@@ -493,6 +531,7 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
 
   ],
   Accountant: [
+    'approval.inbox.view',
     'finance.view',
     'finance.setup.manage',
     'finance.transactions.create',
@@ -659,17 +698,54 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
     'reports.export',
   ],
   PayrollOfficer: [
+    'approval.inbox.view',
     'payroll.view',
     'payroll.manage',
     'payroll.run.submit',
     'reports.view',
     'reports.export',
   ],
-  HrOfficer: [
-    'payroll.view',
-    'payroll.manage',
+  HrManager: [
+    'approval.inbox.view',
+    'hr.view',
+    'hr.setup.manage',
+    'hr.employee.create',
+    'hr.employee.update',
+    'hr.employee.terminate',
+    'hr.employee.view.sensitive',
+    'hr.department.manage',
+    'hr.designation.manage',
+    'hr.grade.manage',
+    'hr.leave.view',
+    'hr.leave.create',
+    'hr.leave.approve',
+    'hr.leave.reject',
+    'hr.training.manage',
+    'hr.disciplinary.manage',
+    'hr.reports.view',
+    'hr.export',
     'reports.view',
     'reports.export',
+  ],
+  HrOfficer: [
+    'hr.view',
+    'hr.employee.create',
+    'hr.employee.update',
+    'hr.department.manage',
+    'hr.designation.manage',
+    'hr.grade.manage',
+    'hr.leave.view',
+    'hr.leave.create',
+    'hr.training.manage',
+    'hr.disciplinary.manage',
+    'hr.reports.view',
+    'reports.view',
+  ],
+  HrViewer: [
+    'hr.view',
+    'hr.leave.view',
+    'hr.reports.view',
+    'reports.view',
   ],
   ProcurementOfficer: [
     'procurement.view',
@@ -772,6 +848,7 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
   ],
 
   BillingOfficer: [
+    'approval.inbox.view',
     'billing.view',
     'billing.setup.manage',
     'billing.invoice.create',

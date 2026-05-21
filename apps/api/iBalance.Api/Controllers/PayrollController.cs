@@ -4,6 +4,8 @@ using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
 using iBalance.Modules.Finance.Domain.Entities;
 using iBalance.Modules.Finance.Domain.Enums;
+using iBalance.Modules.HumanResources.Domain.Entities;
+using iBalance.Modules.HumanResources.Domain.Enums;
 using iBalance.Modules.Platform.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -109,6 +111,89 @@ public sealed class PayrollController : ControllerBase
         return normalized.Length > 0 && scope.DepartmentTokens.Contains(normalized);
     }
 
+
+    private static string? MapHrDepartment(HrEmployee employee) =>
+        employee.Department is null
+            ? null
+            : string.IsNullOrWhiteSpace(employee.Department.Name)
+                ? employee.Department.Code
+                : employee.Department.Name;
+
+    private static string? MapHrJobTitle(HrEmployee employee) =>
+        employee.Designation is null
+            ? null
+            : string.IsNullOrWhiteSpace(employee.Designation.Name)
+                ? employee.Designation.Code
+                : employee.Designation.Name;
+
+    private static bool IsPayrollActiveFromHr(HrEmployee employee) =>
+        employee.Status == HrEmployeeStatus.Active ||
+        employee.Status == HrEmployeeStatus.OnLeave;
+
+    private static object MapAvailableHrEmployee(HrEmployee employee) => new
+    {
+        employee.Id,
+        employee.EmployeeNumber,
+        employee.FirstName,
+        employee.MiddleName,
+        employee.LastName,
+        employee.FullName,
+        employee.Email,
+        employee.PhoneNumber,
+        employee.HireDateUtc,
+        employee.BankName,
+        employee.BankAccountNumber,
+        employee.PensionNumber,
+        employee.TaxIdentificationNumber,
+        employee.Status,
+        StatusName = employee.Status.ToString(),
+        DepartmentCode = employee.Department != null ? employee.Department.Code : null,
+        DepartmentName = employee.Department != null ? employee.Department.Name : null,
+        DesignationCode = employee.Designation != null ? employee.Designation.Code : null,
+        DesignationName = employee.Designation != null ? employee.Designation.Name : null,
+        GradeCode = employee.Grade != null ? employee.Grade.Code : null,
+        GradeName = employee.Grade != null ? employee.Grade.Name : null
+    };
+
+    private static PayrollEmployee CreatePayrollEmployeeFromHr(Guid tenantId, HrEmployee hrEmployee) =>
+        new(
+            Guid.NewGuid(),
+            tenantId,
+            hrEmployee.EmployeeNumber,
+            hrEmployee.FirstName,
+            hrEmployee.MiddleName,
+            hrEmployee.LastName,
+            hrEmployee.Email,
+            hrEmployee.PhoneNumber,
+            MapHrDepartment(hrEmployee),
+            MapHrJobTitle(hrEmployee),
+            hrEmployee.HireDateUtc,
+            hrEmployee.BankName,
+            hrEmployee.BankAccountNumber,
+            hrEmployee.PensionNumber,
+            hrEmployee.TaxIdentificationNumber,
+            IsPayrollActiveFromHr(hrEmployee),
+            hrEmployee.Notes);
+
+    private static void ApplyHrDataToPayrollEmployee(PayrollEmployee payrollEmployee, HrEmployee hrEmployee)
+    {
+        payrollEmployee.Update(
+            hrEmployee.FirstName,
+            hrEmployee.MiddleName,
+            hrEmployee.LastName,
+            hrEmployee.Email,
+            hrEmployee.PhoneNumber,
+            MapHrDepartment(hrEmployee),
+            MapHrJobTitle(hrEmployee),
+            hrEmployee.HireDateUtc,
+            hrEmployee.BankName,
+            hrEmployee.BankAccountNumber,
+            hrEmployee.PensionNumber,
+            hrEmployee.TaxIdentificationNumber,
+            IsPayrollActiveFromHr(hrEmployee),
+            hrEmployee.Notes);
+    }
+
 [Authorize(Policy = AuthorizationPolicies.PayrollView)]
 [HttpGet("employees")]
 public async Task<IActionResult> GetEmployees(
@@ -152,6 +237,10 @@ public async Task<IActionResult> GetEmployees(
             x.TaxIdentificationNumber,
             x.IsActive,
             x.Notes,
+            HrEmployeeId = EF.Property<Guid?>(x, "HrEmployeeId"),
+            SyncedFromHrOnUtc = EF.Property<DateTime?>(x, "SyncedFromHrOnUtc"),
+            HrSyncStatus = EF.Property<string?>(x, "HrSyncStatus"),
+            IsLinkedToHr = EF.Property<Guid?>(x, "HrEmployeeId").HasValue,
             x.CreatedOnUtc
         })
         .ToListAsync(cancellationToken);
@@ -166,6 +255,568 @@ public async Task<IActionResult> GetEmployees(
         Count = items.Count,
         Items = items
     });
+}
+
+
+[Authorize(Policy = AuthorizationPolicies.PayrollView)]
+[HttpGet("hr-employees/available")]
+public async Task<IActionResult> GetAvailableHrEmployeesForPayroll(
+    [FromServices] ApplicationDbContext dbContext,
+    [FromServices] ITenantContextAccessor tenantContextAccessor,
+    CancellationToken cancellationToken)
+{
+    var tenantContext = tenantContextAccessor.Current;
+
+    if (!tenantContext.IsAvailable)
+    {
+        return BadRequest(new { Message = "Tenant context is required.", RequiredHeader = "X-Tenant-Key" });
+    }
+
+    var linkedHrEmployeeIds = await dbContext.PayrollEmployees
+        .AsNoTracking()
+        .Select(x => EF.Property<Guid?>(x, "HrEmployeeId"))
+        .Where(x => x.HasValue)
+        .Select(x => x!.Value)
+        .ToListAsync(cancellationToken);
+
+    var linked = linkedHrEmployeeIds.ToHashSet();
+
+    var items = await dbContext.HrEmployees
+        .AsNoTracking()
+        .Include(x => x.Department)
+        .Include(x => x.Designation)
+        .Include(x => x.Grade)
+        .Where(x =>
+            (x.Status == HrEmployeeStatus.Active || x.Status == HrEmployeeStatus.OnLeave) &&
+            !linked.Contains(x.Id))
+        .OrderBy(x => x.EmployeeNumber)
+        .ToListAsync(cancellationToken);
+
+    return Ok(new
+    {
+        TenantContextAvailable = true,
+        TenantId = tenantContext.TenantId,
+        TenantKey = tenantContext.TenantKey,
+        Count = items.Count,
+        Items = items.Select(MapAvailableHrEmployee).ToList()
+    });
+}
+
+[Authorize(Policy = AuthorizationPolicies.PayrollManage)]
+[HttpPost("employees/from-hr")]
+public async Task<IActionResult> CreatePayrollEmployeesFromHr(
+    [FromBody] CreatePayrollEmployeesFromHrRequest request,
+    [FromServices] ApplicationDbContext dbContext,
+    [FromServices] ITenantContextAccessor tenantContextAccessor,
+    [FromServices] IAuditTrailWriter auditTrailWriter,
+    CancellationToken cancellationToken)
+{
+    var tenantContext = tenantContextAccessor.Current;
+
+    if (!tenantContext.IsAvailable)
+    {
+        return BadRequest(new { Message = "Tenant context is required.", RequiredHeader = "X-Tenant-Key" });
+    }
+
+    if (request.HrEmployeeIds is null || request.HrEmployeeIds.Count == 0)
+    {
+        return BadRequest(new { Message = "At least one HR employee must be selected." });
+    }
+
+    var payrollScope = await GetPayrollScopeContextAsync(dbContext, tenantContext.TenantId, cancellationToken);
+
+    var hrEmployees = await dbContext.HrEmployees
+        .Include(x => x.Department)
+        .Include(x => x.Designation)
+        .Include(x => x.Grade)
+        .Where(x => request.HrEmployeeIds.Contains(x.Id))
+        .OrderBy(x => x.EmployeeNumber)
+        .ToListAsync(cancellationToken);
+
+    if (hrEmployees.Count != request.HrEmployeeIds.Distinct().Count())
+    {
+        return BadRequest(new { Message = "One or more selected HR employees were not found for the current tenant." });
+    }
+
+    var existingPayrollEmployeeNumbers = await dbContext.PayrollEmployees
+        .AsNoTracking()
+        .Select(x => x.EmployeeNumber)
+        .ToListAsync(cancellationToken);
+
+    var existingNumbers = existingPayrollEmployeeNumbers.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    var existingHrLinks = await dbContext.PayrollEmployees
+        .AsNoTracking()
+        .Select(x => EF.Property<Guid?>(x, "HrEmployeeId"))
+        .Where(x => x.HasValue)
+        .Select(x => x!.Value)
+        .ToListAsync(cancellationToken);
+
+    var existingLinks = existingHrLinks.ToHashSet();
+    var created = new List<PayrollEmployee>();
+    var errors = new List<object>();
+
+    foreach (var hrEmployee in hrEmployees)
+    {
+        if (existingLinks.Contains(hrEmployee.Id))
+        {
+            errors.Add(new { HrEmployeeId = hrEmployee.Id, hrEmployee.EmployeeNumber, Message = "HR employee is already linked to a payroll employee." });
+            continue;
+        }
+
+        if (existingNumbers.Contains(hrEmployee.EmployeeNumber))
+        {
+            errors.Add(new { HrEmployeeId = hrEmployee.Id, hrEmployee.EmployeeNumber, Message = "A payroll employee already exists with the same employee number. Link the existing payroll employee instead." });
+            continue;
+        }
+
+        var department = MapHrDepartment(hrEmployee);
+        if (!IsEmployeeDepartmentAllowed(department, payrollScope))
+        {
+            errors.Add(new { HrEmployeeId = hrEmployee.Id, hrEmployee.EmployeeNumber, Department = department, Message = "You are not allowed to create a payroll employee in this department." });
+            continue;
+        }
+
+        var payrollEmployee = CreatePayrollEmployeeFromHr(tenantContext.TenantId, hrEmployee);
+        dbContext.PayrollEmployees.Add(payrollEmployee);
+
+        dbContext.Entry(payrollEmployee).Property<Guid?>("HrEmployeeId").CurrentValue = hrEmployee.Id;
+        dbContext.Entry(payrollEmployee).Property<DateTime?>("SyncedFromHrOnUtc").CurrentValue = DateTime.UtcNow;
+        dbContext.Entry(payrollEmployee).Property<string?>("HrSyncStatus").CurrentValue = "CreatedFromHr";
+
+        created.Add(payrollEmployee);
+    }
+
+    if (errors.Count > 0)
+    {
+        return BadRequest(new { Message = "One or more HR employees could not be converted to payroll employees.", ErrorCount = errors.Count, Errors = errors });
+    }
+
+    await dbContext.SaveChangesAsync(cancellationToken);
+
+    await auditTrailWriter.WriteAsync(
+        "payroll",
+        "PayrollEmployee",
+        "CreatedFromHr",
+        null,
+        "hr-payroll-bridge",
+        $"Created {created.Count} payroll employee profile(s) from HR.",
+        User.Identity?.Name,
+        tenantContext.TenantId,
+        new { Count = created.Count },
+        cancellationToken);
+
+    return Ok(new
+    {
+        Message = "Payroll employee profile(s) created from HR successfully.",
+        Count = created.Count,
+        Items = created.Select(x => new
+        {
+            x.Id,
+            x.EmployeeNumber,
+            x.FullName,
+            HrEmployeeId = dbContext.Entry(x).Property<Guid?>("HrEmployeeId").CurrentValue
+        }).ToList()
+    });
+}
+
+[Authorize(Policy = AuthorizationPolicies.PayrollManage)]
+[HttpPost("employees/{employeeId:guid}/link-hr/{hrEmployeeId:guid}")]
+public async Task<IActionResult> LinkPayrollEmployeeToHr(
+    [FromRoute] Guid employeeId,
+    [FromRoute] Guid hrEmployeeId,
+    [FromServices] ApplicationDbContext dbContext,
+    [FromServices] ITenantContextAccessor tenantContextAccessor,
+    [FromServices] IAuditTrailWriter auditTrailWriter,
+    CancellationToken cancellationToken)
+{
+    var tenantContext = tenantContextAccessor.Current;
+
+    if (!tenantContext.IsAvailable)
+    {
+        return BadRequest(new { Message = "Tenant context is required.", RequiredHeader = "X-Tenant-Key" });
+    }
+
+    var payrollEmployee = await dbContext.PayrollEmployees
+        .FirstOrDefaultAsync(x => x.Id == employeeId && x.TenantId == tenantContext.TenantId, cancellationToken);
+
+    if (payrollEmployee is null)
+    {
+        return NotFound(new { Message = "Payroll employee was not found.", EmployeeId = employeeId });
+    }
+
+    var hrEmployee = await dbContext.HrEmployees
+        .Include(x => x.Department)
+        .Include(x => x.Designation)
+        .Include(x => x.Grade)
+        .FirstOrDefaultAsync(x => x.Id == hrEmployeeId, cancellationToken);
+
+    if (hrEmployee is null)
+    {
+        return NotFound(new { Message = "HR employee was not found.", HrEmployeeId = hrEmployeeId });
+    }
+
+    var existingLink = await dbContext.PayrollEmployees
+        .AsNoTracking()
+        .AnyAsync(x => x.Id != employeeId && EF.Property<Guid?>(x, "HrEmployeeId") == hrEmployeeId, cancellationToken);
+
+    if (existingLink)
+    {
+        return Conflict(new { Message = "This HR employee is already linked to another payroll employee.", HrEmployeeId = hrEmployeeId });
+    }
+
+    var payrollScope = await GetPayrollScopeContextAsync(dbContext, tenantContext.TenantId, cancellationToken);
+    if (!IsEmployeeDepartmentAllowed(payrollEmployee.Department, payrollScope) || !IsEmployeeDepartmentAllowed(MapHrDepartment(hrEmployee), payrollScope))
+    {
+        return Forbid();
+    }
+
+    dbContext.Entry(payrollEmployee).Property<Guid?>("HrEmployeeId").CurrentValue = hrEmployee.Id;
+    dbContext.Entry(payrollEmployee).Property<DateTime?>("SyncedFromHrOnUtc").CurrentValue = DateTime.UtcNow;
+    dbContext.Entry(payrollEmployee).Property<string?>("HrSyncStatus").CurrentValue = "LinkedToHr";
+
+    await dbContext.SaveChangesAsync(cancellationToken);
+
+    await auditTrailWriter.WriteAsync(
+        "payroll",
+        "PayrollEmployee",
+        "LinkedToHr",
+        payrollEmployee.Id,
+        payrollEmployee.EmployeeNumber,
+        $"Payroll employee '{payrollEmployee.EmployeeNumber}' linked to HR employee '{hrEmployee.EmployeeNumber}'.",
+        User.Identity?.Name,
+        tenantContext.TenantId,
+        new { PayrollEmployeeId = payrollEmployee.Id, HrEmployeeId = hrEmployee.Id },
+        cancellationToken);
+
+    return Ok(new { Message = "Payroll employee linked to HR successfully.", payrollEmployee.Id, payrollEmployee.EmployeeNumber, HrEmployeeId = hrEmployee.Id });
+}
+
+
+[Authorize(Policy = AuthorizationPolicies.PayrollManage)]
+[HttpPost("employees/bulk-link-hr")]
+public async Task<IActionResult> BulkLinkPayrollEmployeesToHr(
+    [FromBody] BulkLinkPayrollEmployeesToHrRequest request,
+    [FromServices] ApplicationDbContext dbContext,
+    [FromServices] ITenantContextAccessor tenantContextAccessor,
+    [FromServices] IAuditTrailWriter auditTrailWriter,
+    CancellationToken cancellationToken)
+{
+    var tenantContext = tenantContextAccessor.Current;
+
+    if (!tenantContext.IsAvailable)
+    {
+        return BadRequest(new { Message = "Tenant context is required.", RequiredHeader = "X-Tenant-Key" });
+    }
+
+    if (request.PayrollEmployeeIds is null || request.PayrollEmployeeIds.Count == 0)
+    {
+        return BadRequest(new { Message = "At least one Payroll employee must be selected." });
+    }
+
+    if (request.HrEmployeeIds is null || request.HrEmployeeIds.Count == 0)
+    {
+        return BadRequest(new { Message = "At least one HR employee must be selected." });
+    }
+
+    var payrollEmployeeIds = request.PayrollEmployeeIds.Distinct().ToList();
+    var hrEmployeeIds = request.HrEmployeeIds.Distinct().ToList();
+
+    var payrollEmployees = await dbContext.PayrollEmployees
+        .Where(x => payrollEmployeeIds.Contains(x.Id) && x.TenantId == tenantContext.TenantId)
+        .OrderBy(x => x.EmployeeNumber)
+        .ToListAsync(cancellationToken);
+
+    var hrEmployees = await dbContext.HrEmployees
+        .Include(x => x.Department)
+        .Include(x => x.Designation)
+        .Include(x => x.Grade)
+        .Where(x => hrEmployeeIds.Contains(x.Id))
+        .OrderBy(x => x.EmployeeNumber)
+        .ToListAsync(cancellationToken);
+
+    if (payrollEmployees.Count != payrollEmployeeIds.Count)
+    {
+        return BadRequest(new { Message = "One or more selected Payroll employees were not found for the current tenant." });
+    }
+
+    if (hrEmployees.Count != hrEmployeeIds.Count)
+    {
+        return BadRequest(new { Message = "One or more selected HR employees were not found for the current tenant." });
+    }
+
+    var payrollScope = await GetPayrollScopeContextAsync(dbContext, tenantContext.TenantId, cancellationToken);
+    var existingHrLinks = await dbContext.PayrollEmployees
+        .AsNoTracking()
+        .Where(x => EF.Property<Guid?>(x, "HrEmployeeId").HasValue)
+        .Select(x => new
+        {
+            PayrollEmployeeId = x.Id,
+            HrEmployeeId = EF.Property<Guid?>(x, "HrEmployeeId")
+        })
+        .ToListAsync(cancellationToken);
+
+    var linkedHrEmployeeIds = existingHrLinks
+        .Where(x => x.HrEmployeeId.HasValue && !payrollEmployeeIds.Contains(x.PayrollEmployeeId))
+        .Select(x => x.HrEmployeeId!.Value)
+        .ToHashSet();
+
+    var hrByEmployeeNumber = hrEmployees
+        .GroupBy(x => x.EmployeeNumber, StringComparer.OrdinalIgnoreCase)
+        .ToDictionary(x => x.Key, x => x.ToList(), StringComparer.OrdinalIgnoreCase);
+
+    var linked = new List<object>();
+    var skipped = new List<object>();
+
+    foreach (var payrollEmployee in payrollEmployees)
+    {
+        var currentLink = dbContext.Entry(payrollEmployee).Property<Guid?>("HrEmployeeId").CurrentValue;
+
+        if (currentLink.HasValue)
+        {
+            skipped.Add(new
+            {
+                payrollEmployee.Id,
+                payrollEmployee.EmployeeNumber,
+                Reason = "Payroll employee is already linked to HR."
+            });
+            continue;
+        }
+
+        if (!hrByEmployeeNumber.TryGetValue(payrollEmployee.EmployeeNumber, out var matches) || matches.Count == 0)
+        {
+            skipped.Add(new
+            {
+                payrollEmployee.Id,
+                payrollEmployee.EmployeeNumber,
+                Reason = "No selected HR employee has the same employee number."
+            });
+            continue;
+        }
+
+        if (matches.Count > 1)
+        {
+            skipped.Add(new
+            {
+                payrollEmployee.Id,
+                payrollEmployee.EmployeeNumber,
+                Reason = "Multiple selected HR employees have the same employee number."
+            });
+            continue;
+        }
+
+        var hrEmployee = matches[0];
+
+        if (linkedHrEmployeeIds.Contains(hrEmployee.Id))
+        {
+            skipped.Add(new
+            {
+                payrollEmployee.Id,
+                payrollEmployee.EmployeeNumber,
+                HrEmployeeId = hrEmployee.Id,
+                Reason = "Matched HR employee is already linked to another Payroll employee."
+            });
+            continue;
+        }
+
+        if (!IsEmployeeDepartmentAllowed(payrollEmployee.Department, payrollScope) ||
+            !IsEmployeeDepartmentAllowed(MapHrDepartment(hrEmployee), payrollScope))
+        {
+            skipped.Add(new
+            {
+                payrollEmployee.Id,
+                payrollEmployee.EmployeeNumber,
+                HrEmployeeId = hrEmployee.Id,
+                Reason = "Payroll scope does not allow this employee department."
+            });
+            continue;
+        }
+
+        dbContext.Entry(payrollEmployee).Property<Guid?>("HrEmployeeId").CurrentValue = hrEmployee.Id;
+        dbContext.Entry(payrollEmployee).Property<DateTime?>("SyncedFromHrOnUtc").CurrentValue = DateTime.UtcNow;
+        dbContext.Entry(payrollEmployee).Property<string?>("HrSyncStatus").CurrentValue = "BulkLinkedToHr";
+
+        linkedHrEmployeeIds.Add(hrEmployee.Id);
+
+        linked.Add(new
+        {
+            PayrollEmployeeId = payrollEmployee.Id,
+            HrEmployeeId = hrEmployee.Id,
+            payrollEmployee.EmployeeNumber,
+            PayrollEmployeeName = payrollEmployee.FullName,
+            HrEmployeeName = hrEmployee.FullName
+        });
+    }
+
+    await dbContext.SaveChangesAsync(cancellationToken);
+
+    await auditTrailWriter.WriteAsync(
+        "payroll",
+        "PayrollEmployee",
+        "BulkLinkedToHr",
+        null,
+        "hr-payroll-bulk-link",
+        $"Bulk linked {linked.Count} payroll employee(s) to HR.",
+        User.Identity?.Name,
+        tenantContext.TenantId,
+        new { Linked = linked.Count, Skipped = skipped.Count },
+        cancellationToken);
+
+    return Ok(new
+    {
+        Message = $"Bulk HR link completed. Linked: {linked.Count}; Skipped: {skipped.Count}.",
+        LinkedCount = linked.Count,
+        SkippedCount = skipped.Count,
+        Linked = linked,
+        Skipped = skipped
+    });
+}
+
+[Authorize(Policy = AuthorizationPolicies.PayrollManage)]
+[HttpPost("employees/{employeeId:guid}/sync-from-hr")]
+public async Task<IActionResult> SyncPayrollEmployeeFromHr(
+    [FromRoute] Guid employeeId,
+    [FromServices] ApplicationDbContext dbContext,
+    [FromServices] ITenantContextAccessor tenantContextAccessor,
+    [FromServices] IAuditTrailWriter auditTrailWriter,
+    CancellationToken cancellationToken)
+{
+    var tenantContext = tenantContextAccessor.Current;
+
+    if (!tenantContext.IsAvailable)
+    {
+        return BadRequest(new { Message = "Tenant context is required.", RequiredHeader = "X-Tenant-Key" });
+    }
+
+    var payrollEmployee = await dbContext.PayrollEmployees
+        .FirstOrDefaultAsync(x => x.Id == employeeId && x.TenantId == tenantContext.TenantId, cancellationToken);
+
+    if (payrollEmployee is null)
+    {
+        return NotFound(new { Message = "Payroll employee was not found.", EmployeeId = employeeId });
+    }
+
+    var hrEmployeeId = dbContext.Entry(payrollEmployee).Property<Guid?>("HrEmployeeId").CurrentValue;
+
+    if (!hrEmployeeId.HasValue)
+    {
+        return BadRequest(new { Message = "Payroll employee is not linked to an HR employee.", EmployeeId = employeeId });
+    }
+
+    var hrEmployee = await dbContext.HrEmployees
+        .Include(x => x.Department)
+        .Include(x => x.Designation)
+        .Include(x => x.Grade)
+        .FirstOrDefaultAsync(x => x.Id == hrEmployeeId.Value, cancellationToken);
+
+    if (hrEmployee is null)
+    {
+        return NotFound(new { Message = "Linked HR employee was not found.", HrEmployeeId = hrEmployeeId.Value });
+    }
+
+    var payrollScope = await GetPayrollScopeContextAsync(dbContext, tenantContext.TenantId, cancellationToken);
+    if (!IsEmployeeDepartmentAllowed(payrollEmployee.Department, payrollScope) || !IsEmployeeDepartmentAllowed(MapHrDepartment(hrEmployee), payrollScope))
+    {
+        return Forbid();
+    }
+
+    ApplyHrDataToPayrollEmployee(payrollEmployee, hrEmployee);
+
+    dbContext.Entry(payrollEmployee).Property<DateTime?>("SyncedFromHrOnUtc").CurrentValue = DateTime.UtcNow;
+    dbContext.Entry(payrollEmployee).Property<string?>("HrSyncStatus").CurrentValue = "SyncedFromHr";
+
+    await dbContext.SaveChangesAsync(cancellationToken);
+
+    await auditTrailWriter.WriteAsync(
+        "payroll",
+        "PayrollEmployee",
+        "SyncedFromHr",
+        payrollEmployee.Id,
+        payrollEmployee.EmployeeNumber,
+        $"Payroll employee '{payrollEmployee.EmployeeNumber}' synced from HR.",
+        User.Identity?.Name,
+        tenantContext.TenantId,
+        new { PayrollEmployeeId = payrollEmployee.Id, HrEmployeeId = hrEmployee.Id },
+        cancellationToken);
+
+    return Ok(new { Message = "Payroll employee synced from HR successfully.", payrollEmployee.Id, payrollEmployee.EmployeeNumber, HrEmployeeId = hrEmployee.Id });
+}
+
+[Authorize(Policy = AuthorizationPolicies.PayrollManage)]
+[HttpPost("employees/sync-all-from-hr")]
+public async Task<IActionResult> SyncAllLinkedPayrollEmployeesFromHr(
+    [FromServices] ApplicationDbContext dbContext,
+    [FromServices] ITenantContextAccessor tenantContextAccessor,
+    [FromServices] IAuditTrailWriter auditTrailWriter,
+    CancellationToken cancellationToken)
+{
+    var tenantContext = tenantContextAccessor.Current;
+
+    if (!tenantContext.IsAvailable)
+    {
+        return BadRequest(new { Message = "Tenant context is required.", RequiredHeader = "X-Tenant-Key" });
+    }
+
+    var payrollEmployees = await dbContext.PayrollEmployees
+        .Where(x => EF.Property<Guid?>(x, "HrEmployeeId").HasValue)
+        .OrderBy(x => x.EmployeeNumber)
+        .ToListAsync(cancellationToken);
+
+    var hrEmployeeIds = payrollEmployees
+        .Select(x => dbContext.Entry(x).Property<Guid?>("HrEmployeeId").CurrentValue)
+        .Where(x => x.HasValue)
+        .Select(x => x!.Value)
+        .Distinct()
+        .ToList();
+
+    var hrEmployees = await dbContext.HrEmployees
+        .Include(x => x.Department)
+        .Include(x => x.Designation)
+        .Include(x => x.Grade)
+        .Where(x => hrEmployeeIds.Contains(x.Id))
+        .ToDictionaryAsync(x => x.Id, cancellationToken);
+
+    var payrollScope = await GetPayrollScopeContextAsync(dbContext, tenantContext.TenantId, cancellationToken);
+    var synced = 0;
+    var skipped = new List<object>();
+
+    foreach (var payrollEmployee in payrollEmployees)
+    {
+        var hrEmployeeId = dbContext.Entry(payrollEmployee).Property<Guid?>("HrEmployeeId").CurrentValue;
+
+        if (!hrEmployeeId.HasValue || !hrEmployees.TryGetValue(hrEmployeeId.Value, out var hrEmployee))
+        {
+            skipped.Add(new { payrollEmployee.Id, payrollEmployee.EmployeeNumber, Reason = "Linked HR employee was not found." });
+            continue;
+        }
+
+        if (!IsEmployeeDepartmentAllowed(payrollEmployee.Department, payrollScope) || !IsEmployeeDepartmentAllowed(MapHrDepartment(hrEmployee), payrollScope))
+        {
+            skipped.Add(new { payrollEmployee.Id, payrollEmployee.EmployeeNumber, Reason = "Payroll scope does not allow this employee department." });
+            continue;
+        }
+
+        ApplyHrDataToPayrollEmployee(payrollEmployee, hrEmployee);
+        dbContext.Entry(payrollEmployee).Property<DateTime?>("SyncedFromHrOnUtc").CurrentValue = DateTime.UtcNow;
+        dbContext.Entry(payrollEmployee).Property<string?>("HrSyncStatus").CurrentValue = "SyncedFromHr";
+        synced += 1;
+    }
+
+    await dbContext.SaveChangesAsync(cancellationToken);
+
+    await auditTrailWriter.WriteAsync(
+        "payroll",
+        "PayrollEmployee",
+        "SyncedAllFromHr",
+        null,
+        "hr-payroll-sync",
+        $"Synced {synced} linked payroll employee(s) from HR.",
+        User.Identity?.Name,
+        tenantContext.TenantId,
+        new { Synced = synced, Skipped = skipped.Count },
+        cancellationToken);
+
+    return Ok(new { Message = "Linked payroll employees synced from HR.", Synced = synced, Skipped = skipped });
 }
 
 [Authorize(Policy = AuthorizationPolicies.PayrollManage)]
@@ -3139,6 +3790,10 @@ public sealed record UpdatePayrollEmployeeRequest(
     bool IsActive,
     string? Notes);
 
+
+public sealed record CreatePayrollEmployeesFromHrRequest(IReadOnlyCollection<Guid> HrEmployeeIds);
+
+public sealed record BulkLinkPayrollEmployeesToHrRequest(IReadOnlyCollection<Guid> PayrollEmployeeIds, IReadOnlyCollection<Guid> HrEmployeeIds);
 
 public sealed record ImportPayrollEmployeesRequest(List<CreatePayrollEmployeeRequest> Items);
 
