@@ -2,6 +2,40 @@ namespace iBalance.Api.Security;
 
 public static class AuthorizationPolicies
 {
+
+    public const string OilGasView = "OilGasView";
+    public const string OilGasSetupManage = "OilGasSetupManage";
+    public const string OilGasAssetManage = "OilGasAssetManage";
+    public const string OilGasProductManage = "OilGasProductManage";
+    public const string OilGasTankManage = "OilGasTankManage";
+    public const string OilGasMeterManage = "OilGasMeterManage";
+    public const string OilGasPermitManage = "OilGasPermitManage";
+    public const string OilGasProductionCreate = "OilGasProductionCreate";
+    public const string OilGasProductionUpdate = "OilGasProductionUpdate";
+    public const string OilGasProductionSubmit = "OilGasProductionSubmit";
+    public const string OilGasProductionApprove = "OilGasProductionApprove";
+    public const string OilGasProductionReject = "OilGasProductionReject";
+    public const string OilGasReportsView = "OilGasReportsView";
+    public const string OilGasExport = "OilGasExport";
+    public const string OilGasMovementCreate = "OilGasMovementCreate";
+    public const string OilGasMovementUpdate = "OilGasMovementUpdate";
+    public const string OilGasMovementSubmit = "OilGasMovementSubmit";
+    public const string OilGasMovementApprove = "OilGasMovementApprove";
+    public const string OilGasMovementReject = "OilGasMovementReject";
+    public const string OilGasMovementPost = "OilGasMovementPost";
+    public const string OilGasLiftingManage = "OilGasLiftingManage";
+    public const string OilGasReconciliationManage = "OilGasReconciliationManage";
+    public const string OilGasLiftingApprove = "OilGasLiftingApprove";
+    public const string OilGasLiftingComplete = "OilGasLiftingComplete";
+    public const string OilGasAfeManage = "OilGasAfeManage";
+    public const string OilGasAfeApprove = "OilGasAfeApprove";
+    public const string OilGasPartnerManage = "OilGasPartnerManage";
+    public const string OilGasProductionClose = "OilGasProductionClose";
+    public const string OilGasProductionCloseApprove = "OilGasProductionCloseApprove";
+    public const string OilGasHseManage = "OilGasHseManage";
+    public const string OilGasEquipmentManage = "OilGasEquipmentManage";
+    public const string OilGasDocumentManage = "OilGasDocumentManage";
+
     public const string AdminAccess = "AdminAccess";
     public const string AdminUsersManage = "AdminUsersManage";
     public const string AdminRolesManage = "AdminRolesManage";

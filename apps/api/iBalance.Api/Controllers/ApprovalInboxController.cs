@@ -1,6 +1,7 @@
 using iBalance.Api.Security;
 using iBalance.BuildingBlocks.Application.Tenancy;
 using iBalance.BuildingBlocks.Infrastructure.Persistence;
+using iBalance.Modules.OilAndGas.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -124,6 +125,130 @@ public sealed class ApprovalInboxController : ControllerBase
                 null,
                 x.Description,
                 "Review journal entry in Finance / General Ledger.")));
+
+
+        var oilGasProductionEntries = await dbContext.OilGasProductionEntries
+            .AsNoTracking()
+            .Include(x => x.Asset)
+            .Include(x => x.Location)
+            .OrderByDescending(x => x.SubmittedOnUtc ?? x.CreatedOnUtc)
+            .Take(500)
+            .ToListAsync(cancellationToken);
+
+        items.AddRange(oilGasProductionEntries
+            .Where(x => x.Status is OilGasProductionStatus.Submitted or OilGasProductionStatus.Rejected)
+            .Where(x => ShouldInclude(x.Status.ToString(), normalizedState))
+            .Select(x => new ApprovalInboxItemDto(
+                x.Id,
+                "oilgas",
+                "Daily Production Entry",
+                x.EntryNumber,
+                x.Status.ToString(),
+                x.SubmittedOnUtc ?? x.RejectedOnUtc ?? x.CreatedOnUtc,
+                x.RejectionReason,
+                x.Status == OilGasProductionStatus.Rejected
+                    ? "/oil-gas/production/rejected"
+                    : "/oil-gas/production",
+                null,
+                null,
+                null,
+                $"{x.Asset?.Name ?? "Oil & Gas Asset"} / {x.Location?.Name ?? "Operational Location"}",
+                "Review the production entry in Oil & Gas Operations.")));
+
+        var oilGasStockMovements = await dbContext.OilGasStockMovements
+            .AsNoTracking()
+            .Include(x => x.Asset)
+            .Include(x => x.Product)
+            .OrderByDescending(x => x.SubmittedOnUtc ?? x.CreatedOnUtc)
+            .Take(500)
+            .ToListAsync(cancellationToken);
+
+        items.AddRange(oilGasStockMovements
+            .Where(x => x.Status is OilGasStockMovementStatus.Submitted or OilGasStockMovementStatus.Rejected)
+            .Where(x => ShouldInclude(x.Status.ToString(), normalizedState))
+            .Select(x => new ApprovalInboxItemDto(
+                x.Id, "oilgas", "Oil & Gas Stock Movement", x.MovementNumber, x.Status.ToString(),
+                x.SubmittedOnUtc ?? x.RejectedOnUtc ?? x.CreatedOnUtc, x.RejectionReason,
+                x.Status == OilGasStockMovementStatus.Rejected ? "/oil-gas/stock/rejected" : "/oil-gas/stock",
+                null, null, null,
+                $"{x.Asset?.Name ?? "Oil & Gas Asset"} / {x.Product?.Name ?? "Product"} / {x.Quantity:N4} {x.UnitOfMeasure}",
+                "Review the stock movement in Oil & Gas Stock Operations.")));
+
+
+        var upstreamLiftings = await dbContext.OilGasLiftings
+            .AsNoTracking()
+            .Include(x => x.Asset)
+            .Include(x => x.Product)
+            .OrderByDescending(x => x.SubmittedOnUtc ?? x.CreatedOnUtc)
+            .Take(500)
+            .ToListAsync(cancellationToken);
+
+        items.AddRange(upstreamLiftings
+            .Where(x => x.Status is OilGasLiftingStatus.Submitted or OilGasLiftingStatus.Rejected)
+            .Where(x => ShouldInclude(x.Status.ToString(), normalizedState))
+            .Select(x => new ApprovalInboxItemDto(
+                x.Id,
+                "oilgas",
+                "Upstream Lifting",
+                x.LiftingNumber,
+                x.Status.ToString(),
+                x.SubmittedOnUtc ?? x.RejectedOnUtc ?? x.CreatedOnUtc,
+                x.RejectionReason,
+                "/oil-gas/upstream/liftings",
+                null,
+                null,
+                null,
+                $"{x.Asset?.Name ?? "Oil & Gas Asset"} / {x.Product?.Name ?? "Product"} / {x.ActualLoadedQuantity:N4}",
+                "Review the lifting in Oil & Gas Upstream Operations.")));
+
+        var upstreamAfes = await dbContext.OilGasAfes
+            .AsNoTracking()
+            .Include(x => x.Asset)
+            .OrderByDescending(x => x.SubmittedOnUtc ?? x.CreatedOnUtc)
+            .Take(500)
+            .ToListAsync(cancellationToken);
+
+        items.AddRange(upstreamAfes
+            .Where(x => x.Status is OilGasAfeStatus.Submitted or OilGasAfeStatus.Rejected)
+            .Where(x => ShouldInclude(x.Status.ToString(), normalizedState))
+            .Select(x => new ApprovalInboxItemDto(
+                x.Id,
+                "oilgas",
+                "Authorisation for Expenditure",
+                x.AfeNumber,
+                x.Status.ToString(),
+                x.SubmittedOnUtc ?? x.RejectedOnUtc ?? x.CreatedOnUtc,
+                x.RejectionReason,
+                "/oil-gas/upstream/afe",
+                null,
+                null,
+                x.RevisedAmount > 0 ? x.RevisedAmount : x.ApprovedAmount,
+                $"{x.Asset?.Name ?? "Oil & Gas Asset"} / {x.Title}",
+                "Review the AFE in Oil & Gas Upstream Operations.")));
+
+        var productionPeriods = await dbContext.OilGasProductionPeriods
+            .AsNoTracking()
+            .OrderByDescending(x => x.SubmittedOnUtc ?? x.CreatedOnUtc)
+            .Take(500)
+            .ToListAsync(cancellationToken);
+
+        items.AddRange(productionPeriods
+            .Where(x => x.Status is OilGasProductionPeriodStatus.Submitted or OilGasProductionPeriodStatus.Rejected)
+            .Where(x => ShouldInclude(x.Status.ToString(), normalizedState))
+            .Select(x => new ApprovalInboxItemDto(
+                x.Id,
+                "oilgas",
+                "Monthly Production Close",
+                x.PeriodCode,
+                x.Status.ToString(),
+                x.SubmittedOnUtc ?? x.RejectedOnUtc ?? x.CreatedOnUtc,
+                x.RejectionReason,
+                "/oil-gas/upstream/production-close",
+                null,
+                null,
+                null,
+                $"{x.PeriodCode} / {x.StartDateUtc:MMM yyyy}",
+                "Review the monthly production close in Oil & Gas Upstream Operations.")));
 
         var ordered = items
             .OrderByDescending(x => x.RequestedOnUtc)

@@ -30,6 +30,7 @@ public sealed class PlatformTenantModuleActivationController : ControllerBase
         new("workingcapital", "Working Capital", 120),
         new("fleet", "Fleet Management", 95),
         new("billing", "Billing & Invoicing", 130),
+        new("oilgas", "Oil & Gas Operations", 140),
     ];
 
 
@@ -200,3 +201,4 @@ public sealed class PlatformTenantModuleActivationController : ControllerBase
     public sealed record SaveTenantModuleActivationItem(string ModuleCode, bool IsEnabled);
     private sealed record ModuleDefinition(string Code, string Name, int DisplayOrder);
 }
+

@@ -132,6 +132,29 @@ export type AppPermission =
   | 'billing.reports.view'
   | 'billing.export'
   | 'billing.price.manage'
+  | 'oilgas.view'
+  | 'oilgas.setup.manage'
+  | 'oilgas.asset.manage'
+  | 'oilgas.product.manage'
+  | 'oilgas.tank.manage'
+  | 'oilgas.meter.manage'
+  | 'oilgas.permit.manage'
+  | 'oilgas.production.create'
+  | 'oilgas.production.update'
+  | 'oilgas.production.correct'
+  | 'oilgas.production.submit'
+  | 'oilgas.production.approve'
+  | 'oilgas.production.reject'
+  | 'oilgas.reports.view'
+  | 'oilgas.export'
+  | 'oilgas.movement.create'
+  | 'oilgas.movement.update'
+  | 'oilgas.movement.submit'
+  | 'oilgas.movement.approve'
+  | 'oilgas.movement.reject'
+  | 'oilgas.movement.post'
+  | 'oilgas.lifting.manage'
+  | 'oilgas.reconciliation.manage'
   | 'fleet.view' 
   | 'fleet.vehicle.manage' 
   | 'fleet.driver.manage'
@@ -304,6 +327,29 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
     'fleet.policy.manage',
     'fleet.reports.view',
 
+    'oilgas.view',
+    'oilgas.setup.manage',
+    'oilgas.asset.manage',
+    'oilgas.product.manage',
+    'oilgas.tank.manage',
+    'oilgas.meter.manage',
+    'oilgas.permit.manage',
+    'oilgas.production.create',
+    'oilgas.production.update',
+    'oilgas.production.correct',
+    'oilgas.production.submit',
+    'oilgas.production.approve',
+    'oilgas.production.reject',
+    'oilgas.reports.view',
+    'oilgas.export',
+    'oilgas.movement.create',
+    'oilgas.movement.update',
+    'oilgas.movement.submit',
+    'oilgas.movement.approve',
+    'oilgas.movement.reject',
+    'oilgas.movement.post',
+    'oilgas.lifting.manage',
+    'oilgas.reconciliation.manage',
   ],
   TenantAdmin: [
     'approval.inbox.view',
@@ -437,6 +483,29 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
     'fleet.policy.manage',
     'fleet.reports.view',
 
+    'oilgas.view',
+    'oilgas.setup.manage',
+    'oilgas.asset.manage',
+    'oilgas.product.manage',
+    'oilgas.tank.manage',
+    'oilgas.meter.manage',
+    'oilgas.permit.manage',
+    'oilgas.production.create',
+    'oilgas.production.update',
+    'oilgas.production.correct',
+    'oilgas.production.submit',
+    'oilgas.production.approve',
+    'oilgas.production.reject',
+    'oilgas.reports.view',
+    'oilgas.export',
+    'oilgas.movement.create',
+    'oilgas.movement.update',
+    'oilgas.movement.submit',
+    'oilgas.movement.approve',
+    'oilgas.movement.reject',
+    'oilgas.movement.post',
+    'oilgas.lifting.manage',
+    'oilgas.reconciliation.manage',
   ],
   FinanceController: [
     'approval.inbox.view',
@@ -529,6 +598,8 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
     'billing.export',
     'billing.price.manage',
 
+    'oilgas.view',
+    'oilgas.reports.view',
   ],
   Accountant: [
     'approval.inbox.view',
@@ -877,6 +948,75 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
     'billing.export',
   ],
 
+  OilGasManager: [
+    'approval.inbox.view',
+    'oilgas.view',
+    'oilgas.setup.manage',
+    'oilgas.asset.manage',
+    'oilgas.product.manage',
+    'oilgas.tank.manage',
+    'oilgas.meter.manage',
+    'oilgas.permit.manage',
+    'oilgas.production.create',
+    'oilgas.production.update',
+    'oilgas.production.correct',
+    'oilgas.production.submit',
+    'oilgas.production.approve',
+    'oilgas.production.reject',
+    'oilgas.reports.view',
+    'oilgas.export',
+    'oilgas.movement.create',
+    'oilgas.movement.update',
+    'oilgas.movement.submit',
+    'oilgas.movement.approve',
+    'oilgas.movement.reject',
+    'oilgas.movement.post',
+    'oilgas.lifting.manage',
+    'oilgas.reconciliation.manage',
+    'workflow.approve',
+    'workflow.reject',
+    'reports.export',
+  ],
+  ProductionOfficer: [
+    'oilgas.view',
+    'oilgas.production.create',
+    'oilgas.production.update',
+    'oilgas.production.correct',
+    'oilgas.production.submit',
+    'oilgas.reports.view',
+  ],
+  ProductionApprover: [
+    'approval.inbox.view',
+    'oilgas.view',
+    'oilgas.production.approve',
+    'oilgas.production.reject',
+    'oilgas.reports.view',
+    'workflow.approve',
+    'workflow.reject',
+  ],
+  MeasurementOfficer: [
+    'oilgas.view',
+    'oilgas.tank.manage',
+    'oilgas.meter.manage',
+    'oilgas.production.create',
+    'oilgas.production.update',
+    'oilgas.production.submit',
+    'oilgas.reports.view',
+  ],
+  OilGasViewer: [
+    'oilgas.view',
+    'oilgas.reports.view',
+    'oilgas.export',
+    'oilgas.movement.create',
+    'oilgas.movement.update',
+    'oilgas.movement.submit',
+    'oilgas.movement.approve',
+    'oilgas.movement.reject',
+    'oilgas.movement.post',
+    'oilgas.lifting.manage',
+    'oilgas.reconciliation.manage',
+  ],
+
   FleetOfficer: [
     'fleet.view',
     'fleet.vehicle.manage',
@@ -959,6 +1099,11 @@ export function getAssignableRolesForRole(role: UserRole | null | undefined): Us
       'FleetApprover',
       'FleetReviewer',
       'FleetViewer',
+      'OilGasManager',
+      'ProductionOfficer',
+      'ProductionApprover',
+      'MeasurementOfficer',
+      'OilGasViewer',
     ];
   }
 
@@ -991,6 +1136,11 @@ export function getAssignableRolesForRole(role: UserRole | null | undefined): Us
       'FleetApprover',
       'FleetReviewer',
       'FleetViewer',
+      'OilGasManager',
+      'ProductionOfficer',
+      'ProductionApprover',
+      'MeasurementOfficer',
+      'OilGasViewer',
     ];
   }
 

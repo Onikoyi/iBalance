@@ -189,6 +189,40 @@ public static class ServiceCollectionExtensions
             AddPermissionPolicy(AuthorizationPolicies.BillingExport, "billing.export", "reports.export");
             AddPermissionPolicy(AuthorizationPolicies.BillingPriceManage, "billing.price.manage");
 
+
+            AddPermissionPolicy(AuthorizationPolicies.OilGasView, "oilgas.view");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasSetupManage, "oilgas.setup.manage");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasAssetManage, "oilgas.asset.manage");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasProductManage, "oilgas.product.manage");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasTankManage, "oilgas.tank.manage");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasMeterManage, "oilgas.meter.manage");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasPermitManage, "oilgas.permit.manage");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasProductionCreate, "oilgas.production.create");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasProductionUpdate, "oilgas.production.update", "oilgas.production.correct");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasProductionSubmit, "oilgas.production.submit");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasProductionApprove, "oilgas.production.approve", "workflow.approve");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasProductionReject, "oilgas.production.reject", "workflow.reject");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasReportsView, "oilgas.reports.view", "oilgas.view");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasExport, "oilgas.export", "reports.export");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasMovementCreate, "oilgas.movement.create");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasMovementUpdate, "oilgas.movement.update", "oilgas.movement.correct");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasMovementSubmit, "oilgas.movement.submit");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasMovementApprove, "oilgas.movement.approve", "workflow.approve");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasMovementReject, "oilgas.movement.reject", "workflow.reject");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasMovementPost, "oilgas.movement.post", "finance.transactions.post");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasLiftingManage, "oilgas.lifting.manage");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasReconciliationManage, "oilgas.reconciliation.manage", "oilgas.reports.view");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasLiftingApprove, "oilgas.lifting.approve", "workflow.approve");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasLiftingComplete, "oilgas.lifting.complete");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasAfeManage, "oilgas.afe.manage");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasAfeApprove, "oilgas.afe.approve", "workflow.approve");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasPartnerManage, "oilgas.partner.manage");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasProductionClose, "oilgas.production-close.manage");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasProductionCloseApprove, "oilgas.production-close.approve", "workflow.approve");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasHseManage, "oilgas.hse.manage");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasEquipmentManage, "oilgas.equipment.manage");
+            AddPermissionPolicy(AuthorizationPolicies.OilGasDocumentManage, "oilgas.document.manage");
+
             AddPermissionPolicy(AuthorizationPolicies.FleetView, "fleet.view");
             AddPermissionPolicy(AuthorizationPolicies.FleetVehicleManage, "fleet.vehicle.manage");
             AddPermissionPolicy(AuthorizationPolicies.FleetDriverManage, "fleet.driver.manage");

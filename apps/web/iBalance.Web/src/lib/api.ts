@@ -1,15 +1,15 @@
-import axios from 'axios';
+import axios from "axios";
 
-export const tenantStorageKey = 'ibalance.tenantKey';
-export const tenantLogoStorageKey = 'ibalance.tenantLogo';
-export const companyLogoStorageKey = 'ibalance.companyLogo';
+export const tenantStorageKey = "ibalance.tenantKey";
+export const tenantLogoStorageKey = "ibalance.tenantLogo";
+export const companyLogoStorageKey = "ibalance.companyLogo";
 
-const authStorageKey = 'ibalance.auth.session';
+const authStorageKey = "ibalance.auth.session";
 
 export function getTenantKey(): string {
   const stored = localStorage.getItem(tenantStorageKey);
   if (stored && stored.trim().length > 0) return stored;
-  return import.meta.env.VITE_DEFAULT_TENANT_KEY || 'demo-tenant';
+  return import.meta.env.VITE_DEFAULT_TENANT_KEY || "demo-tenant";
 }
 
 export function setTenantKey(value: string): void {
@@ -17,7 +17,7 @@ export function setTenantKey(value: string): void {
 }
 
 export function getTenantLogoDataUrl(): string {
-  return localStorage.getItem(tenantLogoStorageKey) || '';
+  return localStorage.getItem(tenantLogoStorageKey) || "";
 }
 
 export function setTenantLogoDataUrl(value: string): void {
@@ -25,7 +25,7 @@ export function setTenantLogoDataUrl(value: string): void {
 }
 
 export function getCompanyLogoDataUrl(): string {
-  return localStorage.getItem(companyLogoStorageKey) || '';
+  return localStorage.getItem(companyLogoStorageKey) || "";
 }
 
 export function setCompanyLogoDataUrl(value: string): void {
@@ -48,13 +48,13 @@ function getStoredAccessToken(): string | null {
 }
 
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5071',
-  headers: { 'Content-Type': 'application/json' },
+  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:5071",
+  headers: { "Content-Type": "application/json" },
 });
 
 api.interceptors.request.use((config) => {
   const tenantKey = getTenantKey();
-  if (tenantKey) config.headers['X-Tenant-Key'] = tenantKey;
+  if (tenantKey) config.headers["X-Tenant-Key"] = tenantKey;
 
   const accessToken = getStoredAccessToken();
   if (accessToken) {
@@ -77,9 +77,9 @@ export function getTenantReadableError(error: unknown, fallback: string) {
   const data: ApiErrorShape | undefined = anyErr?.response?.data;
 
   const msg =
-    (typeof data?.Message === 'string' && data.Message.trim()) ||
-    (typeof data?.message === 'string' && data.message.trim()) ||
-    (typeof anyErr?.message === 'string' && anyErr.message.trim());
+    (typeof data?.Message === "string" && data.Message.trim()) ||
+    (typeof data?.message === "string" && data.message.trim()) ||
+    (typeof anyErr?.message === "string" && anyErr.message.trim());
 
   if (msg) return msg;
   return fallback;
@@ -133,23 +133,28 @@ export type BudgetAwareApiResponse = {
   OverrunPolicy?: number | null;
 };
 
-function pickBudgetValue<T>(camelValue: T | undefined, pascalValue: T | undefined): T | undefined {
+function pickBudgetValue<T>(
+  camelValue: T | undefined,
+  pascalValue: T | undefined,
+): T | undefined {
   return camelValue ?? pascalValue;
 }
 
 export function formatBudgetAwareSuccessMessage(
   response: BudgetAwareApiResponse | undefined,
-  fallback: string
+  fallback: string,
 ) {
   const baseMessage =
-    (typeof response?.message === 'string' && response.message.trim()) ||
-    (typeof response?.Message === 'string' && response.Message.trim()) ||
+    (typeof response?.message === "string" && response.message.trim()) ||
+    (typeof response?.Message === "string" && response.Message.trim()) ||
     fallback;
 
   const budgetWarning =
-    (typeof response?.budgetWarning === 'string' && response.budgetWarning.trim()) ||
-    (typeof response?.BudgetWarning === 'string' && response.BudgetWarning.trim()) ||
-    '';
+    (typeof response?.budgetWarning === "string" &&
+      response.budgetWarning.trim()) ||
+    (typeof response?.BudgetWarning === "string" &&
+      response.BudgetWarning.trim()) ||
+    "";
 
   if (!budgetWarning) {
     return baseMessage;
@@ -168,38 +173,50 @@ export function getBudgetAwareReadableError(error: unknown, fallback: string) {
   const budgetName = pickBudgetValue(data?.budgetName, data?.BudgetName);
   const budgetAmount = pickBudgetValue(data?.budgetAmount, data?.BudgetAmount);
   const actualAmount = pickBudgetValue(data?.actualAmount, data?.ActualAmount);
-  const projectedAmount = pickBudgetValue(data?.projectedAmount, data?.ProjectedAmount);
-  const remainingAmount = pickBudgetValue(data?.remainingAmount, data?.RemainingAmount);
+  const projectedAmount = pickBudgetValue(
+    data?.projectedAmount,
+    data?.ProjectedAmount,
+  );
+  const remainingAmount = pickBudgetValue(
+    data?.remainingAmount,
+    data?.RemainingAmount,
+  );
 
   const detailParts: string[] = [];
 
   if (budgetNumber || budgetName) {
+    detailParts.push([budgetNumber, budgetName].filter(Boolean).join(" - "));
+  }
+
+  if (typeof budgetAmount === "number") {
     detailParts.push(
-      [budgetNumber, budgetName].filter(Boolean).join(' - ')
+      `Budget ${budgetAmount.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
     );
   }
 
-  if (typeof budgetAmount === 'number') {
-    detailParts.push(`Budget ${budgetAmount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+  if (typeof actualAmount === "number") {
+    detailParts.push(
+      `Actual ${actualAmount.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+    );
   }
 
-  if (typeof actualAmount === 'number') {
-    detailParts.push(`Actual ${actualAmount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+  if (typeof projectedAmount === "number") {
+    detailParts.push(
+      `Projected ${projectedAmount.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+    );
   }
 
-  if (typeof projectedAmount === 'number') {
-    detailParts.push(`Projected ${projectedAmount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
-  }
-
-  if (typeof remainingAmount === 'number') {
-    detailParts.push(`Remaining ${remainingAmount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+  if (typeof remainingAmount === "number") {
+    detailParts.push(
+      `Remaining ${remainingAmount.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+    );
   }
 
   if (detailParts.length === 0) {
     return message;
   }
 
-  return `${message} (${detailParts.join(' | ')})`;
+  return `${message} (${detailParts.join(" | ")})`;
 }
 
 export type CurrentTenantLicenseResponse = {
@@ -447,7 +464,6 @@ export type CreateBankReconciliationRequest = {
   notes?: string | null;
 };
 
-
 export type SetBankReconciliationLineReconciledStateRequest = {
   isReconciled: boolean;
   notes?: string | null;
@@ -684,7 +700,6 @@ export type IncomeStatementResponse = {
   expenses: ReportLineDto[];
 };
 
-
 export type CashFlowStatementLineDto = {
   id: string;
   journalEntryId: string;
@@ -902,7 +917,7 @@ export type PlatformAdminTenantSummaryDto = {
     daysRemaining?: number | null;
     renewalWarning: string;
   };
-    users: {
+  users: {
     total: number;
     active: number;
     inactive: number;
@@ -1020,7 +1035,7 @@ export type SalesInvoiceDto = {
   rejectedOnUtc?: string | null;
   rejectionReason?: string | null;
   receiptMatches?: PurchaseInvoiceReceiptMatchDto[];
-  };
+};
 
 export type SalesInvoicesResponse = {
   tenantContextAvailable: boolean;
@@ -1275,7 +1290,6 @@ export type RejectCustomerReceiptRequest = {
   reason: string;
 };
 
-
 export type RejectedCustomerReceiptDto = {
   id: string;
   customerId: string;
@@ -1327,7 +1341,6 @@ export type UpdateCustomerReceiptRequest = {
   description: string;
   amount: number;
 };
-
 
 export type VendorDto = {
   id: string;
@@ -1385,7 +1398,8 @@ export type PurchaseOrderReceiptMatchingDto = {
   availableAmount: number;
 };
 
-export type PurchaseOrderReceiptMatchingResponse = ListEnvelope<PurchaseOrderReceiptMatchingDto>;
+export type PurchaseOrderReceiptMatchingResponse =
+  ListEnvelope<PurchaseOrderReceiptMatchingDto>;
 
 export type PurchaseInvoiceDto = {
   id: string;
@@ -1414,7 +1428,7 @@ export type PurchaseInvoiceDto = {
   rejectedOnUtc?: string | null;
   rejectionReason?: string | null;
   receiptMatches?: PurchaseInvoiceReceiptMatchDto[];
-  };
+};
 
 export type PurchaseInvoicesResponse = {
   tenantContextAvailable: boolean;
@@ -1438,7 +1452,6 @@ export type PostPurchaseInvoiceRequest = {
   payableLedgerAccountId: string;
   expenseLedgerAccountId: string;
 };
-
 
 export type RejectedPurchaseInvoiceLineDto = {
   id: string;
@@ -1510,8 +1523,6 @@ export type UpdatePurchaseInvoiceRequest = {
   taxCodeIds?: string[];
   purchaseOrderReceiptIds?: string[];
 };
-
-
 
 export type VendorPaymentDto = {
   id: string;
@@ -1906,7 +1917,6 @@ export type ConsolidatedBudgetVsActualResponse = {
 
 export type UpdateJournalEntryRequest = CreateJournalEntryRequest;
 
-
 export type PayrollSalaryStructureOverrideDto = {
   id: string;
   tenantId: string;
@@ -1964,41 +1974,61 @@ export type UpdatePayrollSalaryStructureOverrideRequest = {
   notes?: string | null;
 };
 
-export async function getPayrollSalaryStructureOverrides(salaryStructureId: string) {
-  const response = await api.get<PayrollSalaryStructureOverridesResponse>(`/api/payroll/salary-structure-overrides/${salaryStructureId}`);
+export async function getPayrollSalaryStructureOverrides(
+  salaryStructureId: string,
+) {
+  const response = await api.get<PayrollSalaryStructureOverridesResponse>(
+    `/api/payroll/salary-structure-overrides/${salaryStructureId}`,
+  );
   return response.data;
 }
 
-export async function createPayrollSalaryStructureOverride(payload: CreatePayrollSalaryStructureOverrideRequest) {
-  const response = await api.post('/api/payroll/salary-structure-overrides', payload);
+export async function createPayrollSalaryStructureOverride(
+  payload: CreatePayrollSalaryStructureOverrideRequest,
+) {
+  const response = await api.post(
+    "/api/payroll/salary-structure-overrides",
+    payload,
+  );
   return response.data;
 }
 
-export async function updatePayrollSalaryStructureOverride(salaryStructureOverrideId: string, payload: UpdatePayrollSalaryStructureOverrideRequest) {
-  const response = await api.put(`/api/payroll/salary-structure-overrides/${salaryStructureOverrideId}`, payload);
+export async function updatePayrollSalaryStructureOverride(
+  salaryStructureOverrideId: string,
+  payload: UpdatePayrollSalaryStructureOverrideRequest,
+) {
+  const response = await api.put(
+    `/api/payroll/salary-structure-overrides/${salaryStructureOverrideId}`,
+    payload,
+  );
   return response.data;
 }
 
-export async function deletePayrollSalaryStructureOverride(salaryStructureOverrideId: string) {
-  const response = await api.delete(`/api/payroll/salary-structure-overrides/${salaryStructureOverrideId}`);
+export async function deletePayrollSalaryStructureOverride(
+  salaryStructureOverrideId: string,
+) {
+  const response = await api.delete(
+    `/api/payroll/salary-structure-overrides/${salaryStructureOverrideId}`,
+  );
   return response.data;
 }
-
 
 export async function updateJournalEntry(
   journalEntryId: string,
-  payload: UpdateJournalEntryRequest
+  payload: UpdateJournalEntryRequest,
 ) {
   const response = await api.put(
     `/api/finance/journal-entries/${encodeURIComponent(journalEntryId)}`,
-    payload
+    payload,
   );
 
   return response.data;
 }
 
 export async function getRejectedJournalEntries() {
-  const response = await api.get<ListEnvelope<JournalEntryDto>>('/api/finance/journal-entries');
+  const response = await api.get<ListEnvelope<JournalEntryDto>>(
+    "/api/finance/journal-entries",
+  );
 
   const items = response.data.items.filter((item) => item.status === 4);
 
@@ -2012,15 +2042,18 @@ export async function getRejectedJournalEntries() {
 export async function getConsolidatedBudgetVsActual(
   periodStartUtc: string,
   periodEndUtc: string,
-  budgetType?: BudgetType | null
+  budgetType?: BudgetType | null,
 ): Promise<ConsolidatedBudgetVsActualResponse> {
-  const response = await api.get('/api/finance/budgets/reports/budget-vs-actual-consolidated', {
-    params: {
-      periodStartUtc,
-      periodEndUtc,
-      budgetType: budgetType ?? undefined,
+  const response = await api.get(
+    "/api/finance/budgets/reports/budget-vs-actual-consolidated",
+    {
+      params: {
+        periodStartUtc,
+        periodEndUtc,
+        budgetType: budgetType ?? undefined,
+      },
     },
-  });
+  );
 
   return response.data;
 }
@@ -2032,7 +2065,7 @@ export async function getBudgets(): Promise<{
   count: number;
   items: BudgetDto[];
 }> {
-  const response = await api.get('/api/finance/budgets');
+  const response = await api.get("/api/finance/budgets");
   return response.data;
 }
 
@@ -2043,7 +2076,7 @@ export async function getRejectedBudgets(): Promise<{
   count: number;
   items: BudgetDetailDto[];
 }> {
-  const response = await api.get('/api/finance/budgets/rejected');
+  const response = await api.get("/api/finance/budgets/rejected");
   return response.data;
 }
 
@@ -2059,11 +2092,14 @@ export async function getBudgetDetail(budgetId: string): Promise<{
 }
 
 export async function createBudget(payload: CreateBudgetRequest) {
-  const response = await api.post('/api/finance/budgets', payload);
+  const response = await api.post("/api/finance/budgets", payload);
   return response.data;
 }
 
-export async function updateBudget(budgetId: string, payload: CreateBudgetRequest) {
+export async function updateBudget(
+  budgetId: string,
+  payload: CreateBudgetRequest,
+) {
   const response = await api.put(`/api/finance/budgets/${budgetId}`, payload);
   return response.data;
 }
@@ -2083,8 +2119,14 @@ export async function approveBudget(budgetId: string) {
   return response.data;
 }
 
-export async function rejectBudget(budgetId: string, payload: RejectBudgetRequest) {
-  const response = await api.post(`/api/finance/budgets/${budgetId}/reject`, payload);
+export async function rejectBudget(
+  budgetId: string,
+  payload: RejectBudgetRequest,
+) {
+  const response = await api.post(
+    `/api/finance/budgets/${budgetId}/reject`,
+    payload,
+  );
   return response.data;
 }
 
@@ -2093,50 +2135,67 @@ export async function lockBudget(budgetId: string) {
   return response.data;
 }
 
-export async function closeBudget(budgetId: string, payload: CloseBudgetRequest) {
-  const response = await api.post(`/api/finance/budgets/${budgetId}/close`, payload);
+export async function closeBudget(
+  budgetId: string,
+  payload: CloseBudgetRequest,
+) {
+  const response = await api.post(
+    `/api/finance/budgets/${budgetId}/close`,
+    payload,
+  );
   return response.data;
 }
 
 export async function setBudgetOverrunPolicy(
   budgetId: string,
-  payload: SetBudgetOverrunPolicyRequest
+  payload: SetBudgetOverrunPolicyRequest,
 ) {
-  const response = await api.post(`/api/finance/budgets/${budgetId}/overrun-policy`, payload);
+  const response = await api.post(
+    `/api/finance/budgets/${budgetId}/overrun-policy`,
+    payload,
+  );
   return response.data;
 }
 
 export async function transferBudgetAmount(
   budgetId: string,
-  payload: TransferBudgetRequest
+  payload: TransferBudgetRequest,
 ) {
-  const response = await api.post(`/api/finance/budgets/${budgetId}/transfers`, payload);
+  const response = await api.post(
+    `/api/finance/budgets/${budgetId}/transfers`,
+    payload,
+  );
   return response.data;
 }
 
 export async function uploadBudget(payload: UploadBudgetRequest) {
-  const response = await api.post('/api/finance/budgets/upload', payload);
+  const response = await api.post("/api/finance/budgets/upload", payload);
   return response.data;
 }
 
-export async function getBudgetVsActual(budgetId: string): Promise<BudgetVsActualResponse> {
-  const response = await api.get('/api/finance/budgets/reports/budget-vs-actual', {
-    params: { budgetId },
-  });
+export async function getBudgetVsActual(
+  budgetId: string,
+): Promise<BudgetVsActualResponse> {
+  const response = await api.get(
+    "/api/finance/budgets/reports/budget-vs-actual",
+    {
+      params: { budgetId },
+    },
+  );
   return response.data;
 }
 
 export async function downloadBudgetUploadTemplate() {
-  const response = await api.get('/api/finance/budgets/upload-template', {
-    responseType: 'blob',
+  const response = await api.get("/api/finance/budgets/upload-template", {
+    responseType: "blob",
   });
 
-  const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob([response.data], { type: "text/csv;charset=utf-8;" });
   const url = window.URL.createObjectURL(blob);
-  const link = document.createElement('a');
+  const link = document.createElement("a");
 
   link.href = url;
-  link.setAttribute('download', 'ibalance-budget-upload-template.csv');
+  link.setAttribute("download", "ibalance-budget-upload-template.csv");
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -2145,62 +2204,80 @@ export async function downloadBudgetUploadTemplate() {
 }
 
 export async function getVendors() {
-  const response = await api.get<VendorsResponse>('/api/finance/ap/vendors');
+  const response = await api.get<VendorsResponse>("/api/finance/ap/vendors");
   return response.data;
 }
 
 export async function createVendor(payload: CreateVendorRequest) {
-  const response = await api.post('/api/finance/ap/vendors', payload);
+  const response = await api.post("/api/finance/ap/vendors", payload);
   return response.data;
 }
 
 export async function getPurchaseInvoices() {
-  const response = await api.get<PurchaseInvoicesResponse>('/api/finance/ap/purchase-invoices');
-  return response.data;
-}
-
-export async function createPurchaseInvoice(payload: CreatePurchaseInvoiceRequest) {
-  const response = await api.post('/api/finance/ap/purchase-invoices', payload);
-  return response.data;
-}
-
-
-export async function getPurchaseOrderReceiptsForInvoiceMatching(vendorId?: string | null) {
-  const response = await api.get<PurchaseOrderReceiptMatchingResponse>('/api/finance/ap/purchase-order-receipts/matching', {
-    params: {
-      ...(vendorId ? { vendorId } : {}),
-    },
-  });
-  return response.data;
-}
-
-export async function submitPurchaseInvoiceForApproval(purchaseInvoiceId: string) {
-  const response = await api.post(`/api/finance/ap/purchase-invoices/${purchaseInvoiceId}/submit`);
-  return response.data;
-}
-
-export async function approvePurchaseInvoice(purchaseInvoiceId: string) {
-  const response = await api.post(`/api/finance/ap/purchase-invoices/${purchaseInvoiceId}/approve`);
-  return response.data;
-}
-
-export async function rejectPurchaseInvoice(purchaseInvoiceId: string, payload: { reason: string }) {
-  const response = await api.post(`/api/finance/ap/purchase-invoices/${purchaseInvoiceId}/reject`, payload);
-  return response.data;
-}
-
-
-export async function postPurchaseInvoice(
-  purchaseInvoiceId: string,
-  payload: PostPurchaseInvoiceRequest
-): Promise<BudgetAwareApiResponse> {
-  const response = await api.post(
-    `/api/finance/ap/purchase-invoices/${encodeURIComponent(purchaseInvoiceId)}/post`,
-    payload
+  const response = await api.get<PurchaseInvoicesResponse>(
+    "/api/finance/ap/purchase-invoices",
   );
   return response.data;
 }
 
+export async function createPurchaseInvoice(
+  payload: CreatePurchaseInvoiceRequest,
+) {
+  const response = await api.post("/api/finance/ap/purchase-invoices", payload);
+  return response.data;
+}
+
+export async function getPurchaseOrderReceiptsForInvoiceMatching(
+  vendorId?: string | null,
+) {
+  const response = await api.get<PurchaseOrderReceiptMatchingResponse>(
+    "/api/finance/ap/purchase-order-receipts/matching",
+    {
+      params: {
+        ...(vendorId ? { vendorId } : {}),
+      },
+    },
+  );
+  return response.data;
+}
+
+export async function submitPurchaseInvoiceForApproval(
+  purchaseInvoiceId: string,
+) {
+  const response = await api.post(
+    `/api/finance/ap/purchase-invoices/${purchaseInvoiceId}/submit`,
+  );
+  return response.data;
+}
+
+export async function approvePurchaseInvoice(purchaseInvoiceId: string) {
+  const response = await api.post(
+    `/api/finance/ap/purchase-invoices/${purchaseInvoiceId}/approve`,
+  );
+  return response.data;
+}
+
+export async function rejectPurchaseInvoice(
+  purchaseInvoiceId: string,
+  payload: { reason: string },
+) {
+  const response = await api.post(
+    `/api/finance/ap/purchase-invoices/${purchaseInvoiceId}/reject`,
+    payload,
+  );
+  return response.data;
+}
+
+export async function postPurchaseInvoice(
+  purchaseInvoiceId: string,
+  payload: PostPurchaseInvoiceRequest,
+): Promise<BudgetAwareApiResponse> {
+  const response = await api.post(
+    `/api/finance/ap/purchase-invoices/${encodeURIComponent(purchaseInvoiceId)}/post`,
+    payload,
+  );
+  return response.data;
+}
 
 export async function getRejectedPurchaseInvoices(): Promise<{
   tenantContextAvailable: boolean;
@@ -2209,31 +2286,38 @@ export async function getRejectedPurchaseInvoices(): Promise<{
   count: number;
   items: RejectedPurchaseInvoiceDto[];
 }> {
-  const response = await api.get('/api/finance/ap/purchase-invoices/rejected');
+  const response = await api.get("/api/finance/ap/purchase-invoices/rejected");
   return response.data;
 }
 
 export async function updateRejectedPurchaseInvoice(
   purchaseInvoiceId: string,
-  payload: UpdatePurchaseInvoiceRequest
+  payload: UpdatePurchaseInvoiceRequest,
 ) {
-  const response = await api.put(`/api/finance/ap/purchase-invoices/${purchaseInvoiceId}`, payload);
+  const response = await api.put(
+    `/api/finance/ap/purchase-invoices/${purchaseInvoiceId}`,
+    payload,
+  );
   return response.data;
 }
 
 export async function deleteRejectedPurchaseInvoice(purchaseInvoiceId: string) {
-  const response = await api.delete(`/api/finance/ap/purchase-invoices/${purchaseInvoiceId}`);
+  const response = await api.delete(
+    `/api/finance/ap/purchase-invoices/${purchaseInvoiceId}`,
+  );
   return response.data;
 }
 
 export async function getVendorPayments() {
-  const response = await api.get<VendorPaymentsResponse>('/api/finance/ap/vendor-payments');
+  const response = await api.get<VendorPaymentsResponse>(
+    "/api/finance/ap/vendor-payments",
+  );
   return response.data;
 }
 
 export async function getVendorPaymentDetail(vendorPaymentId: string) {
   const response = await api.get<VendorPaymentDetailResponse>(
-    `/api/finance/ap/vendor-payments/${encodeURIComponent(vendorPaymentId)}`
+    `/api/finance/ap/vendor-payments/${encodeURIComponent(vendorPaymentId)}`,
   );
   return response.data;
 }
@@ -2241,7 +2325,7 @@ export async function getVendorPaymentDetail(vendorPaymentId: string) {
 export async function getVendorStatement(
   vendorId: string,
   fromUtc?: string | null,
-  toUtc?: string | null
+  toUtc?: string | null,
 ) {
   const response = await api.get<VendorStatementResponse>(
     `/api/finance/ap/vendors/${encodeURIComponent(vendorId)}/statement`,
@@ -2250,21 +2334,21 @@ export async function getVendorStatement(
         ...(fromUtc ? { fromUtc } : {}),
         ...(toUtc ? { toUtc } : {}),
       },
-    }
+    },
   );
 
   return response.data;
 }
 
 export async function createVendorPayment(payload: CreateVendorPaymentRequest) {
-  const response = await api.post('/api/finance/ap/vendor-payments', payload);
+  const response = await api.post("/api/finance/ap/vendor-payments", payload);
   return response.data;
 }
 
 export async function submitVendorPaymentForApproval(vendorPaymentId: string) {
   const response = await api.post(
     `/api/finance/ap/vendor-payments/${encodeURIComponent(vendorPaymentId)}/submit`,
-    {}
+    {},
   );
   return response.data;
 }
@@ -2272,19 +2356,21 @@ export async function submitVendorPaymentForApproval(vendorPaymentId: string) {
 export async function approveVendorPayment(vendorPaymentId: string) {
   const response = await api.post(
     `/api/finance/ap/vendor-payments/${encodeURIComponent(vendorPaymentId)}/approve`,
-    {}
+    {},
   );
   return response.data;
 }
 
-export async function rejectVendorPayment(vendorPaymentId: string, payload: RejectVendorPaymentRequest) {
+export async function rejectVendorPayment(
+  vendorPaymentId: string,
+  payload: RejectVendorPaymentRequest,
+) {
   const response = await api.post(
     `/api/finance/ap/vendor-payments/${encodeURIComponent(vendorPaymentId)}/reject`,
-    payload
+    payload,
   );
   return response.data;
 }
-
 
 export async function getRejectedVendorPayments(): Promise<{
   tenantContextAvailable: boolean;
@@ -2293,41 +2379,52 @@ export async function getRejectedVendorPayments(): Promise<{
   count: number;
   items: RejectedVendorPaymentDto[];
 }> {
-  const response = await api.get('/api/finance/ap/vendor-payments/rejected');
+  const response = await api.get("/api/finance/ap/vendor-payments/rejected");
   return response.data;
 }
 
 export async function updateRejectedVendorPayment(
   vendorPaymentId: string,
-  payload: UpdateVendorPaymentRequest
+  payload: UpdateVendorPaymentRequest,
 ) {
-  const response = await api.put(`/api/finance/ap/vendor-payments/${vendorPaymentId}`, payload);
+  const response = await api.put(
+    `/api/finance/ap/vendor-payments/${vendorPaymentId}`,
+    payload,
+  );
   return response.data;
 }
 
 export async function deleteRejectedVendorPayment(vendorPaymentId: string) {
-  const response = await api.delete(`/api/finance/ap/vendor-payments/${vendorPaymentId}`);
+  const response = await api.delete(
+    `/api/finance/ap/vendor-payments/${vendorPaymentId}`,
+  );
   return response.data;
 }
 
 export async function postVendorPayment(
   vendorPaymentId: string,
-  payload: PostVendorPaymentRequest
+  payload: PostVendorPaymentRequest,
 ): Promise<BudgetAwareApiResponse> {
   const response = await api.post(
     `/api/finance/ap/vendor-payments/${encodeURIComponent(vendorPaymentId)}/post`,
-    payload
+    payload,
   );
   return response.data;
 }
 
-export async function getTrialBalance(fromUtc?: string | null, toUtc?: string | null) {
-  const response = await api.get<TrialBalanceResponse>('/api/finance/trial-balance', {
-    params: {
-      ...(fromUtc ? { fromUtc } : {}),
-      ...(toUtc ? { toUtc } : {}),
+export async function getTrialBalance(
+  fromUtc?: string | null,
+  toUtc?: string | null,
+) {
+  const response = await api.get<TrialBalanceResponse>(
+    "/api/finance/trial-balance",
+    {
+      params: {
+        ...(fromUtc ? { fromUtc } : {}),
+        ...(toUtc ? { toUtc } : {}),
+      },
     },
-  });
+  );
 
   return response.data;
 }
@@ -2335,17 +2432,25 @@ export async function getTrialBalance(fromUtc?: string | null, toUtc?: string | 
 // ----------- COMMERCIAL -----------
 
 export async function getPublicSubscriptionPackages() {
-  const response = await api.get<{ count: number; items: SubscriptionPackageDto[] }>('/api/commercial/subscription-packages');
+  const response = await api.get<{
+    count: number;
+    items: SubscriptionPackageDto[];
+  }>("/api/commercial/subscription-packages");
   return response.data;
 }
 
 export async function getAdminSubscriptionPackages() {
-  const response = await api.get<{ count: number; items: SubscriptionPackageDto[] }>('/api/commercial/admin/subscription-packages');
+  const response = await api.get<{
+    count: number;
+    items: SubscriptionPackageDto[];
+  }>("/api/commercial/admin/subscription-packages");
   return response.data;
 }
 
 export async function getCurrentTenantLicense() {
-  const response = await api.get<CurrentTenantLicenseResponse>('/api/commercial/current-license');
+  const response = await api.get<CurrentTenantLicenseResponse>(
+    "/api/commercial/current-license",
+  );
   return response.data;
 }
 
@@ -2360,28 +2465,46 @@ export type UpsertSubscriptionPackageRequest = {
   isPublic: boolean;
 };
 
-export async function createSubscriptionPackage(payload: UpsertSubscriptionPackageRequest) {
-  const response = await api.post('/api/commercial/admin/subscription-packages', payload);
+export async function createSubscriptionPackage(
+  payload: UpsertSubscriptionPackageRequest,
+) {
+  const response = await api.post(
+    "/api/commercial/admin/subscription-packages",
+    payload,
+  );
   return response.data;
 }
 
-export async function updateSubscriptionPackage(packageId: string, payload: UpsertSubscriptionPackageRequest) {
-  const response = await api.put(`/api/commercial/admin/subscription-packages/${encodeURIComponent(packageId)}`, payload);
+export async function updateSubscriptionPackage(
+  packageId: string,
+  payload: UpsertSubscriptionPackageRequest,
+) {
+  const response = await api.put(
+    `/api/commercial/admin/subscription-packages/${encodeURIComponent(packageId)}`,
+    payload,
+  );
   return response.data;
 }
 
 export async function getPublicBillingSettings() {
-  const response = await api.get<BillingSettingsDto>('/api/commercial/billing-settings');
+  const response = await api.get<BillingSettingsDto>(
+    "/api/commercial/billing-settings",
+  );
   return response.data;
 }
 
 export async function getAdminBillingSettings() {
-  const response = await api.get<BillingSettingsDto>('/api/commercial/admin/billing-settings');
+  const response = await api.get<BillingSettingsDto>(
+    "/api/commercial/admin/billing-settings",
+  );
   return response.data;
 }
 
 export async function saveBillingSettings(payload: BillingSettingsDto) {
-  const response = await api.put('/api/commercial/admin/billing-settings', payload);
+  const response = await api.put(
+    "/api/commercial/admin/billing-settings",
+    payload,
+  );
   return response.data;
 }
 
@@ -2395,28 +2518,42 @@ export type CreateTenantSubscriptionApplicationRequest = {
   subscriptionPackageId: string;
 };
 
-export async function createTenantSubscriptionApplication(payload: CreateTenantSubscriptionApplicationRequest) {
-  const response = await api.post<SubscriptionApplicationCreateResponse>('/api/commercial/applications', payload);
-  return response.data;
-}
-
-export async function getSubscriptionApplications() {
-  const response = await api.get<{ count: number; items: TenantSubscriptionApplicationDto[] }>('/api/commercial/admin/applications');
-  return response.data;
-}
-
-export async function confirmSubscriptionApplicationPayment(applicationId: string, note?: string) {
-  const response = await api.post(
-    `/api/commercial/admin/applications/${encodeURIComponent(applicationId)}/confirm-payment`,
-    { note: note || '' }
+export async function createTenantSubscriptionApplication(
+  payload: CreateTenantSubscriptionApplicationRequest,
+) {
+  const response = await api.post<SubscriptionApplicationCreateResponse>(
+    "/api/commercial/applications",
+    payload,
   );
   return response.data;
 }
 
-export async function rejectSubscriptionApplication(applicationId: string, reason: string) {
+export async function getSubscriptionApplications() {
+  const response = await api.get<{
+    count: number;
+    items: TenantSubscriptionApplicationDto[];
+  }>("/api/commercial/admin/applications");
+  return response.data;
+}
+
+export async function confirmSubscriptionApplicationPayment(
+  applicationId: string,
+  note?: string,
+) {
+  const response = await api.post(
+    `/api/commercial/admin/applications/${encodeURIComponent(applicationId)}/confirm-payment`,
+    { note: note || "" },
+  );
+  return response.data;
+}
+
+export async function rejectSubscriptionApplication(
+  applicationId: string,
+  reason: string,
+) {
   const response = await api.post(
     `/api/commercial/admin/applications/${encodeURIComponent(applicationId)}/reject`,
-    { reason }
+    { reason },
   );
   return response.data;
 }
@@ -2424,37 +2561,54 @@ export async function rejectSubscriptionApplication(applicationId: string, reaso
 // ----------- ADMIN USERS -----------
 
 export async function getAdminUsers() {
-  const response = await api.get<AdminUsersResponse>('/api/admin/users');
+  const response = await api.get<AdminUsersResponse>("/api/admin/users");
   return response.data;
 }
 
 export async function getAdminAssignableRoles() {
-  const response = await api.get<AssignableRolesResponse>('/api/admin/users/roles');
+  const response = await api.get<AssignableRolesResponse>(
+    "/api/admin/users/roles",
+  );
   return response.data;
 }
 
 export async function createAdminUser(payload: CreateAdminUserRequest) {
-  const response = await api.post('/api/admin/users', payload);
+  const response = await api.post("/api/admin/users", payload);
   return response.data;
 }
 
-export async function updateAdminUser(userId: string, payload: UpdateAdminUserRequest) {
-  const response = await api.put(`/api/admin/users/${encodeURIComponent(userId)}`, payload);
+export async function updateAdminUser(
+  userId: string,
+  payload: UpdateAdminUserRequest,
+) {
+  const response = await api.put(
+    `/api/admin/users/${encodeURIComponent(userId)}`,
+    payload,
+  );
   return response.data;
 }
 
 export async function activateAdminUser(userId: string) {
-  const response = await api.post(`/api/admin/users/${encodeURIComponent(userId)}/activate`, {});
+  const response = await api.post(
+    `/api/admin/users/${encodeURIComponent(userId)}/activate`,
+    {},
+  );
   return response.data;
 }
 
 export async function deactivateAdminUser(userId: string) {
-  const response = await api.post(`/api/admin/users/${encodeURIComponent(userId)}/deactivate`, {});
+  const response = await api.post(
+    `/api/admin/users/${encodeURIComponent(userId)}/deactivate`,
+    {},
+  );
   return response.data;
 }
 
 export async function issueAdminUserPasswordReset(userId: string) {
-  const response = await api.post(`/api/admin/users/${encodeURIComponent(userId)}/issue-password-reset`, {});
+  const response = await api.post(
+    `/api/admin/users/${encodeURIComponent(userId)}/issue-password-reset`,
+    {},
+  );
   return response.data as {
     message: string;
     userId: string;
@@ -2466,36 +2620,46 @@ export async function issueAdminUserPasswordReset(userId: string) {
 // ----------- ADMIN TENANT OVERVIEW -----------
 
 export async function getAdminTenantOverview() {
-  const response = await api.get<TenantOverviewResponse>('/api/admin/tenant-overview');
+  const response = await api.get<TenantOverviewResponse>(
+    "/api/admin/tenant-overview",
+  );
   return response.data;
 }
 
 // ----------- PLATFORM ADMIN TENANTS -----------
 
 export async function getPlatformAdminTenants() {
-  const response = await api.get<PlatformAdminTenantsResponse>('/api/admin/platform/tenants');
+  const response = await api.get<PlatformAdminTenantsResponse>(
+    "/api/admin/platform/tenants",
+  );
   return response.data;
 }
 
 export async function getPlatformAdminTenantDetail(tenantId: string) {
   const response = await api.get<PlatformAdminTenantDetailResponse>(
-    `/api/admin/platform/tenants/${encodeURIComponent(tenantId)}`
+    `/api/admin/platform/tenants/${encodeURIComponent(tenantId)}`,
   );
   return response.data;
 }
 
-export async function renewPlatformTenantLicense(tenantId: string, payload: RenewTenantLicenseRequest) {
+export async function renewPlatformTenantLicense(
+  tenantId: string,
+  payload: RenewTenantLicenseRequest,
+) {
   const response = await api.post(
     `/api/admin/platform/tenants/${encodeURIComponent(tenantId)}/renew-license`,
-    payload
+    payload,
   );
   return response.data;
 }
 
-export async function changePlatformTenantPackage(tenantId: string, payload: ChangeTenantPackageRequest) {
+export async function changePlatformTenantPackage(
+  tenantId: string,
+  payload: ChangeTenantPackageRequest,
+) {
   const response = await api.post(
     `/api/admin/platform/tenants/${encodeURIComponent(tenantId)}/change-package`,
-    payload
+    payload,
   );
   return response.data;
 }
@@ -2503,7 +2667,7 @@ export async function changePlatformTenantPackage(tenantId: string, payload: Cha
 export async function suspendPlatformTenant(tenantId: string) {
   const response = await api.post(
     `/api/admin/platform/tenants/${encodeURIComponent(tenantId)}/suspend`,
-    {}
+    {},
   );
   return response.data;
 }
@@ -2511,7 +2675,7 @@ export async function suspendPlatformTenant(tenantId: string) {
 export async function reactivatePlatformTenant(tenantId: string) {
   const response = await api.post(
     `/api/admin/platform/tenants/${encodeURIComponent(tenantId)}/reactivate`,
-    {}
+    {},
   );
   return response.data;
 }
@@ -2519,48 +2683,62 @@ export async function reactivatePlatformTenant(tenantId: string) {
 // ----------- ACCOUNTS RECEIVABLE -----------
 
 export async function getCustomers() {
-  const response = await api.get<CustomersResponse>('/api/finance/ar/customers');
+  const response = await api.get<CustomersResponse>(
+    "/api/finance/ar/customers",
+  );
   return response.data;
 }
 
 export async function createCustomer(payload: CreateCustomerRequest) {
-  const response = await api.post('/api/finance/ar/customers', payload);
+  const response = await api.post("/api/finance/ar/customers", payload);
   return response.data;
 }
 
 export async function getSalesInvoices() {
-  const response = await api.get<SalesInvoicesResponse>('/api/finance/ar/sales-invoices');
+  const response = await api.get<SalesInvoicesResponse>(
+    "/api/finance/ar/sales-invoices",
+  );
   return response.data;
 }
 
 export async function createSalesInvoice(payload: CreateSalesInvoiceRequest) {
-  const response = await api.post('/api/finance/ar/sales-invoices', payload);
+  const response = await api.post("/api/finance/ar/sales-invoices", payload);
   return response.data;
 }
 
 export async function postSalesInvoice(
   salesInvoiceId: string,
-  payload: PostSalesInvoiceRequest
+  payload: PostSalesInvoiceRequest,
 ): Promise<BudgetAwareApiResponse> {
   const response = await api.post(
     `/api/finance/ar/sales-invoices/${encodeURIComponent(salesInvoiceId)}/post`,
-    payload
+    payload,
   );
   return response.data;
 }
 
 export async function submitSalesInvoiceForApproval(salesInvoiceId: string) {
-  const response = await api.post(`/api/finance/ar/sales-invoices/${salesInvoiceId}/submit`);
+  const response = await api.post(
+    `/api/finance/ar/sales-invoices/${salesInvoiceId}/submit`,
+  );
   return response.data;
 }
 
 export async function approveSalesInvoice(salesInvoiceId: string) {
-  const response = await api.post(`/api/finance/ar/sales-invoices/${salesInvoiceId}/approve`);
+  const response = await api.post(
+    `/api/finance/ar/sales-invoices/${salesInvoiceId}/approve`,
+  );
   return response.data;
 }
 
-export async function rejectSalesInvoice(salesInvoiceId: string, payload: { reason: string }) {
-  const response = await api.post(`/api/finance/ar/sales-invoices/${salesInvoiceId}/reject`, payload);
+export async function rejectSalesInvoice(
+  salesInvoiceId: string,
+  payload: { reason: string },
+) {
+  const response = await api.post(
+    `/api/finance/ar/sales-invoices/${salesInvoiceId}/reject`,
+    payload,
+  );
   return response.data;
 }
 
@@ -2571,20 +2749,25 @@ export async function getRejectedSalesInvoices(): Promise<{
   count: number;
   items: RejectedSalesInvoiceDto[];
 }> {
-  const response = await api.get('/api/finance/ar/sales-invoices/rejected');
+  const response = await api.get("/api/finance/ar/sales-invoices/rejected");
   return response.data;
 }
 
 export async function updateRejectedSalesInvoice(
   salesInvoiceId: string,
-  payload: UpdateSalesInvoiceRequest
+  payload: UpdateSalesInvoiceRequest,
 ) {
-  const response = await api.put(`/api/finance/ar/sales-invoices/${salesInvoiceId}`, payload);
+  const response = await api.put(
+    `/api/finance/ar/sales-invoices/${salesInvoiceId}`,
+    payload,
+  );
   return response.data;
 }
 
 export async function deleteRejectedSalesInvoice(salesInvoiceId: string) {
-  const response = await api.delete(`/api/finance/ar/sales-invoices/${salesInvoiceId}`);
+  const response = await api.delete(
+    `/api/finance/ar/sales-invoices/${salesInvoiceId}`,
+  );
   return response.data;
 }
 
@@ -2595,44 +2778,55 @@ export async function getRejectedCustomerReceipts(): Promise<{
   count: number;
   items: RejectedCustomerReceiptDto[];
 }> {
-  const response = await api.get('/api/finance/ar/customer-receipts/rejected');
+  const response = await api.get("/api/finance/ar/customer-receipts/rejected");
   return response.data;
 }
 
 export async function updateRejectedCustomerReceipt(
   customerReceiptId: string,
-  payload: UpdateCustomerReceiptRequest
+  payload: UpdateCustomerReceiptRequest,
 ) {
-  const response = await api.put(`/api/finance/ar/customer-receipts/${customerReceiptId}`, payload);
+  const response = await api.put(
+    `/api/finance/ar/customer-receipts/${customerReceiptId}`,
+    payload,
+  );
   return response.data;
 }
 
 export async function deleteRejectedCustomerReceipt(customerReceiptId: string) {
-  const response = await api.delete(`/api/finance/ar/customer-receipts/${customerReceiptId}`);
+  const response = await api.delete(
+    `/api/finance/ar/customer-receipts/${customerReceiptId}`,
+  );
   return response.data;
 }
 
 export async function getCustomerReceipts() {
-  const response = await api.get<CustomerReceiptsResponse>('/api/finance/ar/customer-receipts');
+  const response = await api.get<CustomerReceiptsResponse>(
+    "/api/finance/ar/customer-receipts",
+  );
   return response.data;
 }
 
 export async function getCustomerReceiptDetail(customerReceiptId: string) {
   const response = await api.get<CustomerReceiptDetailResponse>(
-    `/api/finance/ar/customer-receipts/${encodeURIComponent(customerReceiptId)}`
+    `/api/finance/ar/customer-receipts/${encodeURIComponent(customerReceiptId)}`,
   );
   return response.data;
 }
 
-export async function createCustomerReceipt(payload: CreateCustomerReceiptRequest) {
-  const response = await api.post('/api/finance/ar/customer-receipts', payload);
+export async function createCustomerReceipt(
+  payload: CreateCustomerReceiptRequest,
+) {
+  const response = await api.post("/api/finance/ar/customer-receipts", payload);
   return response.data;
 }
 
-export async function submitCustomerReceiptForApproval(customerReceiptId: string) {
+export async function submitCustomerReceiptForApproval(
+  customerReceiptId: string,
+) {
   const response = await api.post(
     `/api/finance/ar/customer-receipts/${encodeURIComponent(customerReceiptId)}/submit`,
-    {}
+    {},
   );
   return response.data;
 }
@@ -2640,26 +2834,29 @@ export async function submitCustomerReceiptForApproval(customerReceiptId: string
 export async function approveCustomerReceipt(customerReceiptId: string) {
   const response = await api.post(
     `/api/finance/ar/customer-receipts/${encodeURIComponent(customerReceiptId)}/approve`,
-    {}
+    {},
   );
   return response.data;
 }
 
-export async function rejectCustomerReceipt(customerReceiptId: string, payload: RejectCustomerReceiptRequest) {
+export async function rejectCustomerReceipt(
+  customerReceiptId: string,
+  payload: RejectCustomerReceiptRequest,
+) {
   const response = await api.post(
     `/api/finance/ar/customer-receipts/${encodeURIComponent(customerReceiptId)}/reject`,
-    payload
+    payload,
   );
   return response.data;
 }
 
 export async function postCustomerReceipt(
   customerReceiptId: string,
-  payload: PostCustomerReceiptRequest
+  payload: PostCustomerReceiptRequest,
 ): Promise<BudgetAwareApiResponse> {
   const response = await api.post(
     `/api/finance/ar/customer-receipts/${encodeURIComponent(customerReceiptId)}/post`,
-    payload
+    payload,
   );
   return response.data;
 }
@@ -2667,19 +2864,23 @@ export async function postCustomerReceipt(
 // ----------- READS -----------
 
 export async function getDashboardSummary() {
-  const response = await api.get<DashboardSummaryResponse>('/api/finance/dashboard-summary');
+  const response = await api.get<DashboardSummaryResponse>(
+    "/api/finance/dashboard-summary",
+  );
   return response.data;
 }
 
 export async function getAccounts() {
-  const response = await api.get<ListEnvelope<LedgerAccountDto>>('/api/finance/accounts');
+  const response = await api.get<ListEnvelope<LedgerAccountDto>>(
+    "/api/finance/accounts",
+  );
   return response.data;
 }
 
 export async function getLedgerAccountStatement(
   ledgerAccountId: string,
   fromUtc?: string | null,
-  toUtc?: string | null
+  toUtc?: string | null,
 ) {
   const response = await api.get<LedgerAccountStatementResponse>(
     `/api/finance/accounts/${encodeURIComponent(ledgerAccountId)}/ledger`,
@@ -2688,7 +2889,7 @@ export async function getLedgerAccountStatement(
         ...(fromUtc ? { fromUtc } : {}),
         ...(toUtc ? { toUtc } : {}),
       },
-    }
+    },
   );
 
   return response.data;
@@ -2697,51 +2898,64 @@ export async function getLedgerAccountStatement(
 export async function getCashbook(
   ledgerAccountId?: string | null,
   fromUtc?: string | null,
-  toUtc?: string | null
+  toUtc?: string | null,
 ) {
-  const response = await api.get<CashbookResponse>('/api/finance/reports/cashbook', {
-    params: {
-      ...(ledgerAccountId ? { ledgerAccountId } : {}),
-      ...(fromUtc ? { fromUtc } : {}),
-      ...(toUtc ? { toUtc } : {}),
+  const response = await api.get<CashbookResponse>(
+    "/api/finance/reports/cashbook",
+    {
+      params: {
+        ...(ledgerAccountId ? { ledgerAccountId } : {}),
+        ...(fromUtc ? { fromUtc } : {}),
+        ...(toUtc ? { toUtc } : {}),
+      },
     },
-  });
+  );
 
   return response.data;
 }
 
 export async function getCashbookSummary(
   fromUtc?: string | null,
-  toUtc?: string | null
+  toUtc?: string | null,
 ) {
-  const response = await api.get<CashbookSummaryResponse>('/api/finance/reports/cashbook-summary', {
-    params: {
-      ...(fromUtc ? { fromUtc } : {}),
-      ...(toUtc ? { toUtc } : {}),
+  const response = await api.get<CashbookSummaryResponse>(
+    "/api/finance/reports/cashbook-summary",
+    {
+      params: {
+        ...(fromUtc ? { fromUtc } : {}),
+        ...(toUtc ? { toUtc } : {}),
+      },
     },
-  });
+  );
 
   return response.data;
 }
 
-export async function createBankReconciliation(payload: CreateBankReconciliationRequest) {
-  const response = await api.post('/api/finance/reconciliations', payload);
+export async function createBankReconciliation(
+  payload: CreateBankReconciliationRequest,
+) {
+  const response = await api.post("/api/finance/reconciliations", payload);
   return response.data;
 }
 
 export async function getBankReconciliations(ledgerAccountId?: string | null) {
-  const response = await api.get<BankReconciliationsResponse>('/api/finance/reconciliations', {
-    params: {
-      ...(ledgerAccountId ? { ledgerAccountId } : {}),
+  const response = await api.get<BankReconciliationsResponse>(
+    "/api/finance/reconciliations",
+    {
+      params: {
+        ...(ledgerAccountId ? { ledgerAccountId } : {}),
+      },
     },
-  });
+  );
 
   return response.data;
 }
 
-export async function getBankReconciliationDetail(bankReconciliationId: string) {
+export async function getBankReconciliationDetail(
+  bankReconciliationId: string,
+) {
   const response = await api.get<BankReconciliationDetailResponse>(
-    `/api/finance/reconciliations/${encodeURIComponent(bankReconciliationId)}`
+    `/api/finance/reconciliations/${encodeURIComponent(bankReconciliationId)}`,
   );
 
   return response.data;
@@ -2750,21 +2964,20 @@ export async function getBankReconciliationDetail(bankReconciliationId: string) 
 export async function setBankReconciliationLineReconciledState(
   bankReconciliationId: string,
   bankReconciliationLineId: string,
-  payload: SetBankReconciliationLineReconciledStateRequest
+  payload: SetBankReconciliationLineReconciledStateRequest,
 ) {
   const response = await api.post(
     `/api/finance/reconciliations/${encodeURIComponent(bankReconciliationId)}/lines/${encodeURIComponent(bankReconciliationLineId)}/set-reconciled`,
-    payload
+    payload,
   );
 
   return response.data;
 }
 
-
 export async function completeBankReconciliation(bankReconciliationId: string) {
   const response = await api.post(
     `/api/finance/reconciliations/${encodeURIComponent(bankReconciliationId)}/complete`,
-    {}
+    {},
   );
 
   return response.data;
@@ -2773,51 +2986,62 @@ export async function completeBankReconciliation(bankReconciliationId: string) {
 export async function cancelBankReconciliation(bankReconciliationId: string) {
   const response = await api.post(
     `/api/finance/reconciliations/${encodeURIComponent(bankReconciliationId)}/cancel`,
-    {}
+    {},
   );
 
   return response.data;
 }
 
-
-export async function uploadBankStatementImport(payload: UploadBankStatementImportRequest) {
-  const response = await api.post('/api/finance/bank-statements/imports/upload', payload);
+export async function uploadBankStatementImport(
+  payload: UploadBankStatementImportRequest,
+) {
+  const response = await api.post(
+    "/api/finance/bank-statements/imports/upload",
+    payload,
+  );
   return response.data;
 }
 
 export async function createApiPlaceholderBankStatementImport(
-  payload: CreateApiPlaceholderBankStatementImportRequest
+  payload: CreateApiPlaceholderBankStatementImportRequest,
 ) {
-  const response = await api.post('/api/finance/bank-statements/imports/api-placeholder', payload);
+  const response = await api.post(
+    "/api/finance/bank-statements/imports/api-placeholder",
+    payload,
+  );
   return response.data;
 }
 
 export async function getBankStatementImports(ledgerAccountId?: string | null) {
-  const response = await api.get<BankStatementImportsResponse>('/api/finance/bank-statements/imports', {
-    params: {
-      ...(ledgerAccountId ? { ledgerAccountId } : {}),
+  const response = await api.get<BankStatementImportsResponse>(
+    "/api/finance/bank-statements/imports",
+    {
+      params: {
+        ...(ledgerAccountId ? { ledgerAccountId } : {}),
+      },
     },
-  });
-
-  return response.data;
-}
-
-export async function getBankStatementImportDetail(bankStatementImportId: string) {
-  const response = await api.get<BankStatementImportDetailResponse>(
-    `/api/finance/bank-statements/imports/${encodeURIComponent(bankStatementImportId)}`
   );
 
   return response.data;
 }
 
+export async function getBankStatementImportDetail(
+  bankStatementImportId: string,
+) {
+  const response = await api.get<BankStatementImportDetailResponse>(
+    `/api/finance/bank-statements/imports/${encodeURIComponent(bankStatementImportId)}`,
+  );
+
+  return response.data;
+}
 
 export async function createBankReconciliationMatch(
   bankReconciliationId: string,
-  payload: CreateBankReconciliationMatchRequest
+  payload: CreateBankReconciliationMatchRequest,
 ) {
   const response = await api.post(
     `/api/finance/reconciliations/${encodeURIComponent(bankReconciliationId)}/matches`,
-    payload
+    payload,
   );
 
   return response.data;
@@ -2825,54 +3049,71 @@ export async function createBankReconciliationMatch(
 
 export async function removeBankReconciliationMatch(
   bankReconciliationId: string,
-  bankReconciliationMatchId: string
+  bankReconciliationMatchId: string,
 ) {
   const response = await api.post(
     `/api/finance/reconciliations/${encodeURIComponent(bankReconciliationId)}/matches/${encodeURIComponent(bankReconciliationMatchId)}/remove`,
-    {}
+    {},
   );
 
   return response.data;
 }
 
-
 export async function getJournalEntries() {
-  const response = await api.get<ListEnvelope<JournalEntryDto>>('/api/finance/journal-entries');
+  const response = await api.get<ListEnvelope<JournalEntryDto>>(
+    "/api/finance/journal-entries",
+  );
   return response.data;
 }
 
 export async function getFiscalPeriods() {
-  const response = await api.get<ListEnvelope<FiscalPeriodDto>>('/api/finance/fiscal-periods');
+  const response = await api.get<ListEnvelope<FiscalPeriodDto>>(
+    "/api/finance/fiscal-periods",
+  );
   return response.data;
 }
 
 export async function getBalanceSheet(asOfUtc?: string | null) {
-  const response = await api.get<BalanceSheetResponse>('/api/finance/reports/balance-sheet', {
-    params: {
-      ...(asOfUtc ? { asOfUtc } : {}),
+  const response = await api.get<BalanceSheetResponse>(
+    "/api/finance/reports/balance-sheet",
+    {
+      params: {
+        ...(asOfUtc ? { asOfUtc } : {}),
+      },
     },
-  });
+  );
   return response.data;
 }
 
-
-export async function getCashFlowStatement(fromUtc?: string | null, toUtc?: string | null) {
-  const response = await api.get<CashFlowStatementResponse>('/api/finance/reports/cash-flow', {
-    params: {
-      ...(fromUtc ? { fromUtc } : {}),
-      ...(toUtc ? { toUtc } : {}),
+export async function getCashFlowStatement(
+  fromUtc?: string | null,
+  toUtc?: string | null,
+) {
+  const response = await api.get<CashFlowStatementResponse>(
+    "/api/finance/reports/cash-flow",
+    {
+      params: {
+        ...(fromUtc ? { fromUtc } : {}),
+        ...(toUtc ? { toUtc } : {}),
+      },
     },
-  });
+  );
   return response.data;
 }
 
-export async function getIncomeStatement(fromUtc?: string | null, toUtc?: string | null) {
-  const response = await api.get<IncomeStatementResponse>('/api/finance/reports/income-statement', {
-    params: {
-      ...(fromUtc ? { fromUtc } : {}),
-      ...(toUtc ? { toUtc } : {}),
+export async function getIncomeStatement(
+  fromUtc?: string | null,
+  toUtc?: string | null,
+) {
+  const response = await api.get<IncomeStatementResponse>(
+    "/api/finance/reports/income-statement",
+    {
+      params: {
+        ...(fromUtc ? { fromUtc } : {}),
+        ...(toUtc ? { toUtc } : {}),
+      },
     },
-  });
+  );
   return response.data;
 }
 
@@ -2976,7 +3217,6 @@ export type PreviewTaxCalculationResponse = {
   items: PreviewTaxCalculationLineDto[];
 };
 
-
 export type TaxReportByComponentKindDto = {
   componentKind: number;
   count: number;
@@ -3045,16 +3285,18 @@ export type TaxReportResponse = {
   items: TaxReportLineDto[];
 };
 
-
 export async function createLedgerAccount(payload: CreateLedgerAccountRequest) {
-  const response = await api.post('/api/finance/accounts', payload);
+  const response = await api.post("/api/finance/accounts", payload);
   return response.data;
 }
 
-export async function updateLedgerAccount(ledgerAccountId: string, payload: UpdateLedgerAccountRequest) {
+export async function updateLedgerAccount(
+  ledgerAccountId: string,
+  payload: UpdateLedgerAccountRequest,
+) {
   const response = await api.put(
     `/api/finance/accounts/${encodeURIComponent(ledgerAccountId)}`,
-    payload
+    payload,
   );
   return response.data;
 }
@@ -3062,13 +3304,15 @@ export async function updateLedgerAccount(ledgerAccountId: string, payload: Upda
 export async function getTaxCodes(
   componentKind?: number | null,
   transactionScope?: number | null,
-  activeOnly?: boolean | null
+  activeOnly?: boolean | null,
 ) {
-  const response = await api.get<TaxCodesResponse>('/api/finance/tax-codes', {
+  const response = await api.get<TaxCodesResponse>("/api/finance/tax-codes", {
     params: {
       ...(componentKind ? { componentKind } : {}),
       ...(transactionScope ? { transactionScope } : {}),
-      ...(activeOnly !== null && activeOnly !== undefined ? { activeOnly } : {}),
+      ...(activeOnly !== null && activeOnly !== undefined
+        ? { activeOnly }
+        : {}),
     },
   });
 
@@ -3076,39 +3320,41 @@ export async function getTaxCodes(
 }
 
 export async function createTaxCode(payload: CreateTaxCodeRequest) {
-  const response = await api.post('/api/finance/tax-codes', payload);
+  const response = await api.post("/api/finance/tax-codes", payload);
   return response.data;
 }
 
-
-export async function previewTaxCalculation(payload: PreviewTaxCalculationRequest) {
+export async function previewTaxCalculation(
+  payload: PreviewTaxCalculationRequest,
+) {
   const response = await api.post<PreviewTaxCalculationResponse>(
-    '/api/finance/tax-calculations/preview',
-    payload
+    "/api/finance/tax-calculations/preview",
+    payload,
   );
 
   return response.data;
 }
 
-
 export async function getTaxReport(
   fromUtc?: string | null,
   toUtc?: string | null,
   componentKind?: number | null,
-  transactionScope?: number | null
+  transactionScope?: number | null,
 ) {
-  const response = await api.get<TaxReportResponse>('/api/finance/reports/taxes', {
-    params: {
-      ...(fromUtc ? { fromUtc } : {}),
-      ...(toUtc ? { toUtc } : {}),
-      ...(componentKind ? { componentKind } : {}),
-      ...(transactionScope ? { transactionScope } : {}),
+  const response = await api.get<TaxReportResponse>(
+    "/api/finance/reports/taxes",
+    {
+      params: {
+        ...(fromUtc ? { fromUtc } : {}),
+        ...(toUtc ? { toUtc } : {}),
+        ...(componentKind ? { componentKind } : {}),
+        ...(transactionScope ? { transactionScope } : {}),
+      },
     },
-  });
+  );
 
   return response.data;
 }
-
 
 export type JournalLineRequest = {
   ledgerAccountId: string;
@@ -3125,40 +3371,52 @@ export type CreateJournalEntryRequest = {
 };
 
 export async function createJournalEntry(payload: CreateJournalEntryRequest) {
-  const response = await api.post('/api/finance/journal-entries', payload);
+  const response = await api.post("/api/finance/journal-entries", payload);
   return response.data;
 }
 
 export async function submitJournalEntryForApproval(journalEntryId: string) {
-  const response = await api.post(`/api/finance/journal-entries/${encodeURIComponent(journalEntryId)}/submit`, {});
+  const response = await api.post(
+    `/api/finance/journal-entries/${encodeURIComponent(journalEntryId)}/submit`,
+    {},
+  );
   return response.data;
 }
 
 export async function approveJournalEntry(journalEntryId: string) {
-  const response = await api.post(`/api/finance/journal-entries/${encodeURIComponent(journalEntryId)}/approve`, {});
+  const response = await api.post(
+    `/api/finance/journal-entries/${encodeURIComponent(journalEntryId)}/approve`,
+    {},
+  );
   return response.data;
 }
 
-export async function rejectJournalEntry(journalEntryId: string, payload: RejectJournalEntryRequest) {
+export async function rejectJournalEntry(
+  journalEntryId: string,
+  payload: RejectJournalEntryRequest,
+) {
   const response = await api.post(
     `/api/finance/journal-entries/${encodeURIComponent(journalEntryId)}/reject`,
-    payload
+    payload,
   );
   return response.data;
 }
 
 export async function postJournalEntry(
-  journalEntryId: string
+  journalEntryId: string,
 ): Promise<BudgetAwareApiResponse> {
   const response = await api.post(
     `/api/finance/journal-entries/${encodeURIComponent(journalEntryId)}/post`,
-    {}
+    {},
   );
   return response.data;
 }
 
 export async function voidJournalEntry(journalEntryId: string) {
-  const response = await api.post(`/api/finance/journal-entries/${encodeURIComponent(journalEntryId)}/void`, {});
+  const response = await api.post(
+    `/api/finance/journal-entries/${encodeURIComponent(journalEntryId)}/void`,
+    {},
+  );
   return response.data;
 }
 
@@ -3168,8 +3426,14 @@ export type ReverseJournalEntryRequest = {
   description: string;
 };
 
-export async function reverseJournalEntry(journalEntryId: string, payload: ReverseJournalEntryRequest) {
-  const response = await api.post(`/api/finance/journal-entries/${encodeURIComponent(journalEntryId)}/reverse`, payload);
+export async function reverseJournalEntry(
+  journalEntryId: string,
+  payload: ReverseJournalEntryRequest,
+) {
+  const response = await api.post(
+    `/api/finance/journal-entries/${encodeURIComponent(journalEntryId)}/reverse`,
+    payload,
+  );
   return response.data;
 }
 
@@ -3180,8 +3444,10 @@ export type CreateOpeningBalanceRequest = {
   lines: JournalLineRequest[];
 };
 
-export async function createOpeningBalance(payload: CreateOpeningBalanceRequest) {
-  const response = await api.post('/api/finance/opening-balances', payload);
+export async function createOpeningBalance(
+  payload: CreateOpeningBalanceRequest,
+) {
+  const response = await api.post("/api/finance/opening-balances", payload);
   return response.data;
 }
 
@@ -3193,27 +3459,39 @@ export type CreateFiscalPeriodRequest = {
 };
 
 export async function createFiscalYear(payload: CreateFiscalYearRequest) {
-  const response = await api.post<CreateFiscalYearResponse>('/api/finance/fiscal-years', payload);
+  const response = await api.post<CreateFiscalYearResponse>(
+    "/api/finance/fiscal-years",
+    payload,
+  );
   return response.data;
 }
 
 export async function createFiscalPeriod(payload: CreateFiscalPeriodRequest) {
-  const response = await api.post('/api/finance/fiscal-periods', payload);
+  const response = await api.post("/api/finance/fiscal-periods", payload);
   return response.data;
 }
 
 export async function openFiscalPeriod(fiscalPeriodId: string) {
-  const response = await api.post(`/api/finance/fiscal-periods/${encodeURIComponent(fiscalPeriodId)}/open`, {});
+  const response = await api.post(
+    `/api/finance/fiscal-periods/${encodeURIComponent(fiscalPeriodId)}/open`,
+    {},
+  );
   return response.data;
 }
 
 export async function closeFiscalPeriod(fiscalPeriodId: string) {
-  const response = await api.post(`/api/finance/fiscal-periods/${encodeURIComponent(fiscalPeriodId)}/close`, {});
+  const response = await api.post(
+    `/api/finance/fiscal-periods/${encodeURIComponent(fiscalPeriodId)}/close`,
+    {},
+  );
   return response.data;
 }
 
 export async function runYearEndClose(payload: YearEndCloseRequest) {
-  const response = await api.post<YearEndCloseResponse>('/api/finance/fiscal-periods/year-end-close', payload);
+  const response = await api.post<YearEndCloseResponse>(
+    "/api/finance/fiscal-periods/year-end-close",
+    payload,
+  );
   return response.data;
 }
 // ----------- FIXED ASSETS -----------
@@ -3375,7 +3653,8 @@ export type FixedAssetRegisterResponse = {
   totalNetBookValue: number;
   items: FixedAssetRegisterItemDto[];
 };
-export type FixedAssetDepreciationRunsResponse = ListEnvelope<FixedAssetDepreciationRunDto>;
+export type FixedAssetDepreciationRunsResponse =
+  ListEnvelope<FixedAssetDepreciationRunDto>;
 
 export type CreateFixedAssetClassRequest = {
   code: string;
@@ -3473,27 +3752,29 @@ export type DisposeFixedAssetRequest = {
 };
 
 export async function getFixedAssetClasses(): Promise<FixedAssetClassesResponse> {
-  const response = await api.get('/api/finance/fixed-assets/classes');
+  const response = await api.get("/api/finance/fixed-assets/classes");
   return response.data;
 }
 
-export async function createFixedAssetClass(payload: CreateFixedAssetClassRequest) {
-  const response = await api.post('/api/finance/fixed-assets/classes', payload);
+export async function createFixedAssetClass(
+  payload: CreateFixedAssetClassRequest,
+) {
+  const response = await api.post("/api/finance/fixed-assets/classes", payload);
   return response.data;
 }
 
 export async function getFixedAssets(): Promise<FixedAssetsResponse> {
-  const response = await api.get('/api/finance/fixed-assets');
+  const response = await api.get("/api/finance/fixed-assets");
   return response.data;
 }
 
 export async function getFixedAssetRegister(
   status?: number | null,
-  fixedAssetClassId?: string | null
+  fixedAssetClassId?: string | null,
 ): Promise<FixedAssetRegisterResponse> {
-  const response = await api.get('/api/finance/fixed-assets/reports/register', {
+  const response = await api.get("/api/finance/fixed-assets/reports/register", {
     params: {
-      ...(typeof status === 'number' ? { status } : {}),
+      ...(typeof status === "number" ? { status } : {}),
       ...(fixedAssetClassId ? { fixedAssetClassId } : {}),
     },
   });
@@ -3501,59 +3782,107 @@ export async function getFixedAssetRegister(
 }
 
 export async function createFixedAsset(payload: CreateFixedAssetRequest) {
-  const response = await api.post('/api/finance/fixed-assets', payload);
+  const response = await api.post("/api/finance/fixed-assets", payload);
   return response.data;
 }
 
-export async function getFixedAssetDetail(fixedAssetId: string): Promise<FixedAssetDetailResponse> {
-  const response = await api.get(`/api/finance/fixed-assets/${encodeURIComponent(fixedAssetId)}`);
+export async function getFixedAssetDetail(
+  fixedAssetId: string,
+): Promise<FixedAssetDetailResponse> {
+  const response = await api.get(
+    `/api/finance/fixed-assets/${encodeURIComponent(fixedAssetId)}`,
+  );
   return response.data;
 }
 
-export async function capitalizeFixedAsset(fixedAssetId: string, payload: CapitalizeFixedAssetRequest) {
-  const response = await api.post(`/api/finance/fixed-assets/${encodeURIComponent(fixedAssetId)}/capitalize`, payload);
+export async function capitalizeFixedAsset(
+  fixedAssetId: string,
+  payload: CapitalizeFixedAssetRequest,
+) {
+  const response = await api.post(
+    `/api/finance/fixed-assets/${encodeURIComponent(fixedAssetId)}/capitalize`,
+    payload,
+  );
   return response.data;
 }
 
 export async function previewFixedAssetDepreciation(
-  payload: FixedAssetDepreciationPeriodRequest
+  payload: FixedAssetDepreciationPeriodRequest,
 ): Promise<FixedAssetDepreciationPreviewResponse> {
-  const response = await api.post('/api/finance/fixed-assets/depreciation/preview', payload);
+  const response = await api.post(
+    "/api/finance/fixed-assets/depreciation/preview",
+    payload,
+  );
   return response.data;
 }
 
 export async function getFixedAssetDepreciationRuns(): Promise<FixedAssetDepreciationRunsResponse> {
-  const response = await api.get('/api/finance/fixed-assets/depreciation-runs');
+  const response = await api.get("/api/finance/fixed-assets/depreciation-runs");
   return response.data;
 }
 
-export async function runFixedAssetDepreciation(payload: RunFixedAssetDepreciationRequest) {
-  const response = await api.post('/api/finance/fixed-assets/depreciation-runs', payload);
+export async function runFixedAssetDepreciation(
+  payload: RunFixedAssetDepreciationRequest,
+) {
+  const response = await api.post(
+    "/api/finance/fixed-assets/depreciation-runs",
+    payload,
+  );
   return response.data;
 }
 
-export async function recordFixedAssetImprovement(fixedAssetId: string, payload: FixedAssetImprovementRequest) {
-  const response = await api.post(`/api/finance/fixed-assets/${encodeURIComponent(fixedAssetId)}/improvements`, payload);
+export async function recordFixedAssetImprovement(
+  fixedAssetId: string,
+  payload: FixedAssetImprovementRequest,
+) {
+  const response = await api.post(
+    `/api/finance/fixed-assets/${encodeURIComponent(fixedAssetId)}/improvements`,
+    payload,
+  );
   return response.data;
 }
 
-export async function transferFixedAsset(fixedAssetId: string, payload: TransferFixedAssetRequest) {
-  const response = await api.post(`/api/finance/fixed-assets/${encodeURIComponent(fixedAssetId)}/transfer`, payload);
+export async function transferFixedAsset(
+  fixedAssetId: string,
+  payload: TransferFixedAssetRequest,
+) {
+  const response = await api.post(
+    `/api/finance/fixed-assets/${encodeURIComponent(fixedAssetId)}/transfer`,
+    payload,
+  );
   return response.data;
 }
 
-export async function reclassifyFixedAsset(fixedAssetId: string, payload: ReclassifyFixedAssetRequest) {
-  const response = await api.post(`/api/finance/fixed-assets/${encodeURIComponent(fixedAssetId)}/reclassify`, payload);
+export async function reclassifyFixedAsset(
+  fixedAssetId: string,
+  payload: ReclassifyFixedAssetRequest,
+) {
+  const response = await api.post(
+    `/api/finance/fixed-assets/${encodeURIComponent(fixedAssetId)}/reclassify`,
+    payload,
+  );
   return response.data;
 }
 
-export async function impairFixedAsset(fixedAssetId: string, payload: ImpairFixedAssetRequest) {
-  const response = await api.post(`/api/finance/fixed-assets/${encodeURIComponent(fixedAssetId)}/impair`, payload);
+export async function impairFixedAsset(
+  fixedAssetId: string,
+  payload: ImpairFixedAssetRequest,
+) {
+  const response = await api.post(
+    `/api/finance/fixed-assets/${encodeURIComponent(fixedAssetId)}/impair`,
+    payload,
+  );
   return response.data;
 }
 
-export async function disposeFixedAsset(fixedAssetId: string, payload: DisposeFixedAssetRequest) {
-  const response = await api.post(`/api/finance/fixed-assets/${encodeURIComponent(fixedAssetId)}/dispose`, payload);
+export async function disposeFixedAsset(
+  fixedAssetId: string,
+  payload: DisposeFixedAssetRequest,
+) {
+  const response = await api.post(
+    `/api/finance/fixed-assets/${encodeURIComponent(fixedAssetId)}/dispose`,
+    payload,
+  );
   return response.data;
 }
 
@@ -3574,20 +3903,20 @@ export type CapitalizeFromPurchaseInvoiceRequest = {
 };
 
 export async function capitalizeFromPurchaseInvoice(
-  request: CapitalizeFromPurchaseInvoiceRequest
+  request: CapitalizeFromPurchaseInvoiceRequest,
 ) {
   const { data } = await api.post(
-    '/api/finance/fixed-assets/capitalize-from-purchase-invoice',
-    request
+    "/api/finance/fixed-assets/capitalize-from-purchase-invoice",
+    request,
   );
   return data;
 }
 
-
-export type CapitalizePurchaseInvoiceToFixedAssetRequest = CapitalizeFromPurchaseInvoiceRequest;
+export type CapitalizePurchaseInvoiceToFixedAssetRequest =
+  CapitalizeFromPurchaseInvoiceRequest;
 
 export async function capitalizePurchaseInvoiceToFixedAsset(
-  payload: CapitalizePurchaseInvoiceToFixedAssetRequest
+  payload: CapitalizePurchaseInvoiceToFixedAssetRequest,
 ) {
   return capitalizeFromPurchaseInvoice(payload);
 }
@@ -3644,7 +3973,7 @@ export type AgeingAnalysisResponse = {
   tenantContextAvailable: boolean;
   tenantId: string | null;
   tenantKey: string | null;
-  scope: 'AR' | 'AP';
+  scope: "AR" | "AP";
   title: string;
   asOfUtc: string;
   partyFilterId?: string | null;
@@ -3679,27 +4008,36 @@ function buildAgeingParams(query?: AgeingAnalysisQuery) {
   if (query?.asOfUtc) params.asOfUtc = query.asOfUtc;
   if (query?.customerId) params.customerId = query.customerId;
   if (query?.vendorId) params.vendorId = query.vendorId;
-  if (typeof query?.includeZeroBalances === 'boolean') {
+  if (typeof query?.includeZeroBalances === "boolean") {
     params.includeZeroBalances = query.includeZeroBalances;
   }
 
   return params;
 }
 
-export async function getAccountsReceivableAgeingAnalysis(query?: AgeingAnalysisQuery) {
-  const response = await api.get<AgeingAnalysisResponse>('/api/finance/ageing-analysis/ar', {
-    params: buildAgeingParams(query),
-  });
+export async function getAccountsReceivableAgeingAnalysis(
+  query?: AgeingAnalysisQuery,
+) {
+  const response = await api.get<AgeingAnalysisResponse>(
+    "/api/finance/ageing-analysis/ar",
+    {
+      params: buildAgeingParams(query),
+    },
+  );
   return response.data;
 }
 
-export async function getAccountsPayableAgeingAnalysis(query?: AgeingAnalysisQuery) {
-  const response = await api.get<AgeingAnalysisResponse>('/api/finance/ageing-analysis/ap', {
-    params: buildAgeingParams(query),
-  });
+export async function getAccountsPayableAgeingAnalysis(
+  query?: AgeingAnalysisQuery,
+) {
+  const response = await api.get<AgeingAnalysisResponse>(
+    "/api/finance/ageing-analysis/ap",
+    {
+      params: buildAgeingParams(query),
+    },
+  );
   return response.data;
 }
-
 
 // ==========================================
 // BANK & CASH SETUP
@@ -3746,27 +4084,39 @@ export type UpdateBankAccountRequest = {
 };
 
 export async function getBankAccounts() {
-  const { data } = await api.get<BankAccountsResponse>('/api/finance/bank-accounts');
+  const { data } = await api.get<BankAccountsResponse>(
+    "/api/finance/bank-accounts",
+  );
   return data;
 }
 
 export async function createBankAccount(request: CreateBankAccountRequest) {
-  const { data } = await api.post('/api/finance/bank-accounts', request);
+  const { data } = await api.post("/api/finance/bank-accounts", request);
   return data;
 }
 
-export async function updateBankAccount(bankAccountId: string, request: UpdateBankAccountRequest) {
-  const { data } = await api.put(`/api/finance/bank-accounts/${bankAccountId}`, request);
+export async function updateBankAccount(
+  bankAccountId: string,
+  request: UpdateBankAccountRequest,
+) {
+  const { data } = await api.put(
+    `/api/finance/bank-accounts/${bankAccountId}`,
+    request,
+  );
   return data;
 }
 
 export async function activateBankAccount(bankAccountId: string) {
-  const { data } = await api.post(`/api/finance/bank-accounts/${bankAccountId}/activate`);
+  const { data } = await api.post(
+    `/api/finance/bank-accounts/${bankAccountId}/activate`,
+  );
   return data;
 }
 
 export async function deactivateBankAccount(bankAccountId: string) {
-  const { data } = await api.post(`/api/finance/bank-accounts/${bankAccountId}/deactivate`);
+  const { data } = await api.post(
+    `/api/finance/bank-accounts/${bankAccountId}/deactivate`,
+  );
   return data;
 }
 
@@ -3871,7 +4221,8 @@ export type InventoryTransactionDto = {
 export type InventoryItemsResponse = ListEnvelope<InventoryItemDto>;
 export type WarehousesResponse = ListEnvelope<WarehouseDto>;
 export type StockLedgerResponse = ListEnvelope<StockLedgerEntryDto>;
-export type InventoryTransactionsResponse = ListEnvelope<InventoryTransactionDto>;
+export type InventoryTransactionsResponse =
+  ListEnvelope<InventoryTransactionDto>;
 export type StockPositionResponse = ListEnvelope<StockPositionRowDto> & {
   totalQuantityOnHand?: number;
   totalInventoryValue?: number;
@@ -3891,7 +4242,10 @@ export type CreateInventoryItemRequest = {
   notes?: string | null;
 };
 
-export type UpdateInventoryItemRequest = Omit<CreateInventoryItemRequest, 'code' | 'itemCode'> & {
+export type UpdateInventoryItemRequest = Omit<
+  CreateInventoryItemRequest,
+  "code" | "itemCode"
+> & {
   isActive: boolean;
 };
 
@@ -3904,7 +4258,10 @@ export type CreateWarehouseRequest = {
   notes?: string | null;
 };
 
-export type UpdateWarehouseRequest = Omit<CreateWarehouseRequest, 'code' | 'warehouseCode'> & {
+export type UpdateWarehouseRequest = Omit<
+  CreateWarehouseRequest,
+  "code" | "warehouseCode"
+> & {
   isActive: boolean;
 };
 
@@ -3916,7 +4273,7 @@ export type CreateStockInRequest = {
   reference?: string | null;
   journalReference?: string | null;
   inventoryLedgerAccountId: string;
-  creditLedgerAccountId: string; 
+  creditLedgerAccountId: string;
   notes?: string | null;
   lines: {
     itemId: string;
@@ -3950,67 +4307,97 @@ export type CreateStockAdjustmentRequest = {
 };
 
 export async function getInventoryItems() {
-  const { data } = await api.get<InventoryItemsResponse>('/api/finance/inventory/items');
+  const { data } = await api.get<InventoryItemsResponse>(
+    "/api/finance/inventory/items",
+  );
   return data;
 }
 
 export async function createInventoryItem(request: CreateInventoryItemRequest) {
-  const { data } = await api.post('/api/finance/inventory/items', request);
+  const { data } = await api.post("/api/finance/inventory/items", request);
   return data;
 }
 
-export async function updateInventoryItem(inventoryItemId: string, request: UpdateInventoryItemRequest) {
-  const { data } = await api.put(`/api/finance/inventory/items/${inventoryItemId}`, request);
+export async function updateInventoryItem(
+  inventoryItemId: string,
+  request: UpdateInventoryItemRequest,
+) {
+  const { data } = await api.put(
+    `/api/finance/inventory/items/${inventoryItemId}`,
+    request,
+  );
   return data;
 }
 
 export async function activateInventoryItem(inventoryItemId: string) {
-  const { data } = await api.post(`/api/finance/inventory/items/${inventoryItemId}/activate`);
+  const { data } = await api.post(
+    `/api/finance/inventory/items/${inventoryItemId}/activate`,
+  );
   return data;
 }
 
 export async function deactivateInventoryItem(inventoryItemId: string) {
-  const { data } = await api.post(`/api/finance/inventory/items/${inventoryItemId}/deactivate`);
+  const { data } = await api.post(
+    `/api/finance/inventory/items/${inventoryItemId}/deactivate`,
+  );
   return data;
 }
 
 export async function getWarehouses() {
-  const { data } = await api.get<WarehousesResponse>('/api/finance/inventory/warehouses');
+  const { data } = await api.get<WarehousesResponse>(
+    "/api/finance/inventory/warehouses",
+  );
   return data;
 }
 
 export async function createWarehouse(request: CreateWarehouseRequest) {
-  const { data } = await api.post('/api/finance/inventory/warehouses', request);
+  const { data } = await api.post("/api/finance/inventory/warehouses", request);
   return data;
 }
 
-export async function updateWarehouse(warehouseId: string, request: UpdateWarehouseRequest) {
-  const { data } = await api.put(`/api/finance/inventory/warehouses/${warehouseId}`, request);
+export async function updateWarehouse(
+  warehouseId: string,
+  request: UpdateWarehouseRequest,
+) {
+  const { data } = await api.put(
+    `/api/finance/inventory/warehouses/${warehouseId}`,
+    request,
+  );
   return data;
 }
 
 export async function activateWarehouse(warehouseId: string) {
-  const { data } = await api.post(`/api/finance/inventory/warehouses/${warehouseId}/activate`);
+  const { data } = await api.post(
+    `/api/finance/inventory/warehouses/${warehouseId}/activate`,
+  );
   return data;
 }
 
 export async function deactivateWarehouse(warehouseId: string) {
-  const { data } = await api.post(`/api/finance/inventory/warehouses/${warehouseId}/deactivate`);
+  const { data } = await api.post(
+    `/api/finance/inventory/warehouses/${warehouseId}/deactivate`,
+  );
   return data;
 }
 
-export async function getStockPosition(itemId?: string | null, warehouseId?: string | null) {
-  const { data } = await api.get<StockPositionResponse>('/api/finance/inventory/stock-position', {
-    params: {
-      ...(itemId ? { itemId } : {}),
-      ...(warehouseId ? { warehouseId } : {}),
+export async function getStockPosition(
+  itemId?: string | null,
+  warehouseId?: string | null,
+) {
+  const { data } = await api.get<StockPositionResponse>(
+    "/api/finance/inventory/stock-position",
+    {
+      params: {
+        ...(itemId ? { itemId } : {}),
+        ...(warehouseId ? { warehouseId } : {}),
+      },
     },
-  });
+  );
   return data;
 }
 
 export async function stockIn(request: CreateStockInRequest) {
-  const { data } = await api.post('/api/finance/inventory/stock-in', request);
+  const { data } = await api.post("/api/finance/inventory/stock-in", request);
   return data;
 }
 
@@ -4019,26 +4406,36 @@ export async function postStockIn(request: CreateStockInRequest) {
 }
 
 export async function stockAdjust(request: CreateStockAdjustmentRequest) {
-  const { data } = await api.post('/api/finance/inventory/adjust', request);
+  const { data } = await api.post("/api/finance/inventory/adjust", request);
   return data;
 }
 
-export async function postStockAdjustment(request: CreateStockAdjustmentRequest) {
+export async function postStockAdjustment(
+  request: CreateStockAdjustmentRequest,
+) {
   return stockAdjust(request);
 }
 
-export async function getStockLedger(itemId?: string | null, warehouseId?: string | null) {
-  const { data } = await api.get<StockLedgerResponse>('/api/finance/inventory/stock-ledger', {
-    params: {
-      ...(itemId ? { itemId } : {}),
-      ...(warehouseId ? { warehouseId } : {}),
+export async function getStockLedger(
+  itemId?: string | null,
+  warehouseId?: string | null,
+) {
+  const { data } = await api.get<StockLedgerResponse>(
+    "/api/finance/inventory/stock-ledger",
+    {
+      params: {
+        ...(itemId ? { itemId } : {}),
+        ...(warehouseId ? { warehouseId } : {}),
+      },
     },
-  });
+  );
   return data;
 }
 
 export async function getInventoryTransactions() {
-  const { data } = await api.get<InventoryTransactionsResponse>('/api/finance/inventory/transactions');
+  const { data } = await api.get<InventoryTransactionsResponse>(
+    "/api/finance/inventory/transactions",
+  );
   return data;
 }
 
@@ -4089,16 +4486,25 @@ export type IssueInventoryForSalesInvoiceRequest = {
   lines: IssueInventoryForSalesInvoiceLineRequest[];
 };
 
-export async function receivePurchaseInvoiceIntoInventory(request: ReceivePurchaseInvoiceIntoInventoryRequest) {
-  const { data } = await api.post('/api/finance/inventory/purchase-invoice-receipts', request);
+export async function receivePurchaseInvoiceIntoInventory(
+  request: ReceivePurchaseInvoiceIntoInventoryRequest,
+) {
+  const { data } = await api.post(
+    "/api/finance/inventory/purchase-invoice-receipts",
+    request,
+  );
   return data;
 }
 
-export async function issueInventoryForSalesInvoice(request: IssueInventoryForSalesInvoiceRequest) {
-  const { data } = await api.post('/api/finance/inventory/sales-invoice-issues', request);
+export async function issueInventoryForSalesInvoice(
+  request: IssueInventoryForSalesInvoiceRequest,
+) {
+  const { data } = await api.post(
+    "/api/finance/inventory/sales-invoice-issues",
+    request,
+  );
   return data;
 }
-
 
 // ==========================================
 // FINAL INVENTORY PHASE - REPORTING
@@ -4230,12 +4636,15 @@ export async function getInventoryValuationReport(params?: {
 }) {
   const searchParams = new URLSearchParams();
 
-  if (params?.asOfUtc) searchParams.set('asOfUtc', params.asOfUtc);
-  if (params?.inventoryItemId) searchParams.set('inventoryItemId', params.inventoryItemId);
-  if (params?.warehouseId) searchParams.set('warehouseId', params.warehouseId);
+  if (params?.asOfUtc) searchParams.set("asOfUtc", params.asOfUtc);
+  if (params?.inventoryItemId)
+    searchParams.set("inventoryItemId", params.inventoryItemId);
+  if (params?.warehouseId) searchParams.set("warehouseId", params.warehouseId);
 
-  const suffix = searchParams.toString() ? `?${searchParams.toString()}` : '';
-  const { data } = await api.get<InventoryValuationReportResponse>(`/api/finance/inventory/reports/valuation${suffix}`);
+  const suffix = searchParams.toString() ? `?${searchParams.toString()}` : "";
+  const { data } = await api.get<InventoryValuationReportResponse>(
+    `/api/finance/inventory/reports/valuation${suffix}`,
+  );
   return data;
 }
 
@@ -4245,11 +4654,11 @@ export async function getInventoryGlReconciliation(params: {
 }) {
   const searchParams = new URLSearchParams();
 
-  searchParams.set('inventoryLedgerAccountId', params.inventoryLedgerAccountId);
-  if (params.asOfUtc) searchParams.set('asOfUtc', params.asOfUtc);
+  searchParams.set("inventoryLedgerAccountId", params.inventoryLedgerAccountId);
+  if (params.asOfUtc) searchParams.set("asOfUtc", params.asOfUtc);
 
   const { data } = await api.get<InventoryGlReconciliationResponse>(
-    `/api/finance/inventory/reports/stock-gl-reconciliation?${searchParams.toString()}`
+    `/api/finance/inventory/reports/stock-gl-reconciliation?${searchParams.toString()}`,
   );
   return data;
 }
@@ -4263,14 +4672,18 @@ export async function getInventoryAuditTrace(params?: {
 }) {
   const searchParams = new URLSearchParams();
 
-  if (params?.inventoryTransactionId) searchParams.set('inventoryTransactionId', params.inventoryTransactionId);
-  if (params?.journalEntryId) searchParams.set('journalEntryId', params.journalEntryId);
-  if (params?.reference) searchParams.set('reference', params.reference);
-  if (params?.fromUtc) searchParams.set('fromUtc', params.fromUtc);
-  if (params?.toUtc) searchParams.set('toUtc', params.toUtc);
+  if (params?.inventoryTransactionId)
+    searchParams.set("inventoryTransactionId", params.inventoryTransactionId);
+  if (params?.journalEntryId)
+    searchParams.set("journalEntryId", params.journalEntryId);
+  if (params?.reference) searchParams.set("reference", params.reference);
+  if (params?.fromUtc) searchParams.set("fromUtc", params.fromUtc);
+  if (params?.toUtc) searchParams.set("toUtc", params.toUtc);
 
-  const suffix = searchParams.toString() ? `?${searchParams.toString()}` : '';
-  const { data } = await api.get<InventoryAuditTraceResponse>(`/api/finance/inventory/reports/audit-trace${suffix}`);
+  const suffix = searchParams.toString() ? `?${searchParams.toString()}` : "";
+  const { data } = await api.get<InventoryAuditTraceResponse>(
+    `/api/finance/inventory/reports/audit-trace${suffix}`,
+  );
   return data;
 }
 
@@ -4323,8 +4736,6 @@ export type WorkingCapitalDashboardResponse = {
   topInventory: WorkingCapitalInventoryRowDto[];
 };
 
-
-
 export type WorkingCapitalCashflowForecastBucketDto = {
   bucket: string;
   startDay: number;
@@ -4375,7 +4786,6 @@ export type WorkingCapitalCashflowForecastResponse = {
   paymentForecastItems: WorkingCapitalCashflowForecastItemDto[];
   alerts: WorkingCapitalCashflowAlertDto[];
 };
-
 
 export type WorkingCapitalActionDto = {
   severity: string;
@@ -4447,7 +4857,6 @@ export type WorkingCapitalPayablesStrategyResponse = {
   items: WorkingCapitalPayableStrategyRowDto[];
 };
 
-
 export type WorkingCapitalDashboardQuery = {
   asOfUtc?: string | null;
   fromUtc?: string | null;
@@ -4464,60 +4873,70 @@ function buildWorkingCapitalParams(query?: WorkingCapitalDashboardQuery) {
   return params;
 }
 
-export async function getWorkingCapitalDashboard(query?: WorkingCapitalDashboardQuery) {
-  const response = await api.get<WorkingCapitalDashboardResponse>('/api/finance/working-capital/dashboard', {
-    params: buildWorkingCapitalParams(query),
-  });
+export async function getWorkingCapitalDashboard(
+  query?: WorkingCapitalDashboardQuery,
+) {
+  const response = await api.get<WorkingCapitalDashboardResponse>(
+    "/api/finance/working-capital/dashboard",
+    {
+      params: buildWorkingCapitalParams(query),
+    },
+  );
   return response.data;
 }
 
-
 export async function getReceivablesHealth(asOfUtc?: string | null) {
-  const response = await api.get<WorkingCapitalReceivablesHealthResponse>('/api/finance/working-capital/receivables-health', {
-    params: asOfUtc ? { asOfUtc } : {},
-  });
+  const response = await api.get<WorkingCapitalReceivablesHealthResponse>(
+    "/api/finance/working-capital/receivables-health",
+    {
+      params: asOfUtc ? { asOfUtc } : {},
+    },
+  );
   return response.data;
 }
 
 export async function getPayablesStrategy(asOfUtc?: string | null) {
-  const response = await api.get<WorkingCapitalPayablesStrategyResponse>('/api/finance/working-capital/payables-strategy', {
-    params: asOfUtc ? { asOfUtc } : {},
-  });
+  const response = await api.get<WorkingCapitalPayablesStrategyResponse>(
+    "/api/finance/working-capital/payables-strategy",
+    {
+      params: asOfUtc ? { asOfUtc } : {},
+    },
+  );
   return response.data;
 }
 
 export async function getWorkingCapitalActions(asOfUtc?: string | null) {
-  const response = await api.get<WorkingCapitalActionsResponse>('/api/finance/working-capital/actions', {
-    params: asOfUtc ? { asOfUtc } : {},
-  });
+  const response = await api.get<WorkingCapitalActionsResponse>(
+    "/api/finance/working-capital/actions",
+    {
+      params: asOfUtc ? { asOfUtc } : {},
+    },
+  );
   return response.data;
 }
 
-
-export async function getWorkingCapitalCashflowForecast(asOfUtc?: string | null) {
-  const response = await api.get<WorkingCapitalCashflowForecastResponse>('/api/finance/working-capital/cashflow-forecast', {
-    params: asOfUtc ? { asOfUtc } : {},
-  });
+export async function getWorkingCapitalCashflowForecast(
+  asOfUtc?: string | null,
+) {
+  const response = await api.get<WorkingCapitalCashflowForecastResponse>(
+    "/api/finance/working-capital/cashflow-forecast",
+    {
+      params: asOfUtc ? { asOfUtc } : {},
+    },
+  );
   return response.data;
 }
 
 export async function getWorkingCapitalOptimization(asOfUtc?: string | null) {
-  const response = await api.get('/api/finance/working-capital/optimization', {
+  const response = await api.get("/api/finance/working-capital/optimization", {
     params: asOfUtc ? { asOfUtc } : {},
   });
   return response.data;
 }
 
-
-
-
-
-
-
 // ==========================================
 // PAYROLL / SALARY MANAGEMENT — PHASE 1
 // ==========================================
-
 
 export type ApprovalInboxItemDto = {
   id: string;
@@ -4572,8 +4991,6 @@ export type PayrollEmployeeDto = {
   isLinkedToHr?: boolean;
   createdOnUtc: string;
 };
-
-
 
 export type PayrollAvailableHrEmployeeDto = {
   id: string;
@@ -4659,8 +5076,6 @@ export type UpdatePayrollEmployeeRequest = {
   notes?: string | null;
 };
 
-
-
 export type ImportPayrollEmployeesRequest = {
   items: CreatePayrollEmployeeRequest[];
 };
@@ -4695,7 +5110,6 @@ export type UpdatePayrollPayGroupRequest = {
   description?: string | null;
   isActive: boolean;
 };
-
 
 export type UpdatePayrollPayElementRequest = {
   name: string;
@@ -4782,7 +5196,6 @@ export type CreatePayrollSalaryStructureRequest = {
   isActive: boolean;
   notes?: string | null;
 };
-
 
 export type UpdatePayrollSalaryStructureRequest = {
   employeeId: string;
@@ -4953,12 +5366,11 @@ export type PayrollStatutoryReportRowDto = {
   netPay: number;
 };
 
-
 export type PayrollPolicySettingDto = {
   id: string;
   tenantId: string;
   enforceMinimumTakeHome: boolean;
-  minimumTakeHomeRuleType: 'fixed_amount' | 'gross_percentage';
+  minimumTakeHomeRuleType: "fixed_amount" | "gross_percentage";
   minimumTakeHomeAmount: number;
   minimumTakeHomePercent: number;
   currencyCode: string;
@@ -4968,12 +5380,11 @@ export type PayrollPolicySettingDto = {
 
 export type UpdatePayrollPolicySettingRequest = {
   enforceMinimumTakeHome: boolean;
-  minimumTakeHomeRuleType: 'fixed_amount' | 'gross_percentage';
+  minimumTakeHomeRuleType: "fixed_amount" | "gross_percentage";
   minimumTakeHomeAmount: number;
   minimumTakeHomePercent: number;
   currencyCode: string;
 };
-
 
 export type PurchaseRequisitionLineDto = {
   id: string;
@@ -5001,7 +5412,8 @@ export type PurchaseRequisitionDto = {
   lines?: PurchaseRequisitionLineDto[];
 };
 
-export type PurchaseRequisitionListResponse = ListEnvelope<PurchaseRequisitionDto>;
+export type PurchaseRequisitionListResponse =
+  ListEnvelope<PurchaseRequisitionDto>;
 
 export type PurchaseOrderLineDto = {
   id: string;
@@ -5081,85 +5493,139 @@ export type UpdatePurchaseOrderRequest = {
 };
 
 export async function getPurchaseRequisitions() {
-  const { data } = await api.get<PurchaseRequisitionListResponse>('/api/finance/procurement/requisitions');
+  const { data } = await api.get<PurchaseRequisitionListResponse>(
+    "/api/finance/procurement/requisitions",
+  );
   return data;
 }
 
 export async function getRejectedPurchaseRequisitions() {
-  const { data } = await api.get<PurchaseRequisitionListResponse>('/api/finance/procurement/requisitions/rejected');
+  const { data } = await api.get<PurchaseRequisitionListResponse>(
+    "/api/finance/procurement/requisitions/rejected",
+  );
   return data;
 }
 
-export async function createPurchaseRequisition(request: CreatePurchaseRequisitionRequest) {
-  const { data } = await api.post('/api/finance/procurement/requisitions', request);
+export async function createPurchaseRequisition(
+  request: CreatePurchaseRequisitionRequest,
+) {
+  const { data } = await api.post(
+    "/api/finance/procurement/requisitions",
+    request,
+  );
   return data;
 }
 
-export async function updatePurchaseRequisition(requisitionId: string, request: UpdatePurchaseRequisitionRequest) {
-  const { data } = await api.put(`/api/finance/procurement/requisitions/${requisitionId}`, request);
+export async function updatePurchaseRequisition(
+  requisitionId: string,
+  request: UpdatePurchaseRequisitionRequest,
+) {
+  const { data } = await api.put(
+    `/api/finance/procurement/requisitions/${requisitionId}`,
+    request,
+  );
   return data;
 }
 
 export async function submitPurchaseRequisition(requisitionId: string) {
-  const { data } = await api.post(`/api/finance/procurement/requisitions/${requisitionId}/submit`);
+  const { data } = await api.post(
+    `/api/finance/procurement/requisitions/${requisitionId}/submit`,
+  );
   return data;
 }
 
 export async function approvePurchaseRequisition(requisitionId: string) {
-  const { data } = await api.post(`/api/finance/procurement/requisitions/${requisitionId}/approve`);
+  const { data } = await api.post(
+    `/api/finance/procurement/requisitions/${requisitionId}/approve`,
+  );
   return data;
 }
 
-export async function rejectPurchaseRequisition(requisitionId: string, reason: string) {
-  const { data } = await api.post(`/api/finance/procurement/requisitions/${requisitionId}/reject`, { reason });
+export async function rejectPurchaseRequisition(
+  requisitionId: string,
+  reason: string,
+) {
+  const { data } = await api.post(
+    `/api/finance/procurement/requisitions/${requisitionId}/reject`,
+    { reason },
+  );
   return data;
 }
 
 export async function deletePurchaseRequisition(requisitionId: string) {
-  const { data } = await api.delete(`/api/finance/procurement/requisitions/${requisitionId}`);
+  const { data } = await api.delete(
+    `/api/finance/procurement/requisitions/${requisitionId}`,
+  );
   return data;
 }
 
 export async function getPurchaseOrders() {
-  const { data } = await api.get<PurchaseOrderListResponse>('/api/finance/procurement/purchase-orders');
+  const { data } = await api.get<PurchaseOrderListResponse>(
+    "/api/finance/procurement/purchase-orders",
+  );
   return data;
 }
 
 export async function getRejectedPurchaseOrders() {
-  const { data } = await api.get<PurchaseOrderListResponse>('/api/finance/procurement/purchase-orders/rejected');
+  const { data } = await api.get<PurchaseOrderListResponse>(
+    "/api/finance/procurement/purchase-orders/rejected",
+  );
   return data;
 }
 
-export async function createPurchaseOrderFromRequisition(requisitionId: string, request: CreatePurchaseOrderFromRequisitionRequest) {
-  const { data } = await api.post(`/api/finance/procurement/purchase-orders/from-requisition/${requisitionId}`, request);
+export async function createPurchaseOrderFromRequisition(
+  requisitionId: string,
+  request: CreatePurchaseOrderFromRequisitionRequest,
+) {
+  const { data } = await api.post(
+    `/api/finance/procurement/purchase-orders/from-requisition/${requisitionId}`,
+    request,
+  );
   return data;
 }
 
-export async function updatePurchaseOrder(purchaseOrderId: string, request: UpdatePurchaseOrderRequest) {
-  const { data } = await api.put(`/api/finance/procurement/purchase-orders/${purchaseOrderId}`, request);
+export async function updatePurchaseOrder(
+  purchaseOrderId: string,
+  request: UpdatePurchaseOrderRequest,
+) {
+  const { data } = await api.put(
+    `/api/finance/procurement/purchase-orders/${purchaseOrderId}`,
+    request,
+  );
   return data;
 }
 
 export async function submitPurchaseOrder(purchaseOrderId: string) {
-  const { data } = await api.post(`/api/finance/procurement/purchase-orders/${purchaseOrderId}/submit`);
+  const { data } = await api.post(
+    `/api/finance/procurement/purchase-orders/${purchaseOrderId}/submit`,
+  );
   return data;
 }
 
 export async function approvePurchaseOrder(purchaseOrderId: string) {
-  const { data } = await api.post(`/api/finance/procurement/purchase-orders/${purchaseOrderId}/approve`);
+  const { data } = await api.post(
+    `/api/finance/procurement/purchase-orders/${purchaseOrderId}/approve`,
+  );
   return data;
 }
 
-export async function rejectPurchaseOrder(purchaseOrderId: string, reason: string) {
-  const { data } = await api.post(`/api/finance/procurement/purchase-orders/${purchaseOrderId}/reject`, { reason });
+export async function rejectPurchaseOrder(
+  purchaseOrderId: string,
+  reason: string,
+) {
+  const { data } = await api.post(
+    `/api/finance/procurement/purchase-orders/${purchaseOrderId}/reject`,
+    { reason },
+  );
   return data;
 }
 
 export async function deletePurchaseOrder(purchaseOrderId: string) {
-  const { data } = await api.delete(`/api/finance/procurement/purchase-orders/${purchaseOrderId}`);
+  const { data } = await api.delete(
+    `/api/finance/procurement/purchase-orders/${purchaseOrderId}`,
+  );
   return data;
 }
-
 
 export async function reopenRejectedPayrollRun(runId: string) {
   const response = await api.post(`/api/payroll/run/${runId}/reopen`);
@@ -5171,115 +5637,175 @@ export async function resubmitRejectedPayrollRun(runId: string) {
   return response.data;
 }
 
-
 export async function getPayrollPolicySetting() {
-  const response = await api.get<PayrollPolicySettingDto>('/api/payroll/policy');
+  const response = await api.get<PayrollPolicySettingDto>(
+    "/api/payroll/policy",
+  );
   return response.data;
 }
 
-export async function upsertPayrollPolicySetting(payload: UpdatePayrollPolicySettingRequest) {
-  const response = await api.put('/api/payroll/policy', payload);
+export async function upsertPayrollPolicySetting(
+  payload: UpdatePayrollPolicySettingRequest,
+) {
+  const response = await api.put("/api/payroll/policy", payload);
   return response.data;
 }
-
-
 
 export async function getPayrollRunDetail(runId: string) {
-  const response = await api.get<PayrollRunDetailDto>(`/api/payroll/runs/${runId}`);
+  const response = await api.get<PayrollRunDetailDto>(
+    `/api/payroll/runs/${runId}`,
+  );
   return response.data;
 }
 
 export async function getPayrollPayslips(runId: string) {
-  const response = await api.get<{ tenantContextAvailable: boolean; tenantId: string | null; tenantKey: string | null; payrollRun: any; count: number; items: PayrollPayslipDto[] }>(`/api/payroll/runs/${runId}/payslips`);
+  const response = await api.get<{
+    tenantContextAvailable: boolean;
+    tenantId: string | null;
+    tenantKey: string | null;
+    payrollRun: any;
+    count: number;
+    items: PayrollPayslipDto[];
+  }>(`/api/payroll/runs/${runId}/payslips`);
   return response.data;
 }
 
 export async function getPayrollStatutoryReport(runId: string) {
-  const response = await api.get<{ tenantContextAvailable: boolean; tenantId: string | null; tenantKey: string | null; payrollRun: any; count: number; totalGrossPay: number; totalStatutoryDeductions: number; totalNetPay: number; items: PayrollStatutoryReportRowDto[] }>(`/api/payroll/runs/${runId}/statutory-report`);
+  const response = await api.get<{
+    tenantContextAvailable: boolean;
+    tenantId: string | null;
+    tenantKey: string | null;
+    payrollRun: any;
+    count: number;
+    totalGrossPay: number;
+    totalStatutoryDeductions: number;
+    totalNetPay: number;
+    items: PayrollStatutoryReportRowDto[];
+  }>(`/api/payroll/runs/${runId}/statutory-report`);
   return response.data;
 }
 
 export async function getEmployeePayrollHistory(employeeId: string) {
-  const response = await api.get(`/api/payroll/employees/${employeeId}/history`);
+  const response = await api.get(
+    `/api/payroll/employees/${employeeId}/history`,
+  );
   return response.data;
 }
-
 
 export async function getPayrollPayGroupElements(payGroupId: string) {
-  const response = await api.get<PayrollPayGroupElementsResponse>(`/api/payroll/pay-group-elements/${payGroupId}`);
+  const response = await api.get<PayrollPayGroupElementsResponse>(
+    `/api/payroll/pay-group-elements/${payGroupId}`,
+  );
   return response.data;
 }
 
-export async function createPayrollPayGroupElement(payload: CreatePayrollPayGroupElementRequest) {
-  const response = await api.post('/api/payroll/pay-group-elements', payload);
+export async function createPayrollPayGroupElement(
+  payload: CreatePayrollPayGroupElementRequest,
+) {
+  const response = await api.post("/api/payroll/pay-group-elements", payload);
   return response.data;
 }
 
-export async function updatePayrollPayGroupElement(payGroupElementId: string, payload: UpdatePayrollPayGroupElementRequest) {
-  const response = await api.put(`/api/payroll/pay-group-elements/${payGroupElementId}`, payload);
+export async function updatePayrollPayGroupElement(
+  payGroupElementId: string,
+  payload: UpdatePayrollPayGroupElementRequest,
+) {
+  const response = await api.put(
+    `/api/payroll/pay-group-elements/${payGroupElementId}`,
+    payload,
+  );
   return response.data;
 }
 
 export async function deletePayrollPayGroupElement(payGroupElementId: string) {
-  const response = await api.delete(`/api/payroll/pay-group-elements/${payGroupElementId}`);
+  const response = await api.delete(
+    `/api/payroll/pay-group-elements/${payGroupElementId}`,
+  );
   return response.data;
 }
 
-
-
-
-export async function getApprovalInboxItems(state?: 'all' | 'pending' | 'rejected') {
-  const response = await api.get<ApprovalInboxResponse>('/api/approval-inbox/items', {
-    params: {
-      ...(state ? { state } : {}),
+export async function getApprovalInboxItems(
+  state?: "all" | "pending" | "rejected",
+) {
+  const response = await api.get<ApprovalInboxResponse>(
+    "/api/approval-inbox/items",
+    {
+      params: {
+        ...(state ? { state } : {}),
+      },
     },
-  });
+  );
   return response.data;
 }
 
 export async function getAvailableHrEmployeesForPayroll() {
-  const response = await api.get<PayrollAvailableHrEmployeesResponse>('/api/payroll/hr-employees/available');
+  const response = await api.get<PayrollAvailableHrEmployeesResponse>(
+    "/api/payroll/hr-employees/available",
+  );
   return response.data;
 }
 
-export async function createPayrollEmployeesFromHr(payload: CreatePayrollEmployeesFromHrRequest) {
-  const response = await api.post('/api/payroll/employees/from-hr', payload);
+export async function createPayrollEmployeesFromHr(
+  payload: CreatePayrollEmployeesFromHrRequest,
+) {
+  const response = await api.post("/api/payroll/employees/from-hr", payload);
   return response.data;
 }
 
-export async function linkPayrollEmployeeToHr(payrollEmployeeId: string, hrEmployeeId: string) {
-  const response = await api.post(`/api/payroll/employees/${payrollEmployeeId}/link-hr/${hrEmployeeId}`);
+export async function linkPayrollEmployeeToHr(
+  payrollEmployeeId: string,
+  hrEmployeeId: string,
+) {
+  const response = await api.post(
+    `/api/payroll/employees/${payrollEmployeeId}/link-hr/${hrEmployeeId}`,
+  );
   return response.data;
 }
 
-export async function bulkLinkPayrollEmployeesToHr(payload: BulkLinkPayrollEmployeesToHrRequest) {
-  const response = await api.post('/api/payroll/employees/bulk-link-hr', payload);
+export async function bulkLinkPayrollEmployeesToHr(
+  payload: BulkLinkPayrollEmployeesToHrRequest,
+) {
+  const response = await api.post(
+    "/api/payroll/employees/bulk-link-hr",
+    payload,
+  );
   return response.data;
 }
 
 export async function syncPayrollEmployeeFromHr(payrollEmployeeId: string) {
-  const response = await api.post(`/api/payroll/employees/${payrollEmployeeId}/sync-from-hr`);
+  const response = await api.post(
+    `/api/payroll/employees/${payrollEmployeeId}/sync-from-hr`,
+  );
   return response.data;
 }
 
 export async function syncAllLinkedPayrollEmployeesFromHr() {
-  const response = await api.post('/api/payroll/employees/sync-all-from-hr');
+  const response = await api.post("/api/payroll/employees/sync-all-from-hr");
   return response.data;
 }
 
 export async function getPayrollEmployees() {
-  const response = await api.get<PayrollEmployeesResponse>('/api/payroll/employees');
+  const response = await api.get<PayrollEmployeesResponse>(
+    "/api/payroll/employees",
+  );
   return response.data;
 }
 
-
-export async function createPayrollEmployee(payload: CreatePayrollEmployeeRequest) {
-  const response = await api.post('/api/payroll/employees', payload);
+export async function createPayrollEmployee(
+  payload: CreatePayrollEmployeeRequest,
+) {
+  const response = await api.post("/api/payroll/employees", payload);
   return response.data;
 }
 
-export async function updatePayrollEmployee(employeeId: string, payload: UpdatePayrollEmployeeRequest) {
-  const response = await api.put(`/api/payroll/employees/${employeeId}`, payload);
+export async function updatePayrollEmployee(
+  employeeId: string,
+  payload: UpdatePayrollEmployeeRequest,
+) {
+  const response = await api.put(
+    `/api/payroll/employees/${employeeId}`,
+    payload,
+  );
   return response.data;
 }
 
@@ -5288,27 +5814,35 @@ export async function deletePayrollEmployee(employeeId: string) {
   return response.data;
 }
 
-
-
-export async function importPayrollEmployees(payload: ImportPayrollEmployeesRequest) {
-  const response = await api.post('/api/payroll/employees/import', payload);
+export async function importPayrollEmployees(
+  payload: ImportPayrollEmployeesRequest,
+) {
+  const response = await api.post("/api/payroll/employees/import", payload);
   return response.data;
 }
-
 
 export async function getPayrollPayGroups() {
-  const response = await api.get<PayrollPayGroupsResponse>('/api/payroll/pay-groups');
+  const response = await api.get<PayrollPayGroupsResponse>(
+    "/api/payroll/pay-groups",
+  );
   return response.data;
 }
 
-export async function createPayrollPayGroup(payload: CreatePayrollPayGroupRequest) {
-  const response = await api.post('/api/payroll/pay-groups', payload);
+export async function createPayrollPayGroup(
+  payload: CreatePayrollPayGroupRequest,
+) {
+  const response = await api.post("/api/payroll/pay-groups", payload);
   return response.data;
 }
 
-
-export async function updatePayrollPayGroup(payGroupId: string, payload: UpdatePayrollPayGroupRequest) {
-  const response = await api.put(`/api/payroll/pay-groups/${payGroupId}`, payload);
+export async function updatePayrollPayGroup(
+  payGroupId: string,
+  payload: UpdatePayrollPayGroupRequest,
+) {
+  const response = await api.put(
+    `/api/payroll/pay-groups/${payGroupId}`,
+    payload,
+  );
   return response.data;
 }
 
@@ -5318,52 +5852,75 @@ export async function deletePayrollPayGroup(payGroupId: string) {
 }
 
 export async function getPayrollPayElements() {
-  const response = await api.get<PayrollPayElementsResponse>('/api/payroll/pay-elements');
+  const response = await api.get<PayrollPayElementsResponse>(
+    "/api/payroll/pay-elements",
+  );
   return response.data;
 }
 
-export async function createPayrollPayElement(payload: CreatePayrollPayElementRequest) {
-  const response = await api.post('/api/payroll/pay-elements', payload);
+export async function createPayrollPayElement(
+  payload: CreatePayrollPayElementRequest,
+) {
+  const response = await api.post("/api/payroll/pay-elements", payload);
   return response.data;
 }
 
-export async function updatePayrollPayElement(payElementId: string, payload: UpdatePayrollPayElementRequest) {
-  const response = await api.put(`/api/payroll/pay-elements/${payElementId}`, payload);
+export async function updatePayrollPayElement(
+  payElementId: string,
+  payload: UpdatePayrollPayElementRequest,
+) {
+  const response = await api.put(
+    `/api/payroll/pay-elements/${payElementId}`,
+    payload,
+  );
   return response.data;
 }
 
 export async function deletePayrollPayElement(payElementId: string) {
-  const response = await api.delete(`/api/payroll/pay-elements/${payElementId}`);
+  const response = await api.delete(
+    `/api/payroll/pay-elements/${payElementId}`,
+  );
   return response.data;
 }
 
 export async function getPayrollSalaryStructures() {
-  const response = await api.get<PayrollSalaryStructuresResponse>('/api/payroll/salary-structures');
+  const response = await api.get<PayrollSalaryStructuresResponse>(
+    "/api/payroll/salary-structures",
+  );
   return response.data;
 }
 
-export async function createPayrollSalaryStructure(payload: CreatePayrollSalaryStructureRequest) {
-  const response = await api.post('/api/payroll/salary-structures', payload);
+export async function createPayrollSalaryStructure(
+  payload: CreatePayrollSalaryStructureRequest,
+) {
+  const response = await api.post("/api/payroll/salary-structures", payload);
   return response.data;
 }
 
-export async function updatePayrollSalaryStructure(salaryStructureId: string, payload: UpdatePayrollSalaryStructureRequest) {
-  const response = await api.put(`/api/payroll/salary-structures/${salaryStructureId}`, payload);
+export async function updatePayrollSalaryStructure(
+  salaryStructureId: string,
+  payload: UpdatePayrollSalaryStructureRequest,
+) {
+  const response = await api.put(
+    `/api/payroll/salary-structures/${salaryStructureId}`,
+    payload,
+  );
   return response.data;
 }
 
 export async function deletePayrollSalaryStructure(salaryStructureId: string) {
-  const response = await api.delete(`/api/payroll/salary-structures/${salaryStructureId}`);
+  const response = await api.delete(
+    `/api/payroll/salary-structures/${salaryStructureId}`,
+  );
   return response.data;
 }
 
 export async function generatePayrollRun(period: string) {
-  const response = await api.post('/api/payroll/run', null, {
+  const response = await api.post("/api/payroll/run", null, {
     params: { period },
   });
   return response.data;
 }
-
 
 export type PostPayrollRunRequest = {
   salaryExpenseAccountId: string;
@@ -5374,12 +5931,13 @@ export type PostPayrollRunRequest = {
   description?: string | null;
 };
 
-
-export async function postPayrollRun(runId: string, payload: PostPayrollRunRequest) {
+export async function postPayrollRun(
+  runId: string,
+  payload: PostPayrollRunRequest,
+) {
   const response = await api.post(`/api/payroll/run/${runId}/post`, payload);
   return response.data;
 }
-
 
 // ==========================================
 // PAYROLL / SALARY MANAGEMENT — MAKER/CHECKER UI
@@ -5393,8 +5951,14 @@ export type RejectPayrollRunRequest = {
   reason: string;
 };
 
-export async function submitPayrollRun(runId: string, payload?: SubmitPayrollRunRequest) {
-  const response = await api.post(`/api/payroll/run/${runId}/submit`, payload ?? {});
+export async function submitPayrollRun(
+  runId: string,
+  payload?: SubmitPayrollRunRequest,
+) {
+  const response = await api.post(
+    `/api/payroll/run/${runId}/submit`,
+    payload ?? {},
+  );
   return response.data;
 }
 
@@ -5403,7 +5967,10 @@ export async function approvePayrollRun(runId: string) {
   return response.data;
 }
 
-export async function rejectPayrollRun(runId: string, payload: RejectPayrollRunRequest) {
+export async function rejectPayrollRun(
+  runId: string,
+  payload: RejectPayrollRunRequest,
+) {
   const response = await api.post(`/api/payroll/run/${runId}/reject`, payload);
   return response.data;
 }
@@ -5423,10 +5990,11 @@ export type PayrollRunSummaryDto = {
   journalEntryId?: string | null;
 };
 
-
 // GET RUNS
 export async function getPayrollRuns() {
-  const res = await api.get<{ items: PayrollRunSummaryDto[] }>('/api/payroll/runs');
+  const res = await api.get<{ items: PayrollRunSummaryDto[] }>(
+    "/api/payroll/runs",
+  );
   return res.data;
 }
 
@@ -5438,7 +6006,6 @@ export async function deletePayrollRun(runId: string) {
   const response = await api.delete(`/api/payroll/runs/${runId}`);
   return response.data;
 }
-
 
 export type PurchaseOrderReceiptLineDto = {
   id: string;
@@ -5470,7 +6037,8 @@ export type PurchaseOrderReceiptDto = {
   lines: PurchaseOrderReceiptLineDto[];
 };
 
-export type PurchaseOrderReceiptsResponse = ListEnvelope<PurchaseOrderReceiptDto>;
+export type PurchaseOrderReceiptsResponse =
+  ListEnvelope<PurchaseOrderReceiptDto>;
 
 export type CreatePurchaseOrderReceiptLineRequest = {
   purchaseOrderLineId: string;
@@ -5492,12 +6060,19 @@ export type CreatePurchaseOrderReceiptRequest = {
 };
 
 export async function getPurchaseOrderReceipts() {
-  const { data } = await api.get<PurchaseOrderReceiptsResponse>('/api/finance/procurement/purchase-order-receipts');
+  const { data } = await api.get<PurchaseOrderReceiptsResponse>(
+    "/api/finance/procurement/purchase-order-receipts",
+  );
   return data;
 }
 
-export async function createPurchaseOrderReceipt(request: CreatePurchaseOrderReceiptRequest) {
-  const { data } = await api.post('/api/finance/procurement/purchase-order-receipts', request);
+export async function createPurchaseOrderReceipt(
+  request: CreatePurchaseOrderReceiptRequest,
+) {
+  const { data } = await api.post(
+    "/api/finance/procurement/purchase-order-receipts",
+    request,
+  );
   return data;
 }
 
@@ -5539,7 +6114,13 @@ export type UserAccessAssignmentDto = {
   role: string;
   isActive: boolean;
   roles: { id: string; code: string; name: string; isPrimary: boolean }[];
-  scopes: { id: string; scopeType: string; scopeEntityId: string; scopeCode?: string | null; scopeName?: string | null }[];
+  scopes: {
+    id: string;
+    scopeType: string;
+    scopeEntityId: string;
+    scopeCode?: string | null;
+    scopeName?: string | null;
+  }[];
 };
 
 export type DepartmentWorkflowPolicyDto = {
@@ -5556,85 +6137,168 @@ export type DepartmentWorkflowPolicyDto = {
 };
 
 export async function seedDefaultAccessControl() {
-  const { data } = await api.post('/api/admin/access-control/seed-defaults');
+  const { data } = await api.post("/api/admin/access-control/seed-defaults");
   return data;
 }
 
 export async function getSecurityRoles() {
-  const { data } = await api.get<ListEnvelope<SecurityRoleDto>>('/api/admin/access-control/roles');
+  const { data } = await api.get<ListEnvelope<SecurityRoleDto>>(
+    "/api/admin/access-control/roles",
+  );
   return data;
 }
 
-export async function createSecurityRole(payload: { code: string; name: string; description?: string | null; isActive: boolean }) {
-  const { data } = await api.post('/api/admin/access-control/roles', payload);
+export async function createSecurityRole(payload: {
+  code: string;
+  name: string;
+  description?: string | null;
+  isActive: boolean;
+}) {
+  const { data } = await api.post("/api/admin/access-control/roles", payload);
   return data;
 }
 
 export async function getSecurityPermissions() {
-  const { data } = await api.get<ListEnvelope<SecurityPermissionDto>>('/api/admin/access-control/permissions');
+  const { data } = await api.get<ListEnvelope<SecurityPermissionDto>>(
+    "/api/admin/access-control/permissions",
+  );
   return data;
 }
 
-export async function createSecurityPermission(payload: { code: string; module: string; action: string; name: string; description?: string | null; isActive: boolean }) {
-  const { data } = await api.post('/api/admin/access-control/permissions', payload);
+export async function createSecurityPermission(payload: {
+  code: string;
+  module: string;
+  action: string;
+  name: string;
+  description?: string | null;
+  isActive: boolean;
+}) {
+  const { data } = await api.post(
+    "/api/admin/access-control/permissions",
+    payload,
+  );
   return data;
 }
 
-export async function setSecurityRolePermissions(roleId: string, permissionIds: string[]) {
-  const { data } = await api.put(`/api/admin/access-control/roles/${roleId}/permissions`, { permissionIds });
+export async function setSecurityRolePermissions(
+  roleId: string,
+  permissionIds: string[],
+) {
+  const { data } = await api.put(
+    `/api/admin/access-control/roles/${roleId}/permissions`,
+    { permissionIds },
+  );
   return data;
 }
 
 export async function getAccessDepartments() {
-  const { data } = await api.get<ListEnvelope<ScopeMasterDto>>('/api/admin/access-control/departments');
+  const { data } = await api.get<ListEnvelope<ScopeMasterDto>>(
+    "/api/admin/access-control/departments",
+  );
   return data;
 }
 
-export async function createAccessDepartment(payload: { code: string; name: string; description?: string | null; isActive: boolean }) {
-  const { data } = await api.post('/api/admin/access-control/departments', payload);
+export async function createAccessDepartment(payload: {
+  code: string;
+  name: string;
+  description?: string | null;
+  isActive: boolean;
+}) {
+  const { data } = await api.post(
+    "/api/admin/access-control/departments",
+    payload,
+  );
   return data;
 }
 
 export async function getAccessBranches() {
-  const { data } = await api.get<ListEnvelope<ScopeMasterDto>>('/api/admin/access-control/branches');
+  const { data } = await api.get<ListEnvelope<ScopeMasterDto>>(
+    "/api/admin/access-control/branches",
+  );
   return data;
 }
 
-export async function createAccessBranch(payload: { code: string; name: string; description?: string | null; isActive: boolean }) {
-  const { data } = await api.post('/api/admin/access-control/branches', payload);
+export async function createAccessBranch(payload: {
+  code: string;
+  name: string;
+  description?: string | null;
+  isActive: boolean;
+}) {
+  const { data } = await api.post(
+    "/api/admin/access-control/branches",
+    payload,
+  );
   return data;
 }
 
 export async function getAccessCostCenters() {
-  const { data } = await api.get<ListEnvelope<ScopeMasterDto>>('/api/admin/access-control/cost-centers');
+  const { data } = await api.get<ListEnvelope<ScopeMasterDto>>(
+    "/api/admin/access-control/cost-centers",
+  );
   return data;
 }
 
-export async function createAccessCostCenter(payload: { code: string; name: string; description?: string | null; isActive: boolean }) {
-  const { data } = await api.post('/api/admin/access-control/cost-centers', payload);
+export async function createAccessCostCenter(payload: {
+  code: string;
+  name: string;
+  description?: string | null;
+  isActive: boolean;
+}) {
+  const { data } = await api.post(
+    "/api/admin/access-control/cost-centers",
+    payload,
+  );
   return data;
 }
 
 export async function getUserAccessAssignments() {
-  const { data } = await api.get<ListEnvelope<UserAccessAssignmentDto>>('/api/admin/access-control/users/access-assignments');
+  const { data } = await api.get<ListEnvelope<UserAccessAssignmentDto>>(
+    "/api/admin/access-control/users/access-assignments",
+  );
   return data;
 }
 
-export async function setUserAccessAssignments(userId: string, payload: { roleIds?: string[]; scopes?: { scopeType: string; scopeEntityId: string; scopeCode?: string | null; scopeName?: string | null }[] }) {
-  const { data } = await api.put(`/api/admin/access-control/users/${userId}/access-assignments`, payload);
+export async function setUserAccessAssignments(
+  userId: string,
+  payload: {
+    roleIds?: string[];
+    scopes?: {
+      scopeType: string;
+      scopeEntityId: string;
+      scopeCode?: string | null;
+      scopeName?: string | null;
+    }[];
+  },
+) {
+  const { data } = await api.put(
+    `/api/admin/access-control/users/${userId}/access-assignments`,
+    payload,
+  );
   return data;
 }
 
 export async function getDepartmentWorkflowPolicies() {
-  const { data } = await api.get<ListEnvelope<DepartmentWorkflowPolicyDto>>('/api/admin/access-control/workflow-policies');
+  const { data } = await api.get<ListEnvelope<DepartmentWorkflowPolicyDto>>(
+    "/api/admin/access-control/workflow-policies",
+  );
   return data;
 }
 
-export async function createDepartmentWorkflowPolicy(payload: { moduleCode: string; organizationDepartmentId: string; makerCheckerRequired: boolean; enforceSegregationOfDuties: boolean; minimumApproverCount: number; notes?: string | null; isActive: boolean }) {
-  const { data } = await api.post('/api/admin/access-control/workflow-policies', payload);
+export async function createDepartmentWorkflowPolicy(payload: {
+  moduleCode: string;
+  organizationDepartmentId: string;
+  makerCheckerRequired: boolean;
+  enforceSegregationOfDuties: boolean;
+  minimumApproverCount: number;
+  notes?: string | null;
+  isActive: boolean;
+}) {
+  const { data } = await api.post(
+    "/api/admin/access-control/workflow-policies",
+    payload,
+  );
   return data;
 }
-
 
 export type ApprovalInboxServerItemDto = {
   id: string;
@@ -5663,3 +6327,670 @@ export type ApprovalInboxServerResponse = {
   items: ApprovalInboxServerItemDto[];
 };
 
+export type OilGasListResponse<T> = { count: number; items: T[] };
+export type OilGasDashboardDto = {
+  businessUnitCount: number;
+  assetCount: number;
+  locationCount: number;
+  productCount: number;
+  tankCount: number;
+  meterCount: number;
+  pendingProductionCount: number;
+  rejectedProductionCount: number;
+  expiringPermitCount: number;
+  todayGrossOilVolume: number;
+  todayNetOilVolume: number;
+  todayGasProducedVolume: number;
+  todayGasFlaredVolume: number;
+  todayWaterProducedVolume: number;
+  todayOpeningStockVolume: number;
+  todayClosingStockVolume: number;
+  recentEntries: OilGasProductionEntryDto[];
+};
+export type OilGasBusinessUnitDto = {
+  id: string;
+  code: string;
+  name: string;
+  description?: string | null;
+  isActive: boolean;
+  createdOnUtc: string;
+};
+export type OilGasAssetDto = {
+  id: string;
+  businessUnitId: string;
+  businessUnitCode: string;
+  businessUnitName: string;
+  code: string;
+  name: string;
+  assetType: string;
+  operatorName?: string | null;
+  ownershipPercentage: number;
+  organizationCostCenterId?: string | null;
+  locationDescription?: string | null;
+  commissioningDateUtc?: string | null;
+  isActive: boolean;
+  notes?: string | null;
+};
+export type OilGasLocationDto = {
+  id: string;
+  assetId: string;
+  assetCode: string;
+  assetName: string;
+  parentLocationId?: string | null;
+  parentLocationName?: string | null;
+  code: string;
+  name: string;
+  locationType: string;
+  coordinates?: string | null;
+  isActive: boolean;
+  notes?: string | null;
+};
+export type OilGasProductDto = {
+  id: string;
+  code: string;
+  name: string;
+  category: string;
+  unitOfMeasure: string;
+  standardDensity?: number | null;
+  isActive: boolean;
+  notes?: string | null;
+};
+export type OilGasTankDto = {
+  id: string;
+  locationId: string;
+  locationName: string;
+  productId: string;
+  productName: string;
+  tankCode: string;
+  tankName: string;
+  nominalCapacity: number;
+  safeWorkingCapacity: number;
+  currentBookStock: number;
+  status: string;
+  notes?: string | null;
+};
+export type OilGasMeterDto = {
+  id: string;
+  locationId: string;
+  locationName: string;
+  productId: string;
+  productName: string;
+  meterCode: string;
+  meterName: string;
+  meterType: string;
+  serialNumber?: string | null;
+  lastCalibrationDateUtc?: string | null;
+  nextCalibrationDateUtc?: string | null;
+  status: string;
+  notes?: string | null;
+};
+export type OilGasPermitDto = {
+  id: string;
+  assetId?: string | null;
+  assetName?: string | null;
+  locationId?: string | null;
+  locationName?: string | null;
+  permitNumber: string;
+  permitType: string;
+  issuingAuthority: string;
+  effectiveDateUtc: string;
+  expiryDateUtc: string;
+  status: string;
+  responsibleOfficer?: string | null;
+  notes?: string | null;
+};
+export type OilGasLedgerAccountDto = {
+  id: string;
+  code: string;
+  name: string;
+  category: number;
+  isCashOrBankAccount: boolean;
+};
+export type OilGasProductionEntryDto = {
+  id: string;
+  entryNumber: string;
+  productionDateUtc: string;
+  assetId: string;
+  assetName?: string | null;
+  locationId: string;
+  locationName?: string | null;
+  productId: string;
+  productName?: string | null;
+  meterId?: string | null;
+  meterName?: string | null;
+  grossOilVolume: number;
+  netOilVolume: number;
+  gasProducedVolume: number;
+  gasFlaredVolume: number;
+  waterProducedVolume: number;
+  openingStockVolume: number;
+  closingStockVolume: number;
+  lossAdjustmentVolume: number;
+  downtimeHours: number;
+  downtimeReason?: string | null;
+  meterReading?: number | null;
+  notes?: string | null;
+  status: string;
+  createdBy: string;
+  createdOnUtc: string;
+  submittedBy?: string | null;
+  submittedOnUtc?: string | null;
+  approvedBy?: string | null;
+  approvedOnUtc?: string | null;
+  rejectedBy?: string | null;
+  rejectedOnUtc?: string | null;
+  rejectionReason?: string | null;
+};
+
+export async function getOilGasDashboard() {
+  return (await api.get<OilGasDashboardDto>("/api/oil-gas/dashboard")).data;
+}
+export async function getOilGasBusinessUnits() {
+  return (
+    await api.get<OilGasListResponse<OilGasBusinessUnitDto>>(
+      "/api/oil-gas/business-units",
+    )
+  ).data;
+}
+export async function createOilGasBusinessUnit(payload: unknown) {
+  return (await api.post("/api/oil-gas/business-units", payload)).data;
+}
+export async function getOilGasAssets() {
+  return (
+    await api.get<OilGasListResponse<OilGasAssetDto>>("/api/oil-gas/assets")
+  ).data;
+}
+export async function createOilGasAsset(payload: unknown) {
+  return (await api.post("/api/oil-gas/assets", payload)).data;
+}
+export async function getOilGasLocations() {
+  return (
+    await api.get<OilGasListResponse<OilGasLocationDto>>(
+      "/api/oil-gas/locations",
+    )
+  ).data;
+}
+export async function createOilGasLocation(payload: unknown) {
+  return (await api.post("/api/oil-gas/locations", payload)).data;
+}
+export async function getOilGasProducts() {
+  return (
+    await api.get<OilGasListResponse<OilGasProductDto>>("/api/oil-gas/products")
+  ).data;
+}
+export async function createOilGasProduct(payload: unknown) {
+  return (await api.post("/api/oil-gas/products", payload)).data;
+}
+export async function getOilGasTanks() {
+  return (
+    await api.get<OilGasListResponse<OilGasTankDto>>("/api/oil-gas/tanks")
+  ).data;
+}
+export async function createOilGasTank(payload: unknown) {
+  return (await api.post("/api/oil-gas/tanks", payload)).data;
+}
+export async function getOilGasMeters() {
+  return (
+    await api.get<OilGasListResponse<OilGasMeterDto>>("/api/oil-gas/meters")
+  ).data;
+}
+export async function createOilGasMeter(payload: unknown) {
+  return (await api.post("/api/oil-gas/meters", payload)).data;
+}
+export async function getOilGasPermits() {
+  return (
+    await api.get<OilGasListResponse<OilGasPermitDto>>("/api/oil-gas/permits")
+  ).data;
+}
+export async function createOilGasPermit(payload: unknown) {
+  return (await api.post("/api/oil-gas/permits", payload)).data;
+}
+export async function getOilGasLedgerAccounts() {
+  return (
+    await api.get<OilGasListResponse<OilGasLedgerAccountDto>>(
+      "/api/oil-gas/ledger-accounts",
+    )
+  ).data;
+}
+export async function getOilGasPostingSetup() {
+  return (await api.get("/api/oil-gas/posting-setup")).data;
+}
+export async function saveOilGasPostingSetup(payload: unknown) {
+  return (await api.put("/api/oil-gas/posting-setup", payload)).data;
+}
+export async function getOilGasProductionEntries(
+  params?: Record<string, unknown>,
+) {
+  return (
+    await api.get<OilGasListResponse<OilGasProductionEntryDto>>(
+      "/api/oil-gas/production",
+      { params },
+    )
+  ).data;
+}
+export async function createOilGasProductionEntry(payload: unknown) {
+  return (await api.post("/api/oil-gas/production", payload)).data;
+}
+export async function updateOilGasProductionEntry(
+  id: string,
+  payload: unknown,
+) {
+  return (await api.put(`/api/oil-gas/production/${id}`, payload)).data;
+}
+export async function submitOilGasProductionEntry(id: string) {
+  return (await api.post(`/api/oil-gas/production/${id}/submit`)).data;
+}
+export async function approveOilGasProductionEntry(id: string) {
+  return (await api.post(`/api/oil-gas/production/${id}/approve`)).data;
+}
+export async function rejectOilGasProductionEntry(id: string, reason: string) {
+  return (await api.post(`/api/oil-gas/production/${id}/reject`, { reason }))
+    .data;
+}
+export async function getOilGasProductionSummary(
+  fromUtc: string,
+  toUtc: string,
+) {
+  return (
+    await api.get("/api/oil-gas/reports/production-summary", {
+      params: { fromUtc, toUtc },
+    })
+  ).data;
+}
+export async function getOilGasComplianceReport() {
+  return (await api.get("/api/oil-gas/reports/compliance")).data;
+}
+
+export type OilGasStockDashboardDto = {
+  currentTankBookStock: number;
+  todayReceipts: number;
+  todayDeliveries: number;
+  pendingMovementCount: number;
+  rejectedMovementCount: number;
+  unpostedApprovedCount: number;
+  calibrationDueCount: number;
+  permitExpiryCount: number;
+};
+export type OilGasStockMovementDto = {
+  id: string;
+  movementNumber: string;
+  movementDateUtc: string;
+  movementType: string;
+  assetId: string;
+  assetName?: string | null;
+  locationId: string;
+  locationName?: string | null;
+  productId: string;
+  productName?: string | null;
+  sourceTankId?: string | null;
+  sourceTankName?: string | null;
+  destinationTankId?: string | null;
+  destinationTankName?: string | null;
+  quantity: number;
+  unitOfMeasure: string;
+  reference: string;
+  productionEntryId?: string | null;
+  customerId?: string | null;
+  salesInvoiceId?: string | null;
+  billingInvoiceId?: string | null;
+  inventoryTransactionId?: string | null;
+  transportType: string;
+  transportReference?: string | null;
+  destinationDescription?: string | null;
+  notes?: string | null;
+  status: string;
+  createdBy: string;
+  createdOnUtc: string;
+  submittedBy?: string | null;
+  submittedOnUtc?: string | null;
+  approvedBy?: string | null;
+  approvedOnUtc?: string | null;
+  rejectedBy?: string | null;
+  rejectedOnUtc?: string | null;
+  rejectionReason?: string | null;
+  postedBy?: string | null;
+  postedOnUtc?: string | null;
+};
+export type OilGasMeterReadingDto = {
+  id: string;
+  meterId: string;
+  meterCode: string;
+  readingDateUtc: string;
+  previousReading: number;
+  currentReading: number;
+  measuredQuantity: number;
+  reference?: string | null;
+  notes?: string | null;
+};
+export async function getOilGasStockDashboard() {
+  return (
+    await api.get<OilGasStockDashboardDto>(
+      "/api/oil-gas/stock-operations/dashboard",
+    )
+  ).data;
+}
+export async function getOilGasStockMovements(
+  params?: Record<string, unknown>,
+) {
+  return (
+    await api.get<OilGasListResponse<OilGasStockMovementDto>>(
+      "/api/oil-gas/stock-operations/movements",
+      { params },
+    )
+  ).data;
+}
+export async function createOilGasStockMovement(payload: unknown) {
+  return (await api.post("/api/oil-gas/stock-operations/movements", payload))
+    .data;
+}
+export async function updateOilGasStockMovement(id: string, payload: unknown) {
+  return (
+    await api.put(`/api/oil-gas/stock-operations/movements/${id}`, payload)
+  ).data;
+}
+export async function submitOilGasStockMovement(id: string) {
+  return (
+    await api.post(`/api/oil-gas/stock-operations/movements/${id}/submit`)
+  ).data;
+}
+export async function approveOilGasStockMovement(id: string) {
+  return (
+    await api.post(`/api/oil-gas/stock-operations/movements/${id}/approve`)
+  ).data;
+}
+export async function rejectOilGasStockMovement(id: string, reason: string) {
+  return (
+    await api.post(`/api/oil-gas/stock-operations/movements/${id}/reject`, {
+      reason,
+    })
+  ).data;
+}
+export async function postOilGasStockMovement(id: string) {
+  return (await api.post(`/api/oil-gas/stock-operations/movements/${id}/post`))
+    .data;
+}
+export async function getOilGasMeterReadings(meterId?: string) {
+  return (
+    await api.get<OilGasListResponse<OilGasMeterReadingDto>>(
+      "/api/oil-gas/stock-operations/meter-readings",
+      { params: meterId ? { meterId } : undefined },
+    )
+  ).data;
+}
+export async function createOilGasMeterReading(payload: unknown) {
+  return (
+    await api.post("/api/oil-gas/stock-operations/meter-readings", payload)
+  ).data;
+}
+export async function createOilGasMeterCalibration(payload: unknown) {
+  return (
+    await api.post("/api/oil-gas/stock-operations/meter-calibrations", payload)
+  ).data;
+}
+export async function renewOilGasPermit(id: string, payload: unknown) {
+  return (
+    await api.post(`/api/oil-gas/stock-operations/permits/${id}/renew`, payload)
+  ).data;
+}
+export async function getOilGasStockReconciliation(
+  fromUtc: string,
+  toUtc: string,
+) {
+  return (
+    await api.get("/api/oil-gas/stock-operations/reconciliation", {
+      params: { fromUtc, toUtc },
+    })
+  ).data;
+}
+
+// -----------------------------------------------------------------------------
+// Oil & Gas Upstream Operations completion
+// -----------------------------------------------------------------------------
+
+export type OilGasUpstreamListResponse<T> = {
+  count: number;
+  items: T[];
+};
+
+export type OilGasUpstreamDashboardDto = {
+  openLiftings: number;
+  pendingAfeApprovals: number;
+  openProductionPeriods: number;
+  openHseIncidents: number;
+  overdueCorrectiveActions: number;
+  maintenanceDue: number;
+  permitExpiryAlerts: number;
+  unbilledCompletedLiftings: number;
+  activePartners: number;
+  openAfeValue: number;
+};
+
+export async function getOilGasUpstreamDashboard() {
+  return (
+    await api.get<OilGasUpstreamDashboardDto>("/api/oil-gas/upstream/dashboard")
+  ).data;
+}
+
+export async function getOilGasUpstreamLiftings() {
+  return (
+    await api.get<OilGasUpstreamListResponse<any>>(
+      "/api/oil-gas/upstream/liftings",
+    )
+  ).data;
+}
+
+export async function createOilGasUpstreamLifting(payload: unknown) {
+  return (await api.post("/api/oil-gas/upstream/liftings", payload)).data;
+}
+
+export async function updateOilGasUpstreamLifting(
+  id: string,
+  payload: unknown,
+) {
+  return (await api.put(`/api/oil-gas/upstream/liftings/${id}`, payload)).data;
+}
+
+export async function submitOilGasUpstreamLifting(id: string) {
+  return (await api.post(`/api/oil-gas/upstream/liftings/${id}/submit`)).data;
+}
+
+export async function approveOilGasUpstreamLifting(id: string) {
+  return (await api.post(`/api/oil-gas/upstream/liftings/${id}/approve`)).data;
+}
+
+export async function rejectOilGasUpstreamLifting(id: string, reason: string) {
+  return (
+    await api.post(`/api/oil-gas/upstream/liftings/${id}/reject`, { reason })
+  ).data;
+}
+
+export async function completeOilGasUpstreamLifting(
+  id: string,
+  payload: unknown,
+) {
+  return (
+    await api.post(`/api/oil-gas/upstream/liftings/${id}/complete`, payload)
+  ).data;
+}
+
+export async function getOilGasAfes() {
+  return (
+    await api.get<OilGasUpstreamListResponse<any>>("/api/oil-gas/upstream/afes")
+  ).data;
+}
+
+export async function createOilGasAfe(payload: unknown) {
+  return (await api.post("/api/oil-gas/upstream/afes", payload)).data;
+}
+
+export async function updateOilGasAfe(id: string, payload: unknown) {
+  return (await api.put(`/api/oil-gas/upstream/afes/${id}`, payload)).data;
+}
+
+export async function submitOilGasAfe(id: string) {
+  return (await api.post(`/api/oil-gas/upstream/afes/${id}/submit`)).data;
+}
+
+export async function approveOilGasAfe(id: string) {
+  return (await api.post(`/api/oil-gas/upstream/afes/${id}/approve`)).data;
+}
+
+export async function rejectOilGasAfe(id: string, reason: string) {
+  return (await api.post(`/api/oil-gas/upstream/afes/${id}/reject`, { reason }))
+    .data;
+}
+
+export async function closeOilGasAfe(id: string) {
+  return (await api.post(`/api/oil-gas/upstream/afes/${id}/close`)).data;
+}
+
+export async function getOilGasPartners() {
+  return (
+    await api.get<OilGasUpstreamListResponse<any>>(
+      "/api/oil-gas/upstream/partners",
+    )
+  ).data;
+}
+
+export async function createOilGasPartner(payload: unknown) {
+  return (await api.post("/api/oil-gas/upstream/partners", payload)).data;
+}
+
+export async function createOilGasPartnerInterest(
+  partnerId: string,
+  payload: unknown,
+) {
+  return (
+    await api.post(
+      `/api/oil-gas/upstream/partners/${partnerId}/interests`,
+      payload,
+    )
+  ).data;
+}
+
+export async function createOilGasPartnerFunding(
+  partnerId: string,
+  payload: unknown,
+) {
+  return (
+    await api.post(
+      `/api/oil-gas/upstream/partners/${partnerId}/funding`,
+      payload,
+    )
+  ).data;
+}
+
+export async function getOilGasProductionPeriods() {
+  return (
+    await api.get<OilGasUpstreamListResponse<any>>(
+      "/api/oil-gas/upstream/production-periods",
+    )
+  ).data;
+}
+
+export async function createOilGasProductionPeriod(payload: unknown) {
+  return (await api.post("/api/oil-gas/upstream/production-periods", payload))
+    .data;
+}
+
+export async function submitOilGasProductionPeriod(id: string) {
+  return (
+    await api.post(`/api/oil-gas/upstream/production-periods/${id}/submit`)
+  ).data;
+}
+
+export async function approveOilGasProductionPeriod(id: string) {
+  return (
+    await api.post(`/api/oil-gas/upstream/production-periods/${id}/approve`)
+  ).data;
+}
+
+export async function rejectOilGasProductionPeriod(id: string, reason: string) {
+  return (
+    await api.post(`/api/oil-gas/upstream/production-periods/${id}/reject`, {
+      reason,
+    })
+  ).data;
+}
+
+export async function closeOilGasProductionPeriod(id: string) {
+  return (
+    await api.post(`/api/oil-gas/upstream/production-periods/${id}/close`)
+  ).data;
+}
+
+export async function getOilGasHseIncidents() {
+  return (
+    await api.get<OilGasUpstreamListResponse<any>>(
+      "/api/oil-gas/upstream/hse-incidents",
+    )
+  ).data;
+}
+
+export async function createOilGasHseIncident(payload: unknown) {
+  return (await api.post("/api/oil-gas/upstream/hse-incidents", payload)).data;
+}
+
+export async function createOilGasCorrectiveAction(
+  incidentId: string,
+  payload: unknown,
+) {
+  return (
+    await api.post(
+      `/api/oil-gas/upstream/hse-incidents/${incidentId}/actions`,
+      payload,
+    )
+  ).data;
+}
+
+export async function completeOilGasCorrectiveAction(
+  id: string,
+  payload: unknown,
+) {
+  return (
+    await api.post(
+      `/api/oil-gas/upstream/corrective-actions/${id}/complete`,
+      payload,
+    )
+  ).data;
+}
+
+export async function closeOilGasHseIncident(id: string) {
+  return (await api.post(`/api/oil-gas/upstream/hse-incidents/${id}/close`))
+    .data;
+}
+
+export async function getOilGasEquipment() {
+  return (
+    await api.get<OilGasUpstreamListResponse<any>>(
+      "/api/oil-gas/upstream/equipment",
+    )
+  ).data;
+}
+
+export async function createOilGasEquipment(payload: unknown) {
+  return (await api.post("/api/oil-gas/upstream/equipment", payload)).data;
+}
+
+export async function getOilGasDocuments() {
+  return (
+    await api.get<OilGasUpstreamListResponse<any>>(
+      "/api/oil-gas/upstream/documents",
+    )
+  ).data;
+}
+
+export async function createOilGasDocument(payload: unknown) {
+  return (await api.post("/api/oil-gas/upstream/documents", payload)).data;
+}
+
+export async function getOilGasUpstreamManagementReport(
+  fromUtc: string,
+  toUtc: string,
+) {
+  return (
+    await api.get("/api/oil-gas/upstream/reports/management", {
+      params: { fromUtc, toUtc },
+    })
+  ).data;
+}

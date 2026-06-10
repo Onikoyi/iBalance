@@ -34,7 +34,12 @@ export type UserRole =
   | 'FleetOfficer'
   | 'FleetApprover'
   | 'FleetReviewer'
-  | 'FleetViewer';
+  | 'FleetViewer'
+  | 'OilGasManager'
+  | 'ProductionOfficer'
+  | 'ProductionApprover'
+  | 'MeasurementOfficer'
+  | 'OilGasViewer';
 
 export type AuthScope = {
   scopeType: string;
@@ -741,6 +746,47 @@ export function canExportBillingReports(): boolean {
   return hasPermission('billing.export') || hasPermission('reports.export');
 }
 
+
+export function canViewOilGas(): boolean {
+  return hasPermission('oilgas.view');
+}
+export function canManageOilGasSetup(): boolean {
+  return hasPermission('oilgas.setup.manage');
+}
+export function canManageOilGasAssets(): boolean {
+  return hasPermission('oilgas.asset.manage');
+}
+export function canManageOilGasProducts(): boolean {
+  return hasPermission('oilgas.product.manage');
+}
+export function canManageOilGasTanks(): boolean {
+  return hasPermission('oilgas.tank.manage');
+}
+export function canManageOilGasMeters(): boolean {
+  return hasPermission('oilgas.meter.manage');
+}
+export function canManageOilGasPermits(): boolean {
+  return hasPermission('oilgas.permit.manage');
+}
+export function canCreateOilGasProduction(): boolean {
+  return hasPermission('oilgas.production.create');
+}
+export function canUpdateOilGasProduction(): boolean {
+  return hasPermission('oilgas.production.update') || hasPermission('oilgas.production.correct');
+}
+export function canSubmitOilGasProduction(): boolean {
+  return hasPermission('oilgas.production.submit');
+}
+export function canApproveOilGasProduction(): boolean {
+  return hasPermission('oilgas.production.approve');
+}
+export function canRejectOilGasProduction(): boolean {
+  return hasPermission('oilgas.production.reject');
+}
+export function canViewOilGasReports(): boolean {
+  return hasPermission('oilgas.reports.view') || hasPermission('oilgas.view');
+}
+
 export function canViewFleet(): boolean {
   return hasPermission('fleet.view');
 }
@@ -953,3 +999,13 @@ export function getFirstAccessibleWorkspaceRoute(): string {
   if (canAccessAdmin()) return '/admin';
   return '/dashboard';
 }
+
+
+export function canCreateOilGasMovement(): boolean { return hasPermission('oilgas.movement.create'); }
+export function canUpdateOilGasMovement(): boolean { return hasPermission('oilgas.movement.update'); }
+export function canSubmitOilGasMovement(): boolean { return hasPermission('oilgas.movement.submit'); }
+export function canApproveOilGasMovement(): boolean { return hasPermission('oilgas.movement.approve') || hasPermission('workflow.approve'); }
+export function canRejectOilGasMovement(): boolean { return hasPermission('oilgas.movement.reject') || hasPermission('workflow.reject'); }
+export function canPostOilGasMovement(): boolean { return hasPermission('oilgas.movement.post'); }
+export function canManageOilGasReconciliation(): boolean { return hasPermission('oilgas.reconciliation.manage') || hasPermission('oilgas.reports.view'); }
+

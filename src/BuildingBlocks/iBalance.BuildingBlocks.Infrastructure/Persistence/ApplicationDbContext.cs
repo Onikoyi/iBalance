@@ -7,6 +7,7 @@ using iBalance.Modules.HumanResources.Domain.Enums;
 using iBalance.Modules.Finance.Persistence;
 using iBalance.Modules.Platform.Domain.Entities;
 using iBalance.Modules.Platform.Persistence;
+using iBalance.Modules.OilAndGas.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace iBalance.BuildingBlocks.Infrastructure.Persistence;
@@ -131,6 +132,30 @@ public class ApplicationDbContext : DbContext
     public DbSet<BillingCreditNote> BillingCreditNotes => Set<BillingCreditNote>();
     public DbSet<BillingPaymentAllocation> BillingPaymentAllocations => Set<BillingPaymentAllocation>();
     public DbSet<BillingNumberSequence> BillingNumberSequences => Set<BillingNumberSequence>();
+
+    public DbSet<OilGasBusinessUnit> OilGasBusinessUnits => Set<OilGasBusinessUnit>();
+    public DbSet<OilGasAsset> OilGasAssets => Set<OilGasAsset>();
+    public DbSet<OilGasLocation> OilGasLocations => Set<OilGasLocation>();
+    public DbSet<OilGasProduct> OilGasProducts => Set<OilGasProduct>();
+    public DbSet<OilGasTank> OilGasTanks => Set<OilGasTank>();
+    public DbSet<OilGasMeter> OilGasMeters => Set<OilGasMeter>();
+    public DbSet<OilGasPermit> OilGasPermits => Set<OilGasPermit>();
+    public DbSet<OilGasPostingSetup> OilGasPostingSetups => Set<OilGasPostingSetup>();
+    public DbSet<OilGasProductionEntry> OilGasProductionEntries => Set<OilGasProductionEntry>();
+    public DbSet<OilGasStockMovement> OilGasStockMovements => Set<OilGasStockMovement>();
+    public DbSet<OilGasMeterReading> OilGasMeterReadings => Set<OilGasMeterReading>();
+    public DbSet<OilGasMeterCalibration> OilGasMeterCalibrations => Set<OilGasMeterCalibration>();
+    public DbSet<OilGasLifting> OilGasLiftings => Set<OilGasLifting>();
+    public DbSet<OilGasAfe> OilGasAfes => Set<OilGasAfe>();
+    public DbSet<OilGasPartner> OilGasPartners => Set<OilGasPartner>();
+    public DbSet<OilGasPartnerInterest> OilGasPartnerInterests => Set<OilGasPartnerInterest>();
+    public DbSet<OilGasPartnerFunding> OilGasPartnerFundings => Set<OilGasPartnerFunding>();
+    public DbSet<OilGasProductionPeriod> OilGasProductionPeriods => Set<OilGasProductionPeriod>();
+    public DbSet<OilGasHseIncident> OilGasHseIncidents => Set<OilGasHseIncident>();
+    public DbSet<OilGasCorrectiveAction> OilGasCorrectiveActions => Set<OilGasCorrectiveAction>();
+    public DbSet<OilGasEquipment> OilGasEquipment => Set<OilGasEquipment>();
+    public DbSet<OilGasDocumentReference> OilGasDocumentReferences => Set<OilGasDocumentReference>();
+
 
 
 
@@ -1637,6 +1662,396 @@ modelBuilder.Entity<AuditEvent>(entity =>
         });
 
 
+        modelBuilder.Entity<OilGasBusinessUnit>(entity =>
+        {
+            entity.ToTable("OilGasBusinessUnits", "oilgas");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.Code).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<OilGasAsset>(entity =>
+        {
+            entity.ToTable("OilGasAssets", "oilgas");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.Code).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.OperatorName).HasMaxLength(200);
+            entity.Property(x => x.OwnershipPercentage).HasPrecision(7, 4);
+            entity.Property(x => x.LocationDescription).HasMaxLength(500);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
+            entity.HasOne(x => x.BusinessUnit).WithMany().HasForeignKey(x => x.BusinessUnitId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<OrganizationCostCenter>().WithMany().HasForeignKey(x => x.OrganizationCostCenterId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<OilGasLocation>(entity =>
+        {
+            entity.ToTable("OilGasLocations", "oilgas");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.Code).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Coordinates).HasMaxLength(200);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
+            entity.HasOne(x => x.Asset).WithMany().HasForeignKey(x => x.AssetId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.ParentLocation).WithMany().HasForeignKey(x => x.ParentLocationId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<OilGasProduct>(entity =>
+        {
+            entity.ToTable("OilGasProducts", "oilgas");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.Code).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.UnitOfMeasure).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.StandardDensity).HasPrecision(18, 6);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<OilGasTank>(entity =>
+        {
+            entity.ToTable("OilGasTanks", "oilgas");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.TankCode).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.TankName).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.NominalCapacity).HasPrecision(18, 4);
+            entity.Property(x => x.SafeWorkingCapacity).HasPrecision(18, 4);
+            entity.Property(x => x.CurrentBookStock).HasPrecision(18, 4);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.HasIndex(x => new { x.TenantId, x.TankCode }).IsUnique();
+            entity.HasOne(x => x.Location).WithMany().HasForeignKey(x => x.LocationId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<OilGasMeter>(entity =>
+        {
+            entity.ToTable("OilGasMeters", "oilgas");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.MeterCode).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.MeterName).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.MeterType).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.SerialNumber).HasMaxLength(100);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.HasIndex(x => new { x.TenantId, x.MeterCode }).IsUnique();
+            entity.HasOne(x => x.Location).WithMany().HasForeignKey(x => x.LocationId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<OilGasPermit>(entity =>
+        {
+            entity.ToTable("OilGasPermits", "oilgas");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.PermitNumber).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.PermitType).HasMaxLength(150).IsRequired();
+            entity.Property(x => x.IssuingAuthority).HasMaxLength(150).IsRequired();
+            entity.Property(x => x.ResponsibleOfficer).HasMaxLength(200);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.HasIndex(x => new { x.TenantId, x.PermitNumber }).IsUnique();
+            entity.HasOne(x => x.Asset).WithMany().HasForeignKey(x => x.AssetId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Location).WithMany().HasForeignKey(x => x.LocationId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<OilGasPostingSetup>(entity =>
+        {
+            entity.ToTable("OilGasPostingSetups", "oilgas");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.HasIndex(x => x.TenantId).IsUnique();
+            entity.HasOne<LedgerAccount>().WithMany().HasForeignKey(x => x.InventoryAssetLedgerAccountId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<LedgerAccount>().WithMany().HasForeignKey(x => x.ProductionRevenueLedgerAccountId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<LedgerAccount>().WithMany().HasForeignKey(x => x.ProductionLossExpenseLedgerAccountId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<LedgerAccount>().WithMany().HasForeignKey(x => x.GasFlareExpenseLedgerAccountId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<LedgerAccount>().WithMany().HasForeignKey(x => x.ProductionCostLedgerAccountId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<OilGasProductionEntry>(entity =>
+        {
+            entity.ToTable("OilGasProductionEntries", "oilgas");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.EntryNumber).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.GrossOilVolume).HasPrecision(18, 4);
+            entity.Property(x => x.NetOilVolume).HasPrecision(18, 4);
+            entity.Property(x => x.GasProducedVolume).HasPrecision(18, 4);
+            entity.Property(x => x.GasFlaredVolume).HasPrecision(18, 4);
+            entity.Property(x => x.WaterProducedVolume).HasPrecision(18, 4);
+            entity.Property(x => x.OpeningStockVolume).HasPrecision(18, 4);
+            entity.Property(x => x.ClosingStockVolume).HasPrecision(18, 4);
+            entity.Property(x => x.LossAdjustmentVolume).HasPrecision(18, 4);
+            entity.Property(x => x.DowntimeHours).HasPrecision(8, 2);
+            entity.Property(x => x.MeterReading).HasPrecision(18, 4);
+            entity.Property(x => x.DowntimeReason).HasMaxLength(1000);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.Property(x => x.CreatedBy).HasMaxLength(256).IsRequired();
+            entity.Property(x => x.SubmittedBy).HasMaxLength(256);
+            entity.Property(x => x.ApprovedBy).HasMaxLength(256);
+            entity.Property(x => x.RejectedBy).HasMaxLength(256);
+            entity.Property(x => x.RejectionReason).HasMaxLength(2000);
+            entity.HasIndex(x => new { x.TenantId, x.EntryNumber }).IsUnique();
+            entity.HasIndex(x => new { x.TenantId, x.ProductionDateUtc, x.AssetId });
+            entity.HasOne(x => x.Asset).WithMany().HasForeignKey(x => x.AssetId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Location).WithMany().HasForeignKey(x => x.LocationId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Meter).WithMany().HasForeignKey(x => x.MeterId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<OilGasStockMovement>(entity =>
+        {
+            entity.ToTable("OilGasStockMovements", "oilgas");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.MovementNumber).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.UnitOfMeasure).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.Reference).HasMaxLength(150).IsRequired();
+            entity.Property(x => x.Quantity).HasPrecision(18, 4);
+            entity.Property(x => x.TransportReference).HasMaxLength(150);
+            entity.Property(x => x.DestinationDescription).HasMaxLength(500);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.Property(x => x.CreatedBy).HasMaxLength(256).IsRequired();
+            entity.Property(x => x.SubmittedBy).HasMaxLength(256);
+            entity.Property(x => x.ApprovedBy).HasMaxLength(256);
+            entity.Property(x => x.RejectedBy).HasMaxLength(256);
+            entity.Property(x => x.RejectionReason).HasMaxLength(1000);
+            entity.Property(x => x.PostedBy).HasMaxLength(256);
+            entity.HasIndex(x => new { x.TenantId, x.MovementNumber }).IsUnique();
+            entity.HasIndex(x => new { x.TenantId, x.MovementDateUtc, x.Status });
+            entity.HasOne(x => x.Asset).WithMany().HasForeignKey(x => x.AssetId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Location).WithMany().HasForeignKey(x => x.LocationId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.SourceTank).WithMany().HasForeignKey(x => x.SourceTankId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.DestinationTank).WithMany().HasForeignKey(x => x.DestinationTankId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<OilGasMeterReading>(entity =>
+        {
+            entity.ToTable("OilGasMeterReadings", "oilgas");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.PreviousReading).HasPrecision(18, 4);
+            entity.Property(x => x.CurrentReading).HasPrecision(18, 4);
+            entity.Property(x => x.MeasuredQuantity).HasPrecision(18, 4);
+            entity.Property(x => x.Reference).HasMaxLength(150);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.Property(x => x.CreatedBy).HasMaxLength(256).IsRequired();
+            entity.HasIndex(x => new { x.TenantId, x.MeterId, x.ReadingDateUtc });
+            entity.HasOne(x => x.Meter).WithMany().HasForeignKey(x => x.MeterId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<OilGasMeterCalibration>(entity =>
+        {
+            entity.ToTable("OilGasMeterCalibrations", "oilgas");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.CertificateReference).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.CalibratedBy).HasMaxLength(250).IsRequired();
+            entity.Property(x => x.Result).HasMaxLength(500);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.Property(x => x.CreatedBy).HasMaxLength(256).IsRequired();
+            entity.HasIndex(x => new { x.TenantId, x.MeterId, x.CalibrationDateUtc });
+            entity.HasOne(x => x.Meter).WithMany().HasForeignKey(x => x.MeterId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+
+        modelBuilder.Entity<OilGasLifting>(entity =>
+        {
+            entity.ToTable("OilGasLiftings", "oilgas");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.LiftingNumber).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.NominationReference).HasMaxLength(150);
+            entity.Property(x => x.OfftakerName).HasMaxLength(250).IsRequired();
+            entity.Property(x => x.UnitOfMeasure).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.PlannedQuantity).HasPrecision(18, 4);
+            entity.Property(x => x.ActualLoadedQuantity).HasPrecision(18, 4);
+            entity.Property(x => x.DeliveredQuantity).HasPrecision(18, 4);
+            entity.Property(x => x.UnitPrice).HasPrecision(18, 4);
+            entity.Property(x => x.CurrencyCode).HasMaxLength(10).IsRequired();
+            entity.Property(x => x.VesselOrTruckReference).HasMaxLength(200);
+            entity.Property(x => x.BillOfLadingNumber).HasMaxLength(150);
+            entity.Property(x => x.Destination).HasMaxLength(500);
+            entity.Property(x => x.QualityCertificateReference).HasMaxLength(200);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.Property(x => x.CreatedBy).HasMaxLength(256).IsRequired();
+            entity.Property(x => x.SubmittedBy).HasMaxLength(256);
+            entity.Property(x => x.ApprovedBy).HasMaxLength(256);
+            entity.Property(x => x.RejectedBy).HasMaxLength(256);
+            entity.Property(x => x.RejectionReason).HasMaxLength(1000);
+            entity.Property(x => x.CompletedBy).HasMaxLength(256);
+            entity.HasIndex(x => new { x.TenantId, x.LiftingNumber }).IsUnique();
+            entity.HasOne(x => x.Asset).WithMany().HasForeignKey(x => x.AssetId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Location).WithMany().HasForeignKey(x => x.LocationId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.SourceTank).WithMany().HasForeignKey(x => x.SourceTankId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<OilGasAfe>(entity =>
+        {
+            entity.ToTable("OilGasAfes", "oilgas");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.AfeNumber).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Title).HasMaxLength(250).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(2000).IsRequired();
+            entity.Property(x => x.CostCategory).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.OriginalEstimate).HasPrecision(18, 2);
+            entity.Property(x => x.ApprovedAmount).HasPrecision(18, 2);
+            entity.Property(x => x.RevisedAmount).HasPrecision(18, 2);
+            entity.Property(x => x.CommittedAmount).HasPrecision(18, 2);
+            entity.Property(x => x.ActualExpenditure).HasPrecision(18, 2);
+            entity.Property(x => x.ForecastAtCompletion).HasPrecision(18, 2);
+            entity.Property(x => x.Justification).HasMaxLength(2000).IsRequired();
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.Property(x => x.CreatedBy).HasMaxLength(256).IsRequired();
+            entity.Property(x => x.RejectionReason).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.TenantId, x.AfeNumber }).IsUnique();
+            entity.HasOne(x => x.Asset).WithMany().HasForeignKey(x => x.AssetId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Location).WithMany().HasForeignKey(x => x.LocationId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<OilGasPartner>(entity =>
+        {
+            entity.ToTable("OilGasPartners", "oilgas");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.PartnerCode).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.PartnerName).HasMaxLength(250).IsRequired();
+            entity.Property(x => x.RegistrationNumber).HasMaxLength(120);
+            entity.Property(x => x.ContactEmail).HasMaxLength(250);
+            entity.Property(x => x.ContactPhone).HasMaxLength(80);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.HasIndex(x => new { x.TenantId, x.PartnerCode }).IsUnique();
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<OilGasPartnerInterest>(entity =>
+        {
+            entity.ToTable("OilGasPartnerInterests", "oilgas");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.WorkingInterestPercentage).HasPrecision(7, 4);
+            entity.Property(x => x.CostSharePercentage).HasPrecision(7, 4);
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+            entity.HasOne(x => x.Partner).WithMany().HasForeignKey(x => x.PartnerId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Asset).WithMany().HasForeignKey(x => x.AssetId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => new { x.TenantId, x.PartnerId, x.AssetId, x.EffectiveFromUtc }).IsUnique();
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<OilGasPartnerFunding>(entity =>
+        {
+            entity.ToTable("OilGasPartnerFundings", "oilgas");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Reference).HasMaxLength(150).IsRequired();
+            entity.Property(x => x.Amount).HasPrecision(18, 2);
+            entity.Property(x => x.CurrencyCode).HasMaxLength(10).IsRequired();
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.Property(x => x.CreatedBy).HasMaxLength(256).IsRequired();
+            entity.HasOne(x => x.Partner).WithMany().HasForeignKey(x => x.PartnerId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Asset).WithMany().HasForeignKey(x => x.AssetId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Afe).WithMany().HasForeignKey(x => x.AfeId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<OilGasProductionPeriod>(entity =>
+        {
+            entity.ToTable("OilGasProductionPeriods", "oilgas");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.PeriodCode).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.GrossOilVolume).HasPrecision(18, 4);
+            entity.Property(x => x.NetOilVolume).HasPrecision(18, 4);
+            entity.Property(x => x.GasProducedVolume).HasPrecision(18, 4);
+            entity.Property(x => x.GasFlaredVolume).HasPrecision(18, 4);
+            entity.Property(x => x.WaterProducedVolume).HasPrecision(18, 4);
+            entity.Property(x => x.LiftingVolume).HasPrecision(18, 4);
+            entity.Property(x => x.ClosingStockVolume).HasPrecision(18, 4);
+            entity.Property(x => x.ReconciliationVariance).HasPrecision(18, 4);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.Property(x => x.CreatedBy).HasMaxLength(256).IsRequired();
+            entity.Property(x => x.RejectionReason).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.TenantId, x.PeriodCode }).IsUnique();
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<OilGasHseIncident>(entity =>
+        {
+            entity.ToTable("OilGasHseIncidents", "oilgas");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.IncidentNumber).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.IncidentCategory).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(3000).IsRequired();
+            entity.Property(x => x.ImmediateAction).HasMaxLength(2000).IsRequired();
+            entity.Property(x => x.RootCause).HasMaxLength(2000);
+            entity.Property(x => x.ResponsibleOfficer).HasMaxLength(250).IsRequired();
+            entity.Property(x => x.EvidenceReference).HasMaxLength(250);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.Property(x => x.CreatedBy).HasMaxLength(256).IsRequired();
+            entity.HasIndex(x => new { x.TenantId, x.IncidentNumber }).IsUnique();
+            entity.HasOne(x => x.Asset).WithMany().HasForeignKey(x => x.AssetId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Location).WithMany().HasForeignKey(x => x.LocationId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<OilGasCorrectiveAction>(entity =>
+        {
+            entity.ToTable("OilGasCorrectiveActions", "oilgas");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ActionDescription).HasMaxLength(2000).IsRequired();
+            entity.Property(x => x.ResponsibleOfficer).HasMaxLength(250).IsRequired();
+            entity.Property(x => x.CompletionEvidenceReference).HasMaxLength(250);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.HasOne(x => x.Incident).WithMany().HasForeignKey(x => x.IncidentId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<OilGasEquipment>(entity =>
+        {
+            entity.ToTable("OilGasEquipment", "oilgas");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.EquipmentNumber).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.EquipmentName).HasMaxLength(250).IsRequired();
+            entity.Property(x => x.EquipmentCategory).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.Manufacturer).HasMaxLength(150);
+            entity.Property(x => x.Model).HasMaxLength(150);
+            entity.Property(x => x.SerialNumber).HasMaxLength(150);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.HasIndex(x => new { x.TenantId, x.EquipmentNumber }).IsUnique();
+            entity.HasOne(x => x.Asset).WithMany().HasForeignKey(x => x.AssetId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Location).WithMany().HasForeignKey(x => x.LocationId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
+        modelBuilder.Entity<OilGasDocumentReference>(entity =>
+        {
+            entity.ToTable("OilGasDocumentReferences", "oilgas");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.RelatedEntityType).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.DocumentReference).HasMaxLength(250).IsRequired();
+            entity.Property(x => x.FileName).HasMaxLength(500);
+            entity.Property(x => x.Description).HasMaxLength(2000);
+            entity.Property(x => x.RecordedBy).HasMaxLength(256).IsRequired();
+            entity.HasIndex(x => new { x.TenantId, x.RelatedEntityType, x.RelatedEntityId });
+            entity.HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        });
+
 }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
@@ -1704,5 +2119,7 @@ modelBuilder.Entity<AuditEvent>(entity =>
                 }
             }
         }
+
+
     }
 }

@@ -1,7 +1,10 @@
+
 import type { PropsWithChildren } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { getCompanyLogoDataUrl, getTenantLogoDataUrl } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
+
+const IBALANCE_LOGO_PATH = '/assets/branding/ibalance-logo.png';
 
 function LogoSlot({ dataUrl, fallbackText }: { dataUrl: string; fallbackText: string }) {
   if (dataUrl) {
@@ -37,7 +40,7 @@ export function PublicShell({ children }: PropsWithChildren) {
         <div className="public-header-inner">
           <Link to="/" className="public-brand">
             <div className="public-brand-row">
-              <LogoSlot dataUrl={companyLogo} fallbackText="Nikosoft" />
+              <LogoSlot dataUrl={companyLogo || IBALANCE_LOGO_PATH} fallbackText="Nikosoft" />
               <div className="public-brand-divider" />
               <LogoSlot dataUrl={tenantLogo} fallbackText="Tenant" />
             </div>

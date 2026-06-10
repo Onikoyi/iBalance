@@ -2,6 +2,8 @@ import type { PropsWithChildren } from 'react';
 import { Link } from 'react-router-dom';
 import { getCompanyLogoDataUrl, getTenantLogoDataUrl } from '../../lib/api';
 
+const IBALANCE_LOGO_PATH = '/assets/branding/ibalance-logo.png';
+
 function LogoSlot({ dataUrl, fallbackText }: { dataUrl: string; fallbackText: string }) {
   if (dataUrl) {
     return <img src={dataUrl} alt={fallbackText} style={{ height: 34, maxWidth: 160, objectFit: 'contain' }} />;
@@ -40,7 +42,7 @@ export function AuthShell({ children, wide = false }: AuthShellProps) {
         <div className="auth-header-inner">
           <Link to="/" className="auth-brand">
             <div className="auth-brand-row">
-              <LogoSlot dataUrl={companyLogo} fallbackText="Nikosoft" />
+              <LogoSlot dataUrl={companyLogo || IBALANCE_LOGO_PATH} fallbackText="Nikosoft" />
               <div className="auth-brand-divider" />
               <LogoSlot dataUrl={tenantLogo} fallbackText="Tenant" />
             </div>

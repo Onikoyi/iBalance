@@ -150,6 +150,40 @@ public sealed class AccessControlController : ControllerBase
             new { Code = "billing.reports.view", Module = "billing", Action = "report", Name = "View Billing Reports", Description = "View billing and invoicing reports." },
             new { Code = "billing.export", Module = "billing", Action = "export", Name = "Export Billing Reports", Description = "Export billing and invoicing data." },
 
+            new { Code = "oilgas.view", Module = "oilgas", Action = "view", Name = "View Oil & Gas", Description = "Access Oil & Gas operational workspaces." },
+            new { Code = "oilgas.setup.manage", Module = "oilgas", Action = "manage", Name = "Manage Oil & Gas Setup", Description = "Manage Oil & Gas posting and operational setup." },
+            new { Code = "oilgas.asset.manage", Module = "oilgas", Action = "manage", Name = "Manage Oil & Gas Assets", Description = "Manage business units, assets and operational locations." },
+            new { Code = "oilgas.product.manage", Module = "oilgas", Action = "manage", Name = "Manage Petroleum Products", Description = "Manage Oil & Gas product master data." },
+            new { Code = "oilgas.tank.manage", Module = "oilgas", Action = "manage", Name = "Manage Oil & Gas Tanks", Description = "Manage Oil & Gas tank register and book stock." },
+            new { Code = "oilgas.meter.manage", Module = "oilgas", Action = "manage", Name = "Manage Oil & Gas Meters", Description = "Manage production meters and calibration information." },
+            new { Code = "oilgas.permit.manage", Module = "oilgas", Action = "manage", Name = "Manage Oil & Gas Permits", Description = "Manage licences, permits and expiry controls." },
+            new { Code = "oilgas.production.create", Module = "oilgas", Action = "create", Name = "Create Production Entries", Description = "Create daily Oil & Gas production entries." },
+            new { Code = "oilgas.production.update", Module = "oilgas", Action = "update", Name = "Update Production Entries", Description = "Update draft Oil & Gas production entries." },
+            new { Code = "oilgas.production.correct", Module = "oilgas", Action = "correct", Name = "Correct Rejected Production Entries", Description = "Correct rejected Oil & Gas production entries." },
+            new { Code = "oilgas.production.submit", Module = "oilgas", Action = "submit", Name = "Submit Production Entries", Description = "Submit Oil & Gas production entries for approval." },
+            new { Code = "oilgas.production.approve", Module = "oilgas", Action = "approve", Name = "Approve Production Entries", Description = "Approve submitted Oil & Gas production entries." },
+            new { Code = "oilgas.production.reject", Module = "oilgas", Action = "reject", Name = "Reject Production Entries", Description = "Reject submitted Oil & Gas production entries with a reason." },
+            new { Code = "oilgas.reports.view", Module = "oilgas", Action = "report", Name = "View Oil & Gas Reports", Description = "View Oil & Gas operational and compliance reports." },
+            new { Code = "oilgas.export", Module = "oilgas", Action = "export", Name = "Export Oil & Gas Reports", Description = "Export Oil & Gas operational reports." },
+            new { Code = "oilgas.movement.create", Module = "oilgas", Action = "create", Name = "Create Oil & Gas Stock Movements", Description = "Create stock receipts, transfers, liftings and adjustments." },
+            new { Code = "oilgas.movement.update", Module = "oilgas", Action = "update", Name = "Update Oil & Gas Stock Movements", Description = "Correct draft or rejected stock movements." },
+            new { Code = "oilgas.movement.submit", Module = "oilgas", Action = "submit", Name = "Submit Oil & Gas Stock Movements", Description = "Submit stock movements for approval." },
+            new { Code = "oilgas.movement.approve", Module = "oilgas", Action = "approve", Name = "Approve Oil & Gas Stock Movements", Description = "Approve submitted stock movements." },
+            new { Code = "oilgas.movement.reject", Module = "oilgas", Action = "reject", Name = "Reject Oil & Gas Stock Movements", Description = "Reject submitted stock movements with reason." },
+            new { Code = "oilgas.movement.post", Module = "oilgas", Action = "post", Name = "Post Oil & Gas Stock Movements", Description = "Post approved movements to tank book stock." },
+            new { Code = "oilgas.lifting.manage", Module = "oilgas", Action = "manage", Name = "Manage Oil & Gas Liftings", Description = "Manage customer lifting and delivery references." },
+            new { Code = "oilgas.reconciliation.manage", Module = "oilgas", Action = "reconcile", Name = "Manage Oil & Gas Reconciliation", Description = "Review tank stock and movement reconciliation." },
+            new { Code = "oilgas.lifting.approve", Module = "oilgas", Action = "approve", Name = "Approve Upstream Liftings", Description = "Approve submitted upstream lifting records." },
+            new { Code = "oilgas.lifting.complete", Module = "oilgas", Action = "complete", Name = "Complete Upstream Liftings", Description = "Complete approved liftings after loading and commercial references are confirmed." },
+            new { Code = "oilgas.afe.manage", Module = "oilgas", Action = "manage", Name = "Manage AFE", Description = "Create, update and submit authorisations for expenditure." },
+            new { Code = "oilgas.afe.approve", Module = "oilgas", Action = "approve", Name = "Approve AFE", Description = "Approve or reject submitted authorisations for expenditure." },
+            new { Code = "oilgas.partner.manage", Module = "oilgas", Action = "manage", Name = "Manage Joint Venture Partners", Description = "Manage partners, interests, cash calls and funding records." },
+            new { Code = "oilgas.production-close.manage", Module = "oilgas", Action = "manage", Name = "Manage Production Close", Description = "Prepare and submit monthly upstream production close records." },
+            new { Code = "oilgas.production-close.approve", Module = "oilgas", Action = "approve", Name = "Approve Production Close", Description = "Approve, reject and close monthly upstream production periods." },
+            new { Code = "oilgas.hse.manage", Module = "oilgas", Action = "manage", Name = "Manage HSE Incidents", Description = "Record and close HSE incidents and corrective actions." },
+            new { Code = "oilgas.equipment.manage", Module = "oilgas", Action = "manage", Name = "Manage Operational Equipment", Description = "Manage upstream operational equipment and integrity due dates." },
+            new { Code = "oilgas.document.manage", Module = "oilgas", Action = "manage", Name = "Manage Upstream Documents", Description = "Register upstream operational and compliance document references." },
+
             new { Code = "fleet.view", Module = "fleet", Action = "view", Name = "View Fleet", Description = "Access fleet management workspace." },
             new { Code = "fleet.vehicle.manage", Module = "fleet", Action = "manage", Name = "Manage Fleet Vehicles", Description = "Create and maintain fleet vehicles." },
             new { Code = "fleet.driver.manage", Module = "fleet", Action = "manage", Name = "Manage Fleet Drivers", Description = "Create and maintain fleet drivers." },
@@ -253,6 +287,33 @@ public sealed class AccessControlController : ControllerBase
     Description = "Tenant administrative access with module visibility bound to tenant subscription.",
     PermissionCodes = new[]
     {
+                    "oilgas.view",
+                    "oilgas.setup.manage",
+                    "oilgas.asset.manage",
+                    "oilgas.product.manage",
+                    "oilgas.tank.manage",
+                    "oilgas.meter.manage",
+                    "oilgas.permit.manage",
+                    "oilgas.production.create",
+                    "oilgas.production.update",
+                    "oilgas.production.correct",
+                    "oilgas.production.submit",
+                    "oilgas.production.approve",
+                    "oilgas.production.reject",
+                    "oilgas.lifting.approve",
+                    "oilgas.afe.approve",
+                    "oilgas.production-close.approve",
+                    "oilgas.reports.view",
+                    "oilgas.export",
+                    "oilgas.movement.create",
+                    "oilgas.movement.update",
+                    "oilgas.movement.submit",
+                    "oilgas.movement.approve",
+                    "oilgas.movement.reject",
+                    "oilgas.movement.post",
+                    "oilgas.lifting.manage",
+                    "oilgas.reconciliation.manage",
+
                     "approval.inbox.view",
         "admin.access",
         "admin.users.manage",
@@ -588,6 +649,114 @@ public sealed class AccessControlController : ControllerBase
                     "billing.export"
                 }
             },
+            new
+            {
+                Code = "OIL_GAS_MANAGER",
+                Name = "Oil & Gas Manager",
+                Description = "Manage Oil & Gas setup, operations, approvals and reports.",
+                PermissionCodes = new[]
+                {
+                    "approval.inbox.view",
+                    "oilgas.view",
+                    "oilgas.setup.manage",
+                    "oilgas.asset.manage",
+                    "oilgas.product.manage",
+                    "oilgas.tank.manage",
+                    "oilgas.meter.manage",
+                    "oilgas.permit.manage",
+                    "oilgas.production.create",
+                    "oilgas.production.update",
+                    "oilgas.production.correct",
+                    "oilgas.production.submit",
+                    "oilgas.production.approve",
+                    "oilgas.production.reject",
+                    "oilgas.reports.view",
+                    "oilgas.export",
+                    "oilgas.movement.create",
+                    "oilgas.movement.update",
+                    "oilgas.movement.submit",
+                    "oilgas.movement.approve",
+                    "oilgas.movement.reject",
+                    "oilgas.movement.post",
+                    "oilgas.lifting.manage",
+                    "oilgas.reconciliation.manage",
+                    "oilgas.lifting.approve",
+                    "oilgas.lifting.complete",
+                    "oilgas.afe.manage",
+                    "oilgas.afe.approve",
+                    "oilgas.partner.manage",
+                    "oilgas.production-close.manage",
+                    "oilgas.production-close.approve",
+                    "oilgas.hse.manage",
+                    "oilgas.equipment.manage",
+                    "oilgas.document.manage",
+                    "workflow.approve",
+                    "workflow.reject",
+                    "reports.export"
+                }
+            },
+            new
+            {
+                Code = "PRODUCTION_OFFICER",
+                Name = "Production Officer",
+                Description = "Create, correct and submit daily Oil & Gas production entries.",
+                PermissionCodes = new[]
+                {
+                    "oilgas.view",
+                    "oilgas.production.create",
+                    "oilgas.production.update",
+                    "oilgas.production.correct",
+                    "oilgas.production.submit",
+                    "oilgas.afe.manage",
+                    "oilgas.production-close.manage",
+                    "oilgas.reports.view"
+                }
+            },
+            new
+            {
+                Code = "PRODUCTION_APPROVER",
+                Name = "Production Approver",
+                Description = "Review, approve or reject Oil & Gas production entries.",
+                PermissionCodes = new[]
+                {
+                    "approval.inbox.view",
+                    "oilgas.view",
+                    "oilgas.production.approve",
+                    "oilgas.production.reject",
+                    "oilgas.reports.view",
+                    "workflow.approve",
+                    "workflow.reject"
+                }
+            },
+            new
+            {
+                Code = "MEASUREMENT_OFFICER",
+                Name = "Measurement Officer",
+                Description = "Manage Oil & Gas tanks, meters and production measurements.",
+                PermissionCodes = new[]
+                {
+                    "oilgas.view",
+                    "oilgas.tank.manage",
+                    "oilgas.meter.manage",
+                    "oilgas.production.create",
+                    "oilgas.production.update",
+                    "oilgas.production.submit",
+                    "oilgas.reports.view"
+                }
+            },
+            new
+            {
+                Code = "OIL_GAS_VIEWER",
+                Name = "Oil & Gas Viewer",
+                Description = "Read-only access to Oil & Gas operations and reports.",
+                PermissionCodes = new[]
+                {
+                    "oilgas.view",
+                    "oilgas.reports.view",
+                    "oilgas.export"
+                }
+            },
+
             new
             {
                 Code = "FLEET_OFFICER",

@@ -1,118 +1,119 @@
-import { Route, Routes, Navigate } from 'react-router-dom';
-import { AppShell } from './components/layout/AppShell';
-import { AccountsPage } from './pages/AccountsPage';
-import { DashboardPage } from './pages/DashboardPage';
-import { FiscalPeriodsPage } from './pages/FiscalPeriodsPage';
-import { JournalsPage } from './pages/JournalsPage';
-import { ReportsPage } from './pages/ReportsPage';
-import { WorkingCapitalPage } from './pages/WorkingCapitalPage';
-import { ReconciliationPage } from './pages/ReconciliationPage';
-import { AgeingAnalysisPage } from './pages/AgeingAnalysisPage';
-import { BankAccountsPage } from './pages/BankAccountsPage';
-import { InventoryPage } from './pages/InventoryPage';
-import { CustomersPage } from './pages/CustomersPage';
-import { SalesInvoicesPage } from './pages/SalesInvoicesPage';
-import { RejectedSalesInvoicesPage } from './pages/RejectedSalesInvoicesPage';
-import { CustomerReceiptsPage } from './pages/CustomerReceiptsPage';
-import { CustomerReceiptPrintPage } from './pages/CustomerReceiptPrintPage';
-import { RejectedCustomerReceiptsPage } from './pages/RejectedCustomerReceiptsPage';
-import { VendorsPage } from './pages/VendorsPage';
-import { PurchaseInvoicesPage } from './pages/PurchaseInvoicesPage';
-import { RejectedPurchaseInvoicesPage } from './pages/RejectedPurchaseInvoicesPage';
-import { VendorPaymentsPage } from './pages/VendorPaymentsPage';
-import { RejectedVendorPaymentsPage } from './pages/RejectedVendorPaymentsPage';
-import { VendorPaymentVoucherPrintPage } from './pages/VendorPaymentVoucherPrintPage';
-import { VendorStatementPage } from './pages/VendorStatementPage';
-import { RejectedPurchaseOrdersPage } from './pages/RejectedPurchaseOrdersPage';
-import { PurchaseOrdersPage } from './pages/PurchaseOrdersPage';
-import { PurchaseOrderReceiptsPage } from './pages/PurchaseOrderReceiptsPage';
-import { RejectedPurchaseRequisitionsPage } from './pages/RejectedPurchaseRequisitionsPage';
-import { PurchaseRequisitionsPage } from './pages/PurchaseRequisitionsPage';
-import { BudgetsPage } from './pages/BudgetsPage';
-import { RejectedBudgetsPage } from './pages/RejectedBudgetsPage';
-import { BudgetVsActualPage } from './pages/BudgetVsActualPage';
-import { BudgetVsActualPrintPage } from './pages/BudgetVsActualPrintPage';
-import { LandingPage } from './pages/LandingPage';
-import { PricingPublicPage } from './pages/PricingPublicPage';
-import { TenantOnboardingPage } from './pages/TenantOnboardingPage';
-import { SubscriptionRequestPage } from './pages/SubscriptionRequestPage';
-import { LicenseStatusPage } from './pages/LicenseStatusPage';
-import { NotFoundPage } from './pages/NotFoundPage';
-import { RejectedJournalEntriesPage } from './pages/RejectedJournalEntriesPage';
-import { FixedAssetsPage } from './pages/FixedAssetsPage';
-import { FixedAssetDepreciationRunsPage } from './pages/FixedAssetDepreciationRunsPage';
-import { FixedAssetRegisterPrintPage } from './pages/FixedAssetRegisterPrintPage';
-import { PayrollDashboardPage } from './pages/PayrollDashboardPage';
-import { PayrollEmployeesPage } from './pages/PayrollEmployeesPage';
-import { PayrollSetupPage } from './pages/PayrollSetupPage';
-import { ApprovalInboxPage } from './pages/ApprovalInboxPage';
-import { HrDashboardPage } from './pages/hr/HrDashboardPage';
-import { HrEmployeesPage } from './pages/hr/HrEmployeesPage';
-import { HrSetupPage } from './pages/hr/HrSetupPage';
-import { HrLeavePage } from './pages/hr/HrLeavePage';
-import { HrTrainingPage } from './pages/hr/HrTrainingPage';
-import { HrDisciplinaryPage } from './pages/hr/HrDisciplinaryPage';
-import { HrReportsPage } from './pages/hr/HrReportsPage';
-import { PayrollRunsPage } from './pages/PayrollRunsPage';
-import { PayrollPayslipsPage } from './pages/PayrollPayslipsPage';
-import { PayrollReportsPage } from './pages/PayrollReportsPage';
-import { RejectPayrollRunsPage } from './pages/RejectPayrollRunsPage';
-import { ExpenseAdvanceDashboardPage } from './pages/eam/ExpenseAdvanceDashboardPage';
-import { AdvanceRequestsPage } from './pages/eam/AdvanceRequestsPage';
-import { RejectedAdvanceRequestsPage } from './pages/eam/RejectedAdvanceRequestsPage';
-import { AdvanceApprovalQueuePage } from './pages/eam/AdvanceApprovalQueuePage';
-import { AdvanceDisbursementsPage } from './pages/eam/AdvanceDisbursementsPage';
-import { AdvanceRetirementsPage } from './pages/eam/AdvanceRetirementsPage';
-import { RejectedAdvanceRetirementsPage } from './pages/eam/RejectedAdvanceRetirementsPage';
-import { AdvanceRefundsPage } from './pages/eam/AdvanceRefundsPage';
-import { AdvanceRecoveriesPage } from './pages/eam/AdvanceRecoveriesPage';
-import { ExpenseAdvanceSetupPage } from './pages/eam/ExpenseAdvanceSetupPage';
-import { ExpenseAdvanceReportsPage } from './pages/eam/ExpenseAdvanceReportsPage';
-import { OutstandingAdvancesPage } from './pages/eam/OutstandingAdvancesPage';
-import { OverdueAdvancesPage } from './pages/eam/OverdueAdvancesPage';
-import { TravelAdvancesPage } from './pages/eam/TravelAdvancesPage';
-import { OperationalFloatPage } from './pages/eam/OperationalFloatPage';
-import { ImprestRegisterPage } from './pages/eam/ImprestRegisterPage';
-import { FleetDashboardPage } from './pages/fleet/FleetDashboardPage';
-import { FleetVehiclesPage } from './pages/fleet/FleetVehiclesPage';
-import { FleetDriversPage } from './pages/fleet/FleetDriversPage';
-import { FleetTripsPage } from './pages/fleet/FleetTripsPage';
-import { FleetFuelLogsPage } from './pages/fleet/FleetFuelLogsPage';
-import { FleetMaintenancePage } from './pages/fleet/FleetMaintenancePage';
-import { FleetPolicySetupPage } from './pages/fleet/FleetPolicySetupPage';
-import { FleetReportsPage } from './pages/fleet/FleetReportsPage';
-import { BillingDashboardPage } from './pages/billing/BillingDashboardPage';
-import { BillingInvoicesPage } from './pages/billing/BillingInvoicesPage';
-import { RejectedBillingInvoicesPage } from './pages/billing/RejectedBillingInvoicesPage';
-import { BillingApprovalQueuePage } from './pages/billing/BillingApprovalQueuePage';
-import { BillingSetupPage } from './pages/billing/BillingSetupPage';
-import { BillingReportsPage } from './pages/billing/BillingReportsPage';
-import { BillingOutstandingPage } from './pages/billing/BillingOutstandingPage';
-import { BillingCreditNotesPage } from './pages/billing/BillingCreditNotesPage';
-import { RejectedBillingCreditNotesPage } from './pages/billing/RejectedBillingCreditNotesPage';
-import { BillingPaymentAllocationPage } from './pages/billing/BillingPaymentAllocationPage';
+import { Route, Routes, Navigate } from "react-router-dom";
+import { AppShell } from "./components/layout/AppShell";
+import { AccountsPage } from "./pages/AccountsPage";
+import { DashboardPage } from "./pages/DashboardPage";
+import { FiscalPeriodsPage } from "./pages/FiscalPeriodsPage";
+import { JournalsPage } from "./pages/JournalsPage";
+import { ReportsPage } from "./pages/ReportsPage";
+import { WorkingCapitalPage } from "./pages/WorkingCapitalPage";
+import { ReconciliationPage } from "./pages/ReconciliationPage";
+import { AgeingAnalysisPage } from "./pages/AgeingAnalysisPage";
+import { BankAccountsPage } from "./pages/BankAccountsPage";
+import { InventoryPage } from "./pages/InventoryPage";
+import { CustomersPage } from "./pages/CustomersPage";
+import { SalesInvoicesPage } from "./pages/SalesInvoicesPage";
+import { RejectedSalesInvoicesPage } from "./pages/RejectedSalesInvoicesPage";
+import { CustomerReceiptsPage } from "./pages/CustomerReceiptsPage";
+import { CustomerReceiptPrintPage } from "./pages/CustomerReceiptPrintPage";
+import { RejectedCustomerReceiptsPage } from "./pages/RejectedCustomerReceiptsPage";
+import { VendorsPage } from "./pages/VendorsPage";
+import { PurchaseInvoicesPage } from "./pages/PurchaseInvoicesPage";
+import { RejectedPurchaseInvoicesPage } from "./pages/RejectedPurchaseInvoicesPage";
+import { VendorPaymentsPage } from "./pages/VendorPaymentsPage";
+import { RejectedVendorPaymentsPage } from "./pages/RejectedVendorPaymentsPage";
+import { VendorPaymentVoucherPrintPage } from "./pages/VendorPaymentVoucherPrintPage";
+import { VendorStatementPage } from "./pages/VendorStatementPage";
+import { RejectedPurchaseOrdersPage } from "./pages/RejectedPurchaseOrdersPage";
+import { PurchaseOrdersPage } from "./pages/PurchaseOrdersPage";
+import { PurchaseOrderReceiptsPage } from "./pages/PurchaseOrderReceiptsPage";
+import { RejectedPurchaseRequisitionsPage } from "./pages/RejectedPurchaseRequisitionsPage";
+import { PurchaseRequisitionsPage } from "./pages/PurchaseRequisitionsPage";
+import { BudgetsPage } from "./pages/BudgetsPage";
+import { RejectedBudgetsPage } from "./pages/RejectedBudgetsPage";
+import { BudgetVsActualPage } from "./pages/BudgetVsActualPage";
+import { BudgetVsActualPrintPage } from "./pages/BudgetVsActualPrintPage";
+import { LandingPage } from "./pages/LandingPage";
+import { PricingPublicPage } from "./pages/PricingPublicPage";
+import { TenantOnboardingPage } from "./pages/TenantOnboardingPage";
+import { SubscriptionRequestPage } from "./pages/SubscriptionRequestPage";
+import { LicenseStatusPage } from "./pages/LicenseStatusPage";
+import { NotFoundPage } from "./pages/NotFoundPage";
+import { RejectedJournalEntriesPage } from "./pages/RejectedJournalEntriesPage";
+import { FixedAssetsPage } from "./pages/FixedAssetsPage";
+import { FixedAssetDepreciationRunsPage } from "./pages/FixedAssetDepreciationRunsPage";
+import { FixedAssetRegisterPrintPage } from "./pages/FixedAssetRegisterPrintPage";
+import { PayrollDashboardPage } from "./pages/PayrollDashboardPage";
+import { PayrollEmployeesPage } from "./pages/PayrollEmployeesPage";
+import { PayrollSetupPage } from "./pages/PayrollSetupPage";
+import { ApprovalInboxPage } from "./pages/ApprovalInboxPage";
+import { HrDashboardPage } from "./pages/hr/HrDashboardPage";
+import { HrEmployeesPage } from "./pages/hr/HrEmployeesPage";
+import { HrSetupPage } from "./pages/hr/HrSetupPage";
+import { HrLeavePage } from "./pages/hr/HrLeavePage";
+import { HrTrainingPage } from "./pages/hr/HrTrainingPage";
+import { HrDisciplinaryPage } from "./pages/hr/HrDisciplinaryPage";
+import { HrReportsPage } from "./pages/hr/HrReportsPage";
+import { PayrollRunsPage } from "./pages/PayrollRunsPage";
+import { PayrollPayslipsPage } from "./pages/PayrollPayslipsPage";
+import { PayrollReportsPage } from "./pages/PayrollReportsPage";
+import { RejectPayrollRunsPage } from "./pages/RejectPayrollRunsPage";
+import { ExpenseAdvanceDashboardPage } from "./pages/eam/ExpenseAdvanceDashboardPage";
+import { AdvanceRequestsPage } from "./pages/eam/AdvanceRequestsPage";
+import { RejectedAdvanceRequestsPage } from "./pages/eam/RejectedAdvanceRequestsPage";
+import { AdvanceApprovalQueuePage } from "./pages/eam/AdvanceApprovalQueuePage";
+import { AdvanceDisbursementsPage } from "./pages/eam/AdvanceDisbursementsPage";
+import { AdvanceRetirementsPage } from "./pages/eam/AdvanceRetirementsPage";
+import { RejectedAdvanceRetirementsPage } from "./pages/eam/RejectedAdvanceRetirementsPage";
+import { AdvanceRefundsPage } from "./pages/eam/AdvanceRefundsPage";
+import { AdvanceRecoveriesPage } from "./pages/eam/AdvanceRecoveriesPage";
+import { ExpenseAdvanceSetupPage } from "./pages/eam/ExpenseAdvanceSetupPage";
+import { ExpenseAdvanceReportsPage } from "./pages/eam/ExpenseAdvanceReportsPage";
+import { OutstandingAdvancesPage } from "./pages/eam/OutstandingAdvancesPage";
+import { OverdueAdvancesPage } from "./pages/eam/OverdueAdvancesPage";
+import { TravelAdvancesPage } from "./pages/eam/TravelAdvancesPage";
+import { OperationalFloatPage } from "./pages/eam/OperationalFloatPage";
+import { ImprestRegisterPage } from "./pages/eam/ImprestRegisterPage";
+import { FleetDashboardPage } from "./pages/fleet/FleetDashboardPage";
+import { FleetVehiclesPage } from "./pages/fleet/FleetVehiclesPage";
+import { FleetDriversPage } from "./pages/fleet/FleetDriversPage";
+import { FleetTripsPage } from "./pages/fleet/FleetTripsPage";
+import { FleetFuelLogsPage } from "./pages/fleet/FleetFuelLogsPage";
+import { FleetMaintenancePage } from "./pages/fleet/FleetMaintenancePage";
+import { FleetPolicySetupPage } from "./pages/fleet/FleetPolicySetupPage";
+import { FleetReportsPage } from "./pages/fleet/FleetReportsPage";
+import { BillingDashboardPage } from "./pages/billing/BillingDashboardPage";
+import { BillingInvoicesPage } from "./pages/billing/BillingInvoicesPage";
+import { RejectedBillingInvoicesPage } from "./pages/billing/RejectedBillingInvoicesPage";
+import { BillingApprovalQueuePage } from "./pages/billing/BillingApprovalQueuePage";
+import { BillingSetupPage } from "./pages/billing/BillingSetupPage";
+import { BillingReportsPage } from "./pages/billing/BillingReportsPage";
+import { BillingOutstandingPage } from "./pages/billing/BillingOutstandingPage";
+import { BillingCreditNotesPage } from "./pages/billing/BillingCreditNotesPage";
+import { RejectedBillingCreditNotesPage } from "./pages/billing/RejectedBillingCreditNotesPage";
+import { BillingPaymentAllocationPage } from "./pages/billing/BillingPaymentAllocationPage";
+import { OilGasOperationsPage } from "./pages/OilGasOperationsPage";
+import { OilGasStockOperationsPage } from "./pages/OilGasStockOperationsPage";
+import { OilGasUpstreamCompletionPage } from "./pages/OilGasUpstreamCompletionPage";
 
-import { LoginPage } from './pages/auth/LoginPage';
-import { SignUpPage } from './pages/auth/SignUpPage';
-import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
-import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
+import { LoginPage } from "./pages/auth/LoginPage";
+import { SignUpPage } from "./pages/auth/SignUpPage";
+import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage";
+import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
 
-import { RequireAuth } from './components/auth/RequireAuth';
-import { PublicOnly } from './components/auth/PublicOnly';
+import { RequireAuth } from "./components/auth/RequireAuth";
+import { PublicOnly } from "./components/auth/PublicOnly";
 
-import { AdminShell } from './components/layout/AdminShell';
-import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
-import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
-import { AdminUsersPage } from './pages/admin/AdminUsersPage';
-import { AdminTenantDetailPage } from './pages/admin/AdminTenantDetailPage';
-import { AdminSubscriptionApplicationsPage } from './pages/admin/AdminSubscriptionApplicationsPage';
-import { AdminAccessControlPage } from './pages/admin/AdminAccessControlPage';
-import { AdminAuditTrailPage } from './pages/admin/AdminAuditTrailPage';
-import { AdminTenantModuleActivationPage } from './pages/admin/AdminTenantModuleActivationPage';
-import { WorkspaceResolverPage } from './pages/WorkspaceResolverPage';
-import { NoActiveModulesPage } from './pages/NoActiveModulesPage';
-
-
+import { AdminShell } from "./components/layout/AdminShell";
+import { AdminDashboardPage } from "./pages/admin/AdminDashboardPage";
+import { AdminSettingsPage } from "./pages/admin/AdminSettingsPage";
+import { AdminUsersPage } from "./pages/admin/AdminUsersPage";
+import { AdminTenantDetailPage } from "./pages/admin/AdminTenantDetailPage";
+import { AdminSubscriptionApplicationsPage } from "./pages/admin/AdminSubscriptionApplicationsPage";
+import { AdminAccessControlPage } from "./pages/admin/AdminAccessControlPage";
+import { AdminAuditTrailPage } from "./pages/admin/AdminAuditTrailPage";
+import { AdminTenantModuleActivationPage } from "./pages/admin/AdminTenantModuleActivationPage";
+import { WorkspaceResolverPage } from "./pages/WorkspaceResolverPage";
+import { NoActiveModulesPage } from "./pages/NoActiveModulesPage";
 
 export default function App() {
   return (
@@ -161,34 +162,39 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'BudgetOfficer',
-              'BudgetOwner',
-              'PayrollOfficer',
-              'HrOfficer',
-              'ProcurementOfficer',
-              'TreasuryOfficer',
-              'InventoryOfficer',
-              'ApOfficer',
-              'ArOfficer',
-              'FixedAssetOfficer',
-              'ExpenseAdvanceOfficer',
-              'ExpenseAdvanceApprover',
-              'ExpenseAdvanceReviewer',
-              'ExpenseAdvanceViewer',
-              'BillingOfficer',
-              'BillingApprover',
-              'BillingViewer',
-              'FleetOfficer',
-              'FleetApprover',
-              'FleetReviewer',
-              'FleetViewer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "BudgetOfficer",
+              "BudgetOwner",
+              "PayrollOfficer",
+              "HrOfficer",
+              "ProcurementOfficer",
+              "TreasuryOfficer",
+              "InventoryOfficer",
+              "ApOfficer",
+              "ArOfficer",
+              "FixedAssetOfficer",
+              "ExpenseAdvanceOfficer",
+              "ExpenseAdvanceApprover",
+              "ExpenseAdvanceReviewer",
+              "ExpenseAdvanceViewer",
+              "BillingOfficer",
+              "BillingApprover",
+              "BillingViewer",
+              "FleetOfficer",
+              "FleetApprover",
+              "FleetReviewer",
+              "FleetViewer",
+              "OilGasManager",
+              "ProductionOfficer",
+              "ProductionApprover",
+              "MeasurementOfficer",
+              "OilGasViewer",
             ]}
           >
             <WorkspaceResolverPage />
@@ -201,34 +207,39 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'BudgetOfficer',
-              'BudgetOwner',
-              'PayrollOfficer',
-              'HrOfficer',
-              'ProcurementOfficer',
-              'TreasuryOfficer',
-              'InventoryOfficer',
-              'ApOfficer',
-              'ArOfficer',
-              'FixedAssetOfficer',
-              'ExpenseAdvanceOfficer',
-              'ExpenseAdvanceApprover',
-              'ExpenseAdvanceReviewer',
-              'ExpenseAdvanceViewer',
-              'BillingOfficer',
-              'BillingApprover',
-              'BillingViewer',
-              'FleetOfficer',
-              'FleetApprover',
-              'FleetReviewer',
-              'FleetViewer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "BudgetOfficer",
+              "BudgetOwner",
+              "PayrollOfficer",
+              "HrOfficer",
+              "ProcurementOfficer",
+              "TreasuryOfficer",
+              "InventoryOfficer",
+              "ApOfficer",
+              "ArOfficer",
+              "FixedAssetOfficer",
+              "ExpenseAdvanceOfficer",
+              "ExpenseAdvanceApprover",
+              "ExpenseAdvanceReviewer",
+              "ExpenseAdvanceViewer",
+              "BillingOfficer",
+              "BillingApprover",
+              "BillingViewer",
+              "FleetOfficer",
+              "FleetApprover",
+              "FleetReviewer",
+              "FleetViewer",
+              "OilGasManager",
+              "ProductionOfficer",
+              "ProductionApprover",
+              "MeasurementOfficer",
+              "OilGasViewer",
             ]}
           >
             <AppShell>
@@ -238,31 +249,30 @@ export default function App() {
         }
       />
 
-
       <Route
         path="/dashboard"
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'BudgetOfficer',
-              'BudgetOwner',
-              'PayrollOfficer',
-              'HrOfficer',
-              'ProcurementOfficer',
-              'TreasuryOfficer',
-              'InventoryOfficer',
-              'ApOfficer',
-              'ArOfficer',
-              'FixedAssetOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "BudgetOfficer",
+              "BudgetOwner",
+              "PayrollOfficer",
+              "HrOfficer",
+              "ProcurementOfficer",
+              "TreasuryOfficer",
+              "InventoryOfficer",
+              "ApOfficer",
+              "ArOfficer",
+              "FixedAssetOfficer",
             ]}
-            requiredPermissions={['reports.view']}
+            requiredPermissions={["reports.view"]}
           >
             <AppShell>
               <DashboardPage />
@@ -275,15 +285,15 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
             ]}
-            requiredPermissions={['finance.view']}
+            requiredPermissions={["finance.view"]}
           >
             <AppShell>
               <AccountsPage />
@@ -296,15 +306,15 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
             ]}
-            requiredPermissions={['finance.view']}
+            requiredPermissions={["finance.view"]}
           >
             <AppShell>
               <JournalsPage />
@@ -318,15 +328,15 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
             ]}
-            requiredPermissions={['finance.view']}
+            requiredPermissions={["finance.view"]}
           >
             <AppShell>
               <RejectedJournalEntriesPage />
@@ -339,16 +349,16 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'ArOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ArOfficer",
             ]}
-            requiredPermissions={['ar.view']}
+            requiredPermissions={["ar.view"]}
           >
             <AppShell>
               <CustomersPage />
@@ -361,16 +371,16 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'ArOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ArOfficer",
             ]}
-            requiredPermissions={['ar.view']}
+            requiredPermissions={["ar.view"]}
           >
             <AppShell>
               <SalesInvoicesPage />
@@ -383,16 +393,16 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'ArOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ArOfficer",
             ]}
-            requiredPermissions={['ar.view']}
+            requiredPermissions={["ar.view"]}
           >
             <AppShell>
               <RejectedSalesInvoicesPage />
@@ -405,16 +415,16 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'ArOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ArOfficer",
             ]}
-            requiredPermissions={['ar.view']}
+            requiredPermissions={["ar.view"]}
           >
             <AppShell>
               <CustomerReceiptsPage />
@@ -427,16 +437,16 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'ArOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ArOfficer",
             ]}
-            requiredPermissions={['ar.view']}
+            requiredPermissions={["ar.view"]}
           >
             <AppShell>
               <RejectedCustomerReceiptsPage />
@@ -450,16 +460,16 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'ArOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ArOfficer",
             ]}
-            requiredPermissions={['ar.view']}
+            requiredPermissions={["ar.view"]}
           >
             <AppShell>
               <CustomerReceiptPrintPage />
@@ -473,16 +483,16 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'ApOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ApOfficer",
             ]}
-            requiredPermissions={['ap.view']}
+            requiredPermissions={["ap.view"]}
           >
             <AppShell>
               <VendorsPage />
@@ -495,16 +505,16 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'ApOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ApOfficer",
             ]}
-            requiredPermissions={['ap.view']}
+            requiredPermissions={["ap.view"]}
           >
             <AppShell>
               <VendorStatementPage />
@@ -517,16 +527,16 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'ProcurementOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ProcurementOfficer",
             ]}
-            requiredPermissions={['procurement.view']}
+            requiredPermissions={["procurement.view"]}
           >
             <AppShell>
               <PurchaseRequisitionsPage />
@@ -539,16 +549,16 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'ProcurementOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ProcurementOfficer",
             ]}
-            requiredPermissions={['procurement.view']}
+            requiredPermissions={["procurement.view"]}
           >
             <AppShell>
               <RejectedPurchaseRequisitionsPage />
@@ -561,16 +571,16 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'ProcurementOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ProcurementOfficer",
             ]}
-            requiredPermissions={['procurement.view']}
+            requiredPermissions={["procurement.view"]}
           >
             <AppShell>
               <PurchaseOrdersPage />
@@ -584,16 +594,16 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'ProcurementOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ProcurementOfficer",
             ]}
-            requiredPermissions={['procurement.view']}
+            requiredPermissions={["procurement.view"]}
           >
             <AppShell>
               <PurchaseOrderReceiptsPage />
@@ -606,16 +616,16 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'ProcurementOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ProcurementOfficer",
             ]}
-            requiredPermissions={['procurement.view']}
+            requiredPermissions={["procurement.view"]}
           >
             <AppShell>
               <RejectedPurchaseOrdersPage />
@@ -628,16 +638,16 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'ApOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ApOfficer",
             ]}
-            requiredPermissions={['ap.view']}
+            requiredPermissions={["ap.view"]}
           >
             <AppShell>
               <PurchaseInvoicesPage />
@@ -651,16 +661,16 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'ApOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ApOfficer",
             ]}
-            requiredPermissions={['ap.view']}
+            requiredPermissions={["ap.view"]}
           >
             <AppShell>
               <RejectedPurchaseInvoicesPage />
@@ -673,16 +683,16 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'ApOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ApOfficer",
             ]}
-            requiredPermissions={['ap.view']}
+            requiredPermissions={["ap.view"]}
           >
             <AppShell>
               <VendorPaymentsPage />
@@ -696,16 +706,16 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'ApOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ApOfficer",
             ]}
-            requiredPermissions={['ap.view']}
+            requiredPermissions={["ap.view"]}
           >
             <AppShell>
               <RejectedVendorPaymentsPage />
@@ -719,16 +729,16 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'ApOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ApOfficer",
             ]}
-            requiredPermissions={['ap.view']}
+            requiredPermissions={["ap.view"]}
           >
             <AppShell>
               <VendorPaymentVoucherPrintPage />
@@ -742,12 +752,12 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
             ]}
-            requiredPermissions={['finance.view']}
+            requiredPermissions={["finance.view"]}
           >
             <AppShell>
               <FiscalPeriodsPage />
@@ -761,17 +771,17 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'BudgetOfficer',
-              'BudgetOwner',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "BudgetOfficer",
+              "BudgetOwner",
             ]}
-            requiredPermissions={['budget.view']}
+            requiredPermissions={["budget.view"]}
           >
             <AppShell>
               <BudgetsPage />
@@ -785,17 +795,17 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'BudgetOfficer',
-              'BudgetOwner',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "BudgetOfficer",
+              "BudgetOwner",
             ]}
-            requiredPermissions={['budget.view']}
+            requiredPermissions={["budget.view"]}
           >
             <AppShell>
               <RejectedBudgetsPage />
@@ -809,17 +819,17 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'BudgetOfficer',
-              'BudgetOwner',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "BudgetOfficer",
+              "BudgetOwner",
             ]}
-            requiredPermissions={['budget.view']}
+            requiredPermissions={["budget.view"]}
           >
             <AppShell>
               <BudgetVsActualPage />
@@ -833,17 +843,17 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'BudgetOfficer',
-              'BudgetOwner',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "BudgetOfficer",
+              "BudgetOwner",
             ]}
-            requiredPermissions={['budget.view']}
+            requiredPermissions={["budget.view"]}
           >
             <BudgetVsActualPrintPage />
           </RequireAuth>
@@ -855,16 +865,16 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'FixedAssetOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "FixedAssetOfficer",
             ]}
-            requiredPermissions={['fixedassets.view']}
+            requiredPermissions={["fixedassets.view"]}
           >
             <AppShell>
               <FixedAssetsPage />
@@ -878,16 +888,16 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'FixedAssetOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "FixedAssetOfficer",
             ]}
-            requiredPermissions={['fixedassets.view']}
+            requiredPermissions={["fixedassets.view"]}
           >
             <AppShell>
               <FixedAssetDepreciationRunsPage />
@@ -901,16 +911,16 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'FixedAssetOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "FixedAssetOfficer",
             ]}
-            requiredPermissions={['fixedassets.view']}
+            requiredPermissions={["fixedassets.view"]}
           >
             <FixedAssetRegisterPrintPage />
           </RequireAuth>
@@ -921,16 +931,16 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'TreasuryOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "TreasuryOfficer",
             ]}
-            requiredPermissions={['treasury.view']}
+            requiredPermissions={["treasury.view"]}
           >
             <AppShell>
               <BankAccountsPage />
@@ -944,16 +954,16 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'InventoryOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "InventoryOfficer",
             ]}
-            requiredPermissions={['inventory.view']}
+            requiredPermissions={["inventory.view"]}
           >
             <AppShell>
               <InventoryPage />
@@ -967,16 +977,16 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'TreasuryOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "TreasuryOfficer",
             ]}
-            requiredPermissions={['treasury.view']}
+            requiredPermissions={["treasury.view"]}
           >
             <AppShell>
               <ReconciliationPage />
@@ -985,313 +995,386 @@ export default function App() {
         }
       />
 
-
       <Route
         path="/eam"
         element={
           <RequireAuth
-            allowedRoles={['PlatformAdmin', 'TenantAdmin', 'FinanceController', 'Approver', 'Viewer', 'Auditor', 'ExpenseAdvanceOfficer', 'ExpenseAdvanceApprover', 'ExpenseAdvanceReviewer', 'ExpenseAdvanceViewer']}
-            requiredPermissions={['eam.view']}
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ExpenseAdvanceOfficer",
+              "ExpenseAdvanceApprover",
+              "ExpenseAdvanceReviewer",
+              "ExpenseAdvanceViewer",
+            ]}
+            requiredPermissions={["eam.view"]}
           >
-            <AppShell><ExpenseAdvanceDashboardPage /></AppShell>
+            <AppShell>
+              <ExpenseAdvanceDashboardPage />
+            </AppShell>
           </RequireAuth>
         }
       />
       <Route
         path="/eam/requests"
-        element={<RequireAuth
-          allowedRoles={[
-            'PlatformAdmin',
-            'TenantAdmin',
-            'FinanceController',
-            'Approver',
-            'Viewer',
-            'Auditor',
-            'ExpenseAdvanceOfficer',
-            'ExpenseAdvanceApprover',
-            'ExpenseAdvanceReviewer',
-            'ExpenseAdvanceViewer']}
-          requiredPermissions={['eam.view']}>
-          <AppShell>
-            <AdvanceRequestsPage />
-          </AppShell>
-        </RequireAuth>}
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ExpenseAdvanceOfficer",
+              "ExpenseAdvanceApprover",
+              "ExpenseAdvanceReviewer",
+              "ExpenseAdvanceViewer",
+            ]}
+            requiredPermissions={["eam.view"]}
+          >
+            <AppShell>
+              <AdvanceRequestsPage />
+            </AppShell>
+          </RequireAuth>
+        }
       />
 
       <Route
         path="/eam/requests/rejected"
-        element={<RequireAuth
-          allowedRoles={[
-            'PlatformAdmin',
-            'TenantAdmin',
-            'FinanceController',
-            'Approver',
-            'Viewer',
-            'Auditor',
-            'ExpenseAdvanceOfficer',
-            'ExpenseAdvanceApprover',
-            'ExpenseAdvanceReviewer',
-            'ExpenseAdvanceViewer']}
-          requiredPermissions={['eam.view']}>
-          <AppShell>
-            <RejectedAdvanceRequestsPage />
-          </AppShell>
-        </RequireAuth>}
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ExpenseAdvanceOfficer",
+              "ExpenseAdvanceApprover",
+              "ExpenseAdvanceReviewer",
+              "ExpenseAdvanceViewer",
+            ]}
+            requiredPermissions={["eam.view"]}
+          >
+            <AppShell>
+              <RejectedAdvanceRequestsPage />
+            </AppShell>
+          </RequireAuth>
+        }
       />
-
 
       <Route
         path="/eam/approval-queue"
-        element={<RequireAuth
-          allowedRoles={[
-            'PlatformAdmin',
-            'TenantAdmin',
-            'FinanceController',
-            'Approver',
-            'ExpenseAdvanceApprover',
-            'ExpenseAdvanceReviewer']}
-            requiredPermissions={['eam.view']}>
-          <AppShell>
-            <AdvanceApprovalQueuePage />
-          </AppShell>
-        </RequireAuth>}
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Approver",
+              "ExpenseAdvanceApprover",
+              "ExpenseAdvanceReviewer",
+            ]}
+            requiredPermissions={["eam.view"]}
+          >
+            <AppShell>
+              <AdvanceApprovalQueuePage />
+            </AppShell>
+          </RequireAuth>
+        }
       />
       <Route
         path="/eam/disbursements"
-        element={<RequireAuth
-          allowedRoles={[
-            'PlatformAdmin',
-            'TenantAdmin',
-            'FinanceController',
-            'Approver',
-            'ExpenseAdvanceOfficer',
-            'ExpenseAdvanceApprover',
-            'ExpenseAdvanceReviewer']}
-          requiredPermissions={['eam.view']}>
-          <AppShell><AdvanceDisbursementsPage />
-          </AppShell>
-        </RequireAuth>}
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Approver",
+              "ExpenseAdvanceOfficer",
+              "ExpenseAdvanceApprover",
+              "ExpenseAdvanceReviewer",
+            ]}
+            requiredPermissions={["eam.view"]}
+          >
+            <AppShell>
+              <AdvanceDisbursementsPage />
+            </AppShell>
+          </RequireAuth>
+        }
       />
       <Route
         path="/eam/retirements"
-        element={<RequireAuth
-          allowedRoles={[
-            'PlatformAdmin',
-            'TenantAdmin',
-            'FinanceController',
-            'Approver',
-            'Viewer',
-            'Auditor',
-            'ExpenseAdvanceOfficer',
-            'ExpenseAdvanceApprover',
-            'ExpenseAdvanceReviewer',
-            'ExpenseAdvanceViewer']}
-          requiredPermissions={['eam.view']}>
-          <AppShell>
-            <AdvanceRetirementsPage />
-          </AppShell>
-        </RequireAuth>}
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ExpenseAdvanceOfficer",
+              "ExpenseAdvanceApprover",
+              "ExpenseAdvanceReviewer",
+              "ExpenseAdvanceViewer",
+            ]}
+            requiredPermissions={["eam.view"]}
+          >
+            <AppShell>
+              <AdvanceRetirementsPage />
+            </AppShell>
+          </RequireAuth>
+        }
       />
       <Route
         path="/eam/retirements/rejected"
-        element={<RequireAuth
-          allowedRoles={[
-            'PlatformAdmin',
-            'TenantAdmin',
-            'FinanceController',
-            'Approver',
-            'Viewer',
-            'Auditor',
-            'ExpenseAdvanceOfficer',
-            'ExpenseAdvanceApprover',
-            'ExpenseAdvanceReviewer',
-            'ExpenseAdvanceViewer']}
-          requiredPermissions={['eam.view']}>
-          <AppShell>
-            <RejectedAdvanceRetirementsPage />
-          </AppShell>
-        </RequireAuth>}
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ExpenseAdvanceOfficer",
+              "ExpenseAdvanceApprover",
+              "ExpenseAdvanceReviewer",
+              "ExpenseAdvanceViewer",
+            ]}
+            requiredPermissions={["eam.view"]}
+          >
+            <AppShell>
+              <RejectedAdvanceRetirementsPage />
+            </AppShell>
+          </RequireAuth>
+        }
       />
       <Route
         path="/eam/refunds"
-        element={<RequireAuth
-          allowedRoles={[
-            'PlatformAdmin',
-            'TenantAdmin',
-            'FinanceController',
-            'Approver', 'Viewer',
-            'Auditor',
-            'ExpenseAdvanceOfficer',
-            'ExpenseAdvanceApprover',
-            'ExpenseAdvanceReviewer',
-            'ExpenseAdvanceViewer']}
-          requiredPermissions={['eam.view']}>
-          <AppShell>
-            <AdvanceRefundsPage />
-          </AppShell>
-        </RequireAuth>}
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ExpenseAdvanceOfficer",
+              "ExpenseAdvanceApprover",
+              "ExpenseAdvanceReviewer",
+              "ExpenseAdvanceViewer",
+            ]}
+            requiredPermissions={["eam.view"]}
+          >
+            <AppShell>
+              <AdvanceRefundsPage />
+            </AppShell>
+          </RequireAuth>
+        }
       />
 
       <Route
         path="/eam/recoveries"
-        element={<RequireAuth
-          allowedRoles={[
-            'PlatformAdmin',
-            'TenantAdmin',
-            'FinanceController',
-            'Approver',
-            'Viewer',
-            'Auditor',
-            'ExpenseAdvanceOfficer',
-            'ExpenseAdvanceApprover',
-            'ExpenseAdvanceReviewer',
-            'ExpenseAdvanceViewer']}
-          requiredPermissions={['eam.view']}>
-          <AppShell>
-            <AdvanceRecoveriesPage />
-          </AppShell>
-        </RequireAuth>}
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ExpenseAdvanceOfficer",
+              "ExpenseAdvanceApprover",
+              "ExpenseAdvanceReviewer",
+              "ExpenseAdvanceViewer",
+            ]}
+            requiredPermissions={["eam.view"]}
+          >
+            <AppShell>
+              <AdvanceRecoveriesPage />
+            </AppShell>
+          </RequireAuth>
+        }
       />
       <Route
         path="/eam/imprest-register"
-        element={<RequireAuth
-          allowedRoles={[
-            'PlatformAdmin',
-            'TenantAdmin',
-            'FinanceController',
-            'Approver',
-            'Viewer',
-            'Auditor',
-            'ExpenseAdvanceOfficer',
-            'ExpenseAdvanceApprover',
-            'ExpenseAdvanceReviewer',
-            'ExpenseAdvanceViewer']}
-          requiredPermissions={['eam.view']}>
-          <AppShell>
-            <ImprestRegisterPage />
-          </AppShell>
-        </RequireAuth>}
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ExpenseAdvanceOfficer",
+              "ExpenseAdvanceApprover",
+              "ExpenseAdvanceReviewer",
+              "ExpenseAdvanceViewer",
+            ]}
+            requiredPermissions={["eam.view"]}
+          >
+            <AppShell>
+              <ImprestRegisterPage />
+            </AppShell>
+          </RequireAuth>
+        }
       />
 
       <Route
         path="/eam/travel-advances"
-        element={<RequireAuth
-          allowedRoles={[
-            'PlatformAdmin',
-            'TenantAdmin',
-            'FinanceController',
-            'Approver',
-            'Viewer',
-            'Auditor',
-            'ExpenseAdvanceOfficer',
-            'ExpenseAdvanceApprover',
-            'ExpenseAdvanceReviewer',
-            'ExpenseAdvanceViewer']}
-          requiredPermissions={['eam.view']}>
-          <AppShell>
-            <TravelAdvancesPage />
-          </AppShell>
-        </RequireAuth>}
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ExpenseAdvanceOfficer",
+              "ExpenseAdvanceApprover",
+              "ExpenseAdvanceReviewer",
+              "ExpenseAdvanceViewer",
+            ]}
+            requiredPermissions={["eam.view"]}
+          >
+            <AppShell>
+              <TravelAdvancesPage />
+            </AppShell>
+          </RequireAuth>
+        }
       />
       <Route
         path="/eam/operational-float"
-        element={<RequireAuth
-          allowedRoles={[
-            'PlatformAdmin',
-            'TenantAdmin',
-            'FinanceController',
-            'Approver',
-            'Viewer',
-            'Auditor',
-            'ExpenseAdvanceOfficer',
-            'ExpenseAdvanceApprover',
-            'ExpenseAdvanceReviewer',
-            'ExpenseAdvanceViewer']}
-          requiredPermissions={['eam.view']}
-        ><AppShell>
-            <OperationalFloatPage />
-          </AppShell>
-        </RequireAuth>}
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ExpenseAdvanceOfficer",
+              "ExpenseAdvanceApprover",
+              "ExpenseAdvanceReviewer",
+              "ExpenseAdvanceViewer",
+            ]}
+            requiredPermissions={["eam.view"]}
+          >
+            <AppShell>
+              <OperationalFloatPage />
+            </AppShell>
+          </RequireAuth>
+        }
       />
 
       <Route
         path="/eam/outstanding"
-        element={<RequireAuth
-          allowedRoles={[
-            'PlatformAdmin',
-            'TenantAdmin',
-            'FinanceController',
-            'Approver',
-            'Viewer',
-            'Auditor',
-            'ExpenseAdvanceOfficer',
-            'ExpenseAdvanceApprover',
-            'ExpenseAdvanceReviewer',
-            'ExpenseAdvanceViewer']}
-          requiredPermissions={['eam.view']}>
-          <AppShell>
-            <OutstandingAdvancesPage />
-          </AppShell>
-        </RequireAuth>}
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ExpenseAdvanceOfficer",
+              "ExpenseAdvanceApprover",
+              "ExpenseAdvanceReviewer",
+              "ExpenseAdvanceViewer",
+            ]}
+            requiredPermissions={["eam.view"]}
+          >
+            <AppShell>
+              <OutstandingAdvancesPage />
+            </AppShell>
+          </RequireAuth>
+        }
       />
 
       <Route
         path="/eam/overdue"
-        element={<RequireAuth
-          allowedRoles={[
-            'PlatformAdmin',
-            'TenantAdmin',
-            'FinanceController',
-            'Approver',
-            'Viewer',
-            'Auditor',
-            'ExpenseAdvanceOfficer',
-            'ExpenseAdvanceApprover',
-            'ExpenseAdvanceReviewer',
-            'ExpenseAdvanceViewer']}
-          requiredPermissions={['eam.view']}>
-          <AppShell>
-            <OverdueAdvancesPage />
-          </AppShell>
-        </RequireAuth>}
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ExpenseAdvanceOfficer",
+              "ExpenseAdvanceApprover",
+              "ExpenseAdvanceReviewer",
+              "ExpenseAdvanceViewer",
+            ]}
+            requiredPermissions={["eam.view"]}
+          >
+            <AppShell>
+              <OverdueAdvancesPage />
+            </AppShell>
+          </RequireAuth>
+        }
       />
 
       <Route
         path="/eam/setup"
-        element={<RequireAuth
-          allowedRoles={[
-            'PlatformAdmin',
-            'TenantAdmin',
-            'FinanceController',
-            'ExpenseAdvanceOfficer',
-            'ExpenseAdvanceApprover',
-            'ExpenseAdvanceReviewer']}
-            requiredPermissions={['eam.view']}>
-          <AppShell>
-            <ExpenseAdvanceSetupPage />
-          </AppShell>
-        </RequireAuth>}
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "ExpenseAdvanceOfficer",
+              "ExpenseAdvanceApprover",
+              "ExpenseAdvanceReviewer",
+            ]}
+            requiredPermissions={["eam.view"]}
+          >
+            <AppShell>
+              <ExpenseAdvanceSetupPage />
+            </AppShell>
+          </RequireAuth>
+        }
       />
 
       <Route
         path="/eam/reports"
-        element={<RequireAuth
-          allowedRoles={[
-            'PlatformAdmin',
-            'TenantAdmin',
-            'FinanceController',
-            'Approver',
-            'Viewer',
-            'Auditor',
-            'ExpenseAdvanceOfficer',
-            'ExpenseAdvanceApprover',
-            'ExpenseAdvanceReviewer',
-            'ExpenseAdvanceViewer']}
-            requiredPermissions={['eam.view']}>
-          <AppShell>
-            <ExpenseAdvanceReportsPage />
-          </AppShell>
-        </RequireAuth>}
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "ExpenseAdvanceOfficer",
+              "ExpenseAdvanceApprover",
+              "ExpenseAdvanceReviewer",
+              "ExpenseAdvanceViewer",
+            ]}
+            requiredPermissions={["eam.view"]}
+          >
+            <AppShell>
+              <ExpenseAdvanceReportsPage />
+            </AppShell>
+          </RequireAuth>
+        }
       />
 
       <Route
@@ -1299,18 +1382,18 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'BillingOfficer',
-              'BillingApprover',
-              'BillingViewer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "BillingOfficer",
+              "BillingApprover",
+              "BillingViewer",
             ]}
-            requiredPermissions={['billing.view']}
+            requiredPermissions={["billing.view"]}
           >
             <AppShell>
               <BillingDashboardPage />
@@ -1324,18 +1407,18 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'BillingOfficer',
-              'BillingApprover',
-              'BillingViewer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "BillingOfficer",
+              "BillingApprover",
+              "BillingViewer",
             ]}
-            requiredPermissions={['billing.view']}
+            requiredPermissions={["billing.view"]}
           >
             <AppShell>
               <BillingInvoicesPage />
@@ -1349,18 +1432,18 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'BillingOfficer',
-              'BillingApprover',
-              'BillingViewer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "BillingOfficer",
+              "BillingApprover",
+              "BillingViewer",
             ]}
-            requiredPermissions={['billing.view']}
+            requiredPermissions={["billing.view"]}
           >
             <AppShell>
               <RejectedBillingInvoicesPage />
@@ -1374,16 +1457,16 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Auditor',
-              'BillingOfficer',
-              'BillingApprover',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Auditor",
+              "BillingOfficer",
+              "BillingApprover",
             ]}
-            requiredPermissions={['billing.view']}
+            requiredPermissions={["billing.view"]}
           >
             <AppShell>
               <BillingApprovalQueuePage />
@@ -1397,13 +1480,13 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'BillingOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "BillingOfficer",
             ]}
-            requiredPermissions={['billing.view']}
+            requiredPermissions={["billing.view"]}
           >
             <AppShell>
               <BillingSetupPage />
@@ -1417,18 +1500,18 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'BillingOfficer',
-              'BillingApprover',
-              'BillingViewer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "BillingOfficer",
+              "BillingApprover",
+              "BillingViewer",
             ]}
-            requiredPermissions={['billing.view']}
+            requiredPermissions={["billing.view"]}
           >
             <AppShell>
               <BillingReportsPage />
@@ -1442,18 +1525,18 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'BillingOfficer',
-              'BillingApprover',
-              'BillingViewer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "BillingOfficer",
+              "BillingApprover",
+              "BillingViewer",
             ]}
-            requiredPermissions={['billing.view']}
+            requiredPermissions={["billing.view"]}
           >
             <AppShell>
               <BillingOutstandingPage />
@@ -1467,18 +1550,18 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'BillingOfficer',
-              'BillingApprover',
-              'BillingViewer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "BillingOfficer",
+              "BillingApprover",
+              "BillingViewer",
             ]}
-            requiredPermissions={['billing.view']}
+            requiredPermissions={["billing.view"]}
           >
             <AppShell>
               <BillingCreditNotesPage />
@@ -1492,18 +1575,18 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'BillingOfficer',
-              'BillingApprover',
-              'BillingViewer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "BillingOfficer",
+              "BillingApprover",
+              "BillingViewer",
             ]}
-            requiredPermissions={['billing.view']}
+            requiredPermissions={["billing.view"]}
           >
             <AppShell>
               <RejectedBillingCreditNotesPage />
@@ -1517,13 +1600,13 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'BillingOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "BillingOfficer",
             ]}
-            requiredPermissions={['billing.view']}
+            requiredPermissions={["billing.view"]}
           >
             <AppShell>
               <BillingPaymentAllocationPage />
@@ -1537,25 +1620,25 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'BudgetOfficer',
-              'BudgetOwner',
-              'PayrollOfficer',
-              'HrOfficer',
-              'ProcurementOfficer',
-              'TreasuryOfficer',
-              'InventoryOfficer',
-              'ApOfficer',
-              'ArOfficer',
-              'FixedAssetOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "BudgetOfficer",
+              "BudgetOwner",
+              "PayrollOfficer",
+              "HrOfficer",
+              "ProcurementOfficer",
+              "TreasuryOfficer",
+              "InventoryOfficer",
+              "ApOfficer",
+              "ArOfficer",
+              "FixedAssetOfficer",
             ]}
-            requiredPermissions={['reports.view']}
+            requiredPermissions={["reports.view"]}
           >
             <AppShell>
               <ReportsPage />
@@ -1564,23 +1647,21 @@ export default function App() {
         }
       />
 
-
-
       <Route
         path="/approvals"
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'HrManager',
-              'PayrollOfficer',
-              'FinanceController',
-              'Accountant',
-              'BillingOfficer',
-              'Auditor',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "HrManager",
+              "PayrollOfficer",
+              "FinanceController",
+              "Accountant",
+              "BillingOfficer",
+              "Auditor",
             ]}
-            requiredPermissions={['approval.inbox.view']}
+            requiredPermissions={["approval.inbox.view"]}
           >
             <AppShell>
               <ApprovalInboxPage />
@@ -1594,17 +1675,17 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'HrManager',
-              'HrOfficer',
-              'HrViewer',
-              'PayrollOfficer',
-              'FinanceController',
-              'Viewer',
-              'Auditor',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "HrManager",
+              "HrOfficer",
+              "HrViewer",
+              "PayrollOfficer",
+              "FinanceController",
+              "Viewer",
+              "Auditor",
             ]}
-            requiredPermissions={['hr.view']}
+            requiredPermissions={["hr.view"]}
           >
             <AppShell>
               <HrDashboardPage />
@@ -1618,17 +1699,17 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'HrManager',
-              'HrOfficer',
-              'HrViewer',
-              'PayrollOfficer',
-              'FinanceController',
-              'Viewer',
-              'Auditor',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "HrManager",
+              "HrOfficer",
+              "HrViewer",
+              "PayrollOfficer",
+              "FinanceController",
+              "Viewer",
+              "Auditor",
             ]}
-            requiredPermissions={['hr.view']}
+            requiredPermissions={["hr.view"]}
           >
             <AppShell>
               <HrEmployeesPage />
@@ -1642,17 +1723,17 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'HrManager',
-              'HrOfficer',
-              'HrViewer',
-              'PayrollOfficer',
-              'FinanceController',
-              'Viewer',
-              'Auditor',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "HrManager",
+              "HrOfficer",
+              "HrViewer",
+              "PayrollOfficer",
+              "FinanceController",
+              "Viewer",
+              "Auditor",
             ]}
-            requiredPermissions={['hr.view']}
+            requiredPermissions={["hr.view"]}
           >
             <AppShell>
               <HrSetupPage />
@@ -1666,17 +1747,17 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'HrManager',
-              'HrOfficer',
-              'HrViewer',
-              'PayrollOfficer',
-              'FinanceController',
-              'Viewer',
-              'Auditor',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "HrManager",
+              "HrOfficer",
+              "HrViewer",
+              "PayrollOfficer",
+              "FinanceController",
+              "Viewer",
+              "Auditor",
             ]}
-            requiredPermissions={['hr.view']}
+            requiredPermissions={["hr.view"]}
           >
             <AppShell>
               <HrLeavePage />
@@ -1690,17 +1771,17 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'HrManager',
-              'HrOfficer',
-              'HrViewer',
-              'PayrollOfficer',
-              'FinanceController',
-              'Viewer',
-              'Auditor',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "HrManager",
+              "HrOfficer",
+              "HrViewer",
+              "PayrollOfficer",
+              "FinanceController",
+              "Viewer",
+              "Auditor",
             ]}
-            requiredPermissions={['hr.view']}
+            requiredPermissions={["hr.view"]}
           >
             <AppShell>
               <HrTrainingPage />
@@ -1714,17 +1795,17 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'HrManager',
-              'HrOfficer',
-              'HrViewer',
-              'PayrollOfficer',
-              'FinanceController',
-              'Viewer',
-              'Auditor',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "HrManager",
+              "HrOfficer",
+              "HrViewer",
+              "PayrollOfficer",
+              "FinanceController",
+              "Viewer",
+              "Auditor",
             ]}
-            requiredPermissions={['hr.view']}
+            requiredPermissions={["hr.view"]}
           >
             <AppShell>
               <HrDisciplinaryPage />
@@ -1738,17 +1819,17 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'HrManager',
-              'HrOfficer',
-              'HrViewer',
-              'PayrollOfficer',
-              'FinanceController',
-              'Viewer',
-              'Auditor',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "HrManager",
+              "HrOfficer",
+              "HrViewer",
+              "PayrollOfficer",
+              "FinanceController",
+              "Viewer",
+              "Auditor",
             ]}
-            requiredPermissions={['hr.view']}
+            requiredPermissions={["hr.view"]}
           >
             <AppShell>
               <HrReportsPage />
@@ -1762,17 +1843,17 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'PayrollOfficer',
-              'HrOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "PayrollOfficer",
+              "HrOfficer",
             ]}
-            requiredPermissions={['payroll.view']}
+            requiredPermissions={["payroll.view"]}
           >
             <AppShell>
               <PayrollDashboardPage />
@@ -1785,17 +1866,17 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'PayrollOfficer',
-              'HrOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "PayrollOfficer",
+              "HrOfficer",
             ]}
-            requiredPermissions={['payroll.view']}
+            requiredPermissions={["payroll.view"]}
           >
             <AppShell>
               <PayrollEmployeesPage />
@@ -1808,17 +1889,17 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'PayrollOfficer',
-              'HrOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "PayrollOfficer",
+              "HrOfficer",
             ]}
-            requiredPermissions={['payroll.view']}
+            requiredPermissions={["payroll.view"]}
           >
             <AppShell>
               <PayrollSetupPage />
@@ -1831,17 +1912,17 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'PayrollOfficer',
-              'HrOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "PayrollOfficer",
+              "HrOfficer",
             ]}
-            requiredPermissions={['payroll.view']}
+            requiredPermissions={["payroll.view"]}
           >
             <AppShell>
               <PayrollRunsPage />
@@ -1854,17 +1935,17 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'PayrollOfficer',
-              'HrOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "PayrollOfficer",
+              "HrOfficer",
             ]}
-            requiredPermissions={['payroll.view']}
+            requiredPermissions={["payroll.view"]}
           >
             <AppShell>
               <PayrollPayslipsPage />
@@ -1874,17 +1955,379 @@ export default function App() {
       />
 
       <Route
+        path="/oil-gas"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "OilGasManager",
+              "ProductionOfficer",
+              "ProductionApprover",
+              "MeasurementOfficer",
+              "OilGasViewer",
+            ]}
+            requiredPermissions={["oilgas.view"]}
+          >
+            <AppShell>
+              <OilGasOperationsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/oil-gas/upstream"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "OilGasManager",
+              "ProductionOfficer",
+              "ProductionApprover",
+              "MeasurementOfficer",
+              "OilGasViewer",
+            ]}
+            requiredPermissions={["oilgas.view"]}
+          >
+            <AppShell>
+              <OilGasUpstreamCompletionPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/oil-gas/upstream/liftings"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "OilGasManager",
+              "ProductionOfficer",
+              "ProductionApprover",
+              "MeasurementOfficer",
+              "OilGasViewer",
+            ]}
+            requiredPermissions={["oilgas.view"]}
+          >
+            <AppShell>
+              <OilGasUpstreamCompletionPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/oil-gas/upstream/afe"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "OilGasManager",
+              "ProductionOfficer",
+              "ProductionApprover",
+              "MeasurementOfficer",
+              "OilGasViewer",
+            ]}
+            requiredPermissions={["oilgas.view"]}
+          >
+            <AppShell>
+              <OilGasUpstreamCompletionPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/oil-gas/upstream/partners"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "OilGasManager",
+              "ProductionOfficer",
+              "ProductionApprover",
+              "MeasurementOfficer",
+              "OilGasViewer",
+            ]}
+            requiredPermissions={["oilgas.view"]}
+          >
+            <AppShell>
+              <OilGasUpstreamCompletionPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/oil-gas/upstream/production-close"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "OilGasManager",
+              "ProductionOfficer",
+              "ProductionApprover",
+              "MeasurementOfficer",
+              "OilGasViewer",
+            ]}
+            requiredPermissions={["oilgas.view"]}
+          >
+            <AppShell>
+              <OilGasUpstreamCompletionPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/oil-gas/upstream/hse"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "OilGasManager",
+              "ProductionOfficer",
+              "ProductionApprover",
+              "MeasurementOfficer",
+              "OilGasViewer",
+            ]}
+            requiredPermissions={["oilgas.view"]}
+          >
+            <AppShell>
+              <OilGasUpstreamCompletionPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/oil-gas/upstream/equipment"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "OilGasManager",
+              "ProductionOfficer",
+              "ProductionApprover",
+              "MeasurementOfficer",
+              "OilGasViewer",
+            ]}
+            requiredPermissions={["oilgas.view"]}
+          >
+            <AppShell>
+              <OilGasUpstreamCompletionPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/oil-gas/upstream/documents"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "OilGasManager",
+              "ProductionOfficer",
+              "ProductionApprover",
+              "MeasurementOfficer",
+              "OilGasViewer",
+            ]}
+            requiredPermissions={["oilgas.view"]}
+          >
+            <AppShell>
+              <OilGasUpstreamCompletionPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/oil-gas/upstream/reports"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "OilGasManager",
+              "ProductionOfficer",
+              "ProductionApprover",
+              "MeasurementOfficer",
+              "OilGasViewer",
+            ]}
+            requiredPermissions={["oilgas.view"]}
+          >
+            <AppShell>
+              <OilGasUpstreamCompletionPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/oil-gas/:section"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "OilGasManager",
+              "ProductionOfficer",
+              "ProductionApprover",
+              "MeasurementOfficer",
+              "OilGasViewer",
+            ]}
+            requiredPermissions={["oilgas.view"]}
+          >
+            <AppShell>
+              <OilGasOperationsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/oil-gas/stock"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "OilGasManager",
+              "ProductionOfficer",
+              "ProductionApprover",
+              "MeasurementOfficer",
+              "OilGasViewer",
+            ]}
+            requiredPermissions={["oilgas.view"]}
+          >
+            <AppShell>
+              <OilGasStockOperationsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/oil-gas/stock/rejected"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "OilGasManager",
+              "ProductionOfficer",
+              "ProductionApprover",
+              "MeasurementOfficer",
+              "OilGasViewer",
+            ]}
+            requiredPermissions={["oilgas.view"]}
+          >
+            <AppShell>
+              <OilGasStockOperationsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/oil-gas/reconciliation"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "OilGasManager",
+              "ProductionOfficer",
+              "ProductionApprover",
+              "MeasurementOfficer",
+              "OilGasViewer",
+            ]}
+            requiredPermissions={["oilgas.view"]}
+          >
+            <AppShell>
+              <OilGasStockOperationsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/oil-gas/metering"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "OilGasManager",
+              "ProductionOfficer",
+              "ProductionApprover",
+              "MeasurementOfficer",
+              "OilGasViewer",
+            ]}
+            requiredPermissions={["oilgas.view"]}
+          >
+            <AppShell>
+              <OilGasStockOperationsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/oil-gas/renewals"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "OilGasManager",
+              "ProductionOfficer",
+              "ProductionApprover",
+              "MeasurementOfficer",
+              "OilGasViewer",
+            ]}
+            requiredPermissions={["oilgas.view"]}
+          >
+            <AppShell>
+              <OilGasStockOperationsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/oil-gas/production/rejected"
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "OilGasManager",
+              "ProductionOfficer",
+              "ProductionApprover",
+              "MeasurementOfficer",
+              "OilGasViewer",
+            ]}
+            requiredPermissions={["oilgas.view"]}
+          >
+            <AppShell>
+              <OilGasOperationsPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+
+      <Route
         path="/fleet"
         element={
-          <RequireAuth allowedRoles={[
-            'PlatformAdmin',
-            'TenantAdmin',
-            'FleetOfficer',
-            'FleetApprover',
-            'FleetReviewer',
-            'FleetViewer'
-          ]}
-            requiredPermissions={['fleet.view']}>
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FleetOfficer",
+              "FleetApprover",
+              "FleetReviewer",
+              "FleetViewer",
+            ]}
+            requiredPermissions={["fleet.view"]}
+          >
             <AppShell>
               <FleetDashboardPage />
             </AppShell>
@@ -1895,132 +2338,159 @@ export default function App() {
       <Route
         path="/fleet/vehicles"
         element={
-          <RequireAuth allowedRoles={[
-            'PlatformAdmin',
-            'TenantAdmin',
-            'FleetOfficer',
-            'FleetApprover',
-            'FleetReviewer'
-          ]}
-            requiredPermissions={['fleet.view']}>
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FleetOfficer",
+              "FleetApprover",
+              "FleetReviewer",
+            ]}
+            requiredPermissions={["fleet.view"]}
+          >
             <AppShell>
               <FleetVehiclesPage />
             </AppShell>
-          </RequireAuth>}
+          </RequireAuth>
+        }
       />
 
       <Route
         path="/fleet/drivers"
-        element={<RequireAuth allowedRoles={[
-          'PlatformAdmin',
-          'TenantAdmin',
-          'FleetOfficer',
-          'FleetApprover',
-          'FleetReviewer']}
-          requiredPermissions={['fleet.view']}>
-          <AppShell>
-            <FleetDriversPage />
-          </AppShell>
-        </RequireAuth>}
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FleetOfficer",
+              "FleetApprover",
+              "FleetReviewer",
+            ]}
+            requiredPermissions={["fleet.view"]}
+          >
+            <AppShell>
+              <FleetDriversPage />
+            </AppShell>
+          </RequireAuth>
+        }
       />
 
       <Route
         path="/fleet/trips"
         element={
-          <RequireAuth allowedRoles={[
-            'PlatformAdmin',
-            'TenantAdmin',
-            'FleetOfficer',
-            'FleetApprover',
-            'FleetReviewer'
-          ]}
-            requiredPermissions={['fleet.view']}>
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FleetOfficer",
+              "FleetApprover",
+              "FleetReviewer",
+            ]}
+            requiredPermissions={["fleet.view"]}
+          >
             <AppShell>
               <FleetTripsPage />
             </AppShell>
-          </RequireAuth>}
+          </RequireAuth>
+        }
       />
 
       <Route
         path="/fleet/fuel-logs"
-        element={<RequireAuth allowedRoles={[
-          'PlatformAdmin',
-          'TenantAdmin',
-          'FleetOfficer',
-          'FleetApprover',
-          'FleetReviewer']}
-          requiredPermissions={['fleet.view']}>
-          <AppShell>
-            <FleetFuelLogsPage />
-          </AppShell>
-        </RequireAuth>}
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FleetOfficer",
+              "FleetApprover",
+              "FleetReviewer",
+            ]}
+            requiredPermissions={["fleet.view"]}
+          >
+            <AppShell>
+              <FleetFuelLogsPage />
+            </AppShell>
+          </RequireAuth>
+        }
       />
 
       <Route
         path="/fleet/maintenance"
-        element={<RequireAuth
-          allowedRoles={[
-            'PlatformAdmin',
-            'TenantAdmin',
-            'FleetOfficer',
-            'FleetApprover',
-            'FleetReviewer']}
-          requiredPermissions={['fleet.view']}>
-          <AppShell>
-            <FleetMaintenancePage />
-          </AppShell>
-        </RequireAuth>}
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FleetOfficer",
+              "FleetApprover",
+              "FleetReviewer",
+            ]}
+            requiredPermissions={["fleet.view"]}
+          >
+            <AppShell>
+              <FleetMaintenancePage />
+            </AppShell>
+          </RequireAuth>
+        }
       />
 
       <Route
         path="/fleet/setup"
-        element={<RequireAuth
-          allowedRoles={[
-            'PlatformAdmin',
-            'TenantAdmin',
-            'FleetOfficer',
-            'FleetApprover']}
-          requiredPermissions={['fleet.view']}>
-          <AppShell>
-            <FleetPolicySetupPage />
-          </AppShell>
-        </RequireAuth>}
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FleetOfficer",
+              "FleetApprover",
+            ]}
+            requiredPermissions={["fleet.view"]}
+          >
+            <AppShell>
+              <FleetPolicySetupPage />
+            </AppShell>
+          </RequireAuth>
+        }
       />
 
       <Route
         path="/fleet/reports"
-        element={<RequireAuth
-          allowedRoles={[
-            'PlatformAdmin',
-            'TenantAdmin',
-            'FleetOfficer',
-            'FleetApprover',
-            'FleetReviewer',
-            'FleetViewer']}
-          requiredPermissions={['fleet.view']}>
-          <AppShell>
-            <FleetReportsPage />
-          </AppShell>
-        </RequireAuth>}
+        element={
+          <RequireAuth
+            allowedRoles={[
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FleetOfficer",
+              "FleetApprover",
+              "FleetReviewer",
+              "FleetViewer",
+            ]}
+            requiredPermissions={["fleet.view"]}
+          >
+            <AppShell>
+              <FleetReportsPage />
+            </AppShell>
+          </RequireAuth>
+        }
       />
-
 
       <Route
         path="/payroll/reports"
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'PayrollOfficer',
-              'HrOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "PayrollOfficer",
+              "HrOfficer",
             ]}
-            requiredPermissions={['payroll.view']}
+            requiredPermissions={["payroll.view"]}
           >
             <AppShell>
               <PayrollReportsPage />
@@ -2033,17 +2503,17 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'PayrollOfficer',
-              'HrOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "PayrollOfficer",
+              "HrOfficer",
             ]}
-            requiredPermissions={['payroll.view']}
+            requiredPermissions={["payroll.view"]}
           >
             <AppShell>
               <RejectPayrollRunsPage />
@@ -2056,25 +2526,25 @@ export default function App() {
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'BudgetOfficer',
-              'BudgetOwner',
-              'PayrollOfficer',
-              'HrOfficer',
-              'ProcurementOfficer',
-              'TreasuryOfficer',
-              'InventoryOfficer',
-              'ApOfficer',
-              'ArOfficer',
-              'FixedAssetOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "BudgetOfficer",
+              "BudgetOwner",
+              "PayrollOfficer",
+              "HrOfficer",
+              "ProcurementOfficer",
+              "TreasuryOfficer",
+              "InventoryOfficer",
+              "ApOfficer",
+              "ArOfficer",
+              "FixedAssetOfficer",
             ]}
-            requiredPermissions={['workingcapital.view']}
+            requiredPermissions={["workingcapital.view"]}
           >
             <AppShell>
               <WorkingCapitalPage />
@@ -2083,31 +2553,30 @@ export default function App() {
         }
       />
 
-
       <Route
         path="/ageing-analysis"
         element={
           <RequireAuth
             allowedRoles={[
-              'PlatformAdmin',
-              'TenantAdmin',
-              'FinanceController',
-              'Accountant',
-              'Approver',
-              'Viewer',
-              'Auditor',
-              'BudgetOfficer',
-              'BudgetOwner',
-              'PayrollOfficer',
-              'HrOfficer',
-              'ProcurementOfficer',
-              'TreasuryOfficer',
-              'InventoryOfficer',
-              'ApOfficer',
-              'ArOfficer',
-              'FixedAssetOfficer',
+              "PlatformAdmin",
+              "TenantAdmin",
+              "FinanceController",
+              "Accountant",
+              "Approver",
+              "Viewer",
+              "Auditor",
+              "BudgetOfficer",
+              "BudgetOwner",
+              "PayrollOfficer",
+              "HrOfficer",
+              "ProcurementOfficer",
+              "TreasuryOfficer",
+              "InventoryOfficer",
+              "ApOfficer",
+              "ArOfficer",
+              "FixedAssetOfficer",
             ]}
-            requiredPermissions={['reports.view']}
+            requiredPermissions={["reports.view"]}
           >
             <AppShell>
               <AgeingAnalysisPage />
@@ -2120,8 +2589,8 @@ export default function App() {
         path="/admin"
         element={
           <RequireAuth
-            allowedRoles={['PlatformAdmin', 'TenantAdmin']}
-            requiredPermissions={['admin.access']}
+            allowedRoles={["PlatformAdmin", "TenantAdmin"]}
+            requiredPermissions={["admin.access"]}
           >
             <AdminShell>
               <AdminDashboardPage />
@@ -2133,8 +2602,8 @@ export default function App() {
         path="/admin/settings"
         element={
           <RequireAuth
-            allowedRoles={['PlatformAdmin']}
-            requiredPermissions={['admin.settings.manage']}
+            allowedRoles={["PlatformAdmin"]}
+            requiredPermissions={["admin.settings.manage"]}
           >
             <AdminShell>
               <AdminSettingsPage />
@@ -2146,8 +2615,8 @@ export default function App() {
         path="/admin/users"
         element={
           <RequireAuth
-            allowedRoles={['PlatformAdmin', 'TenantAdmin']}
-            requiredPermissions={['admin.users.manage']}
+            allowedRoles={["PlatformAdmin", "TenantAdmin"]}
+            requiredPermissions={["admin.users.manage"]}
           >
             <AdminShell>
               <AdminUsersPage />
@@ -2158,7 +2627,7 @@ export default function App() {
       <Route
         path="/admin/subscription-applications"
         element={
-          <RequireAuth allowedRoles={['PlatformAdmin']}>
+          <RequireAuth allowedRoles={["PlatformAdmin"]}>
             <AdminShell>
               <AdminSubscriptionApplicationsPage />
             </AdminShell>
@@ -2168,7 +2637,7 @@ export default function App() {
       <Route
         path="/admin/tenants/:tenantId"
         element={
-          <RequireAuth allowedRoles={['PlatformAdmin']}>
+          <RequireAuth allowedRoles={["PlatformAdmin"]}>
             <AdminShell>
               <AdminTenantDetailPage />
             </AdminShell>
@@ -2179,7 +2648,7 @@ export default function App() {
       <Route
         path="/admin/tenant-modules"
         element={
-          <RequireAuth allowedRoles={['PlatformAdmin']}>
+          <RequireAuth allowedRoles={["PlatformAdmin"]}>
             <AdminShell>
               <AdminTenantModuleActivationPage />
             </AdminShell>
@@ -2191,8 +2660,12 @@ export default function App() {
         path="/admin/access-control"
         element={
           <RequireAuth
-            allowedRoles={['PlatformAdmin', 'TenantAdmin']}
-            requiredPermissions={['admin.roles.manage', 'admin.permissions.manage', 'admin.scopes.manage']}
+            allowedRoles={["PlatformAdmin", "TenantAdmin"]}
+            requiredPermissions={[
+              "admin.roles.manage",
+              "admin.permissions.manage",
+              "admin.scopes.manage",
+            ]}
           >
             <AdminShell>
               <AdminAccessControlPage />
@@ -2204,8 +2677,8 @@ export default function App() {
         path="/admin/audit-trail"
         element={
           <RequireAuth
-            allowedRoles={['PlatformAdmin', 'TenantAdmin']}
-            requiredPermissions={['admin.access']}
+            allowedRoles={["PlatformAdmin", "TenantAdmin"]}
+            requiredPermissions={["admin.access"]}
           >
             <AdminShell>
               <AdminAuditTrailPage />
@@ -2213,7 +2686,6 @@ export default function App() {
           </RequireAuth>
         }
       />
-
 
       <Route path="/home" element={<Navigate to="/" replace />} />
       <Route path="*" element={<NotFoundPage />} />
