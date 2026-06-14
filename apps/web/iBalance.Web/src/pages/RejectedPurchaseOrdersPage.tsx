@@ -98,7 +98,15 @@ export function RejectedPurchaseOrdersPage() {
       ...selected,
       lines: [
         ...(selected.lines ?? []),
-        { id: '', purchaseRequisitionLineId: '', inventoryItemId: '', description: '', quantity: 1, unitPrice: 0, notes: '' },
+        { id: '', 
+        purchaseRequisitionLineId: '', 
+        inventoryItemId: '', 
+        description: '', 
+        quantity: 1, 
+        unitPrice: 0, 
+        receivedQuantity: 0,
+        outstandingQuantity: 1,
+        notes: '' },
       ],
     });
   }

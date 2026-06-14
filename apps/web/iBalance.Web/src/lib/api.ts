@@ -5422,6 +5422,8 @@ export type PurchaseOrderLineDto = {
   description: string;
   quantity: number;
   unitPrice: number;
+  receivedQuantity: number;
+  outstandingQuantity: number;
   notes?: string | null;
 };
 
@@ -6495,6 +6497,14 @@ export async function getOilGasBusinessUnits() {
 export async function createOilGasBusinessUnit(payload: unknown) {
   return (await api.post("/api/oil-gas/business-units", payload)).data;
 }
+export async function updateOilGasBusinessUnit(
+  businessUnitId: string,
+  payload: unknown,
+) {
+  return (
+    await api.put(`/api/oil-gas/business-units/${businessUnitId}`, payload)
+  ).data;
+}
 export async function getOilGasAssets() {
   return (
     await api.get<OilGasListResponse<OilGasAssetDto>>("/api/oil-gas/assets")
@@ -6502,6 +6512,9 @@ export async function getOilGasAssets() {
 }
 export async function createOilGasAsset(payload: unknown) {
   return (await api.post("/api/oil-gas/assets", payload)).data;
+}
+export async function updateOilGasAsset(assetId: string, payload: unknown) {
+  return (await api.put(`/api/oil-gas/assets/${assetId}`, payload)).data;
 }
 export async function getOilGasLocations() {
   return (
@@ -6513,6 +6526,12 @@ export async function getOilGasLocations() {
 export async function createOilGasLocation(payload: unknown) {
   return (await api.post("/api/oil-gas/locations", payload)).data;
 }
+export async function updateOilGasLocation(
+  locationId: string,
+  payload: unknown,
+) {
+  return (await api.put(`/api/oil-gas/locations/${locationId}`, payload)).data;
+}
 export async function getOilGasProducts() {
   return (
     await api.get<OilGasListResponse<OilGasProductDto>>("/api/oil-gas/products")
@@ -6520,6 +6539,9 @@ export async function getOilGasProducts() {
 }
 export async function createOilGasProduct(payload: unknown) {
   return (await api.post("/api/oil-gas/products", payload)).data;
+}
+export async function updateOilGasProduct(productId: string, payload: unknown) {
+  return (await api.put(`/api/oil-gas/products/${productId}`, payload)).data;
 }
 export async function getOilGasTanks() {
   return (
@@ -6529,6 +6551,9 @@ export async function getOilGasTanks() {
 export async function createOilGasTank(payload: unknown) {
   return (await api.post("/api/oil-gas/tanks", payload)).data;
 }
+export async function updateOilGasTank(tankId: string, payload: unknown) {
+  return (await api.put(`/api/oil-gas/tanks/${tankId}`, payload)).data;
+}
 export async function getOilGasMeters() {
   return (
     await api.get<OilGasListResponse<OilGasMeterDto>>("/api/oil-gas/meters")
@@ -6537,6 +6562,9 @@ export async function getOilGasMeters() {
 export async function createOilGasMeter(payload: unknown) {
   return (await api.post("/api/oil-gas/meters", payload)).data;
 }
+export async function updateOilGasMeter(meterId: string, payload: unknown) {
+  return (await api.put(`/api/oil-gas/meters/${meterId}`, payload)).data;
+}
 export async function getOilGasPermits() {
   return (
     await api.get<OilGasListResponse<OilGasPermitDto>>("/api/oil-gas/permits")
@@ -6544,6 +6572,9 @@ export async function getOilGasPermits() {
 }
 export async function createOilGasPermit(payload: unknown) {
   return (await api.post("/api/oil-gas/permits", payload)).data;
+}
+export async function updateOilGasPermit(permitId: string, payload: unknown) {
+  return (await api.put(`/api/oil-gas/permits/${permitId}`, payload)).data;
 }
 export async function getOilGasLedgerAccounts() {
   return (

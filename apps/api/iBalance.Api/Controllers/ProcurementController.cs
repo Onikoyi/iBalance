@@ -45,7 +45,19 @@ public sealed class ProcurementController : ControllerBase
                 x.Notes,
                 x.CreatedOnUtc,
                 LineCount = x.Lines.Count,
-                EstimatedTotalAmount = x.Lines.Sum(line => line.Quantity * line.EstimatedUnitPrice)
+                EstimatedTotalAmount = x.Lines.Sum(line => line.Quantity * line.EstimatedUnitPrice),
+                Lines = x.Lines
+                    .OrderBy(line => line.Description)
+                    .Select(line => new
+                    {
+                        line.Id,
+                        line.InventoryItemId,
+                        line.Description,
+                        line.Quantity,
+                        line.EstimatedUnitPrice,
+                        line.Notes
+                    })
+                    .ToList()
             })
             .ToListAsync(cancellationToken);
 
@@ -433,7 +445,22 @@ public sealed class ProcurementController : ControllerBase
                 x.Notes,
                 x.CreatedOnUtc,
                 LineCount = x.Lines.Count,
-                TotalAmount = x.Lines.Sum(line => line.Quantity * line.UnitPrice)
+                TotalAmount = x.Lines.Sum(line => line.Quantity * line.UnitPrice),
+                Lines = x.Lines
+                    .OrderBy(line => line.Description)
+                    .Select(line => new
+                    {
+                        line.Id,
+                        line.PurchaseRequisitionLineId,
+                        line.InventoryItemId,
+                        line.Description,
+                        line.Quantity,
+                        line.UnitPrice,
+                        line.ReceivedQuantity,
+                        OutstandingQuantity = line.Quantity - line.ReceivedQuantity,
+                        line.Notes
+                    })
+                    .ToList()
             })
             .ToListAsync(cancellationToken);
 
@@ -487,6 +514,8 @@ public sealed class ProcurementController : ControllerBase
                     line.Description,
                     line.Quantity,
                     line.UnitPrice,
+                    line.ReceivedQuantity,
+                    OutstandingQuantity = line.Quantity - line.ReceivedQuantity,
                     line.Notes
                 }).ToList()
             })

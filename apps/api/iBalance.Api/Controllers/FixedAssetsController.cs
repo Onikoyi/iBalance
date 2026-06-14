@@ -366,7 +366,8 @@ public sealed class FixedAssetsController : ControllerBase
             return Conflict(new { Message = "A fixed asset with the same asset number already exists.", AssetNumber = assetNumber });
         }
 
-        var capitalizationDateUtc = request.CapitalizationDateUtc ?? invoice.PostedOnUtc.Value;
+        var capitalizationDateUtc = EnsureUtc(request.CapitalizationDateUtc ?? invoice.PostedOnUtc.Value);
+        var invoiceDateUtc = EnsureUtc(invoice.InvoiceDateUtc);
         var postingGuard = await FiscalPeriodPostingGuard.EnsureOpenPeriodAsync(
             dbContext,
             capitalizationDateUtc,
@@ -407,7 +408,7 @@ public sealed class FixedAssetsController : ControllerBase
                 assetNumber,
                 request.AssetName.Trim(),
                 request.Description,
-                invoice.InvoiceDateUtc,
+                invoiceDateUtc,
                 acquisitionCost,
                 request.ResidualValue,
                 usefulLifeMonths,
@@ -431,7 +432,7 @@ public sealed class FixedAssetsController : ControllerBase
                 tenantContext.TenantId,
                 fixedAsset.Id,
                 FixedAssetTransactionType.Acquisition,
-                invoice.InvoiceDateUtc,
+                invoiceDateUtc,
                 acquisitionCost,
                 $"Acquisition from AP purchase invoice {invoice.InvoiceNumber}",
                 invoice.JournalEntryId,
@@ -521,6 +522,7 @@ public sealed class FixedAssetsController : ControllerBase
         if (assetClass.Status != FixedAssetClassStatus.Active) return Conflict(new { Message = "Only active fixed asset classes can be used.", request.FixedAssetClassId });
 
         var assetNumber = request.AssetNumber.Trim().ToUpperInvariant();
+        var acquisitionDateUtc = EnsureUtc(request.AcquisitionDateUtc);
         var exists = await dbContext.Set<FixedAsset>().AsNoTracking().AnyAsync(x => x.AssetNumber == assetNumber, cancellationToken);
         if (exists) return Conflict(new { Message = "A fixed asset with the same asset number already exists.", AssetNumber = assetNumber });
 
@@ -544,7 +546,7 @@ public sealed class FixedAssetsController : ControllerBase
                 assetNumber,
                 request.AssetName.Trim(),
                 request.Description,
-                request.AcquisitionDateUtc,
+                acquisitionDateUtc,
                 request.AcquisitionCost,
                 request.ResidualValue,
                 request.UsefulLifeMonths <= 0 ? assetClass.UsefulLifeMonthsDefault : request.UsefulLifeMonths,
@@ -566,7 +568,7 @@ public sealed class FixedAssetsController : ControllerBase
                 tenantContext.TenantId,
                 fixedAsset.Id,
                 FixedAssetTransactionType.Acquisition,
-                request.AcquisitionDateUtc,
+                acquisitionDateUtc,
                 request.AcquisitionCost,
                 $"Acquisition of fixed asset {fixedAsset.AssetNumber}",
                 reference: fixedAsset.AssetNumber,
@@ -666,11 +668,13 @@ public sealed class FixedAssetsController : ControllerBase
 
         if (request.CreditLedgerAccountId == Guid.Empty) return BadRequest(new { Message = "Credit ledger account is required." });
 
+        var capitalizationDateUtc = EnsureUtc(request.CapitalizationDateUtc);
+
         var asset = await dbContext.Set<FixedAsset>().FirstOrDefaultAsync(x => x.Id == fixedAssetId, cancellationToken);
         if (asset is null) return NotFound(new { Message = "Fixed asset was not found.", FixedAssetId = fixedAssetId });
 
-        var postingPeriod = await GetOpenFiscalPeriodForDateAsync(dbContext, request.CapitalizationDateUtc, cancellationToken);
-        if (postingPeriod is null) return Conflict(new { Message = "No open fiscal period exists for the fixed asset capitalization date.", request.CapitalizationDateUtc });
+        var postingPeriod = await GetOpenFiscalPeriodForDateAsync(dbContext, capitalizationDateUtc, cancellationToken);
+        if (postingPeriod is null) return Conflict(new { Message = "No open fiscal period exists for the fixed asset capitalization date.", capitalizationDateUtc });
 
         var validation = await ValidateLedgerAccountsAsync(dbContext, new[] { asset.AssetCostLedgerAccountId, request.CreditLedgerAccountId }, cancellationToken);
         if (validation is not null) return validation;
@@ -681,7 +685,7 @@ public sealed class FixedAssetsController : ControllerBase
 
         try
         {
-            asset.Capitalize(request.CapitalizationDateUtc);
+            asset.Capitalize(capitalizationDateUtc);
 
             var lines = new List<JournalEntryLine>
             {
@@ -692,7 +696,7 @@ public sealed class FixedAssetsController : ControllerBase
             var journalEntry = new JournalEntry(
                 Guid.NewGuid(),
                 tenantContext.TenantId,
-                request.CapitalizationDateUtc,
+                capitalizationDateUtc,
                 reference,
                 request.Description?.Trim() ?? $"Fixed asset capitalization - {asset.AssetNumber} - {asset.AssetName}",
                 JournalEntryStatus.Draft,
@@ -723,7 +727,7 @@ public sealed class FixedAssetsController : ControllerBase
                 tenantContext.TenantId,
                 asset.Id,
                 FixedAssetTransactionType.Capitalization,
-                request.CapitalizationDateUtc,
+                capitalizationDateUtc,
                 asset.AcquisitionCost,
                 $"Capitalization of fixed asset {asset.AssetNumber}",
                 journalEntry.Id,
@@ -745,7 +749,7 @@ public sealed class FixedAssetsController : ControllerBase
                 {
                     asset.AssetNumber,
                     asset.AssetName,
-                    request.CapitalizationDateUtc,
+                    capitalizationDateUtc,
                     asset.AcquisitionCost,
                     JournalEntryId = journalEntry.Id
                 },
@@ -777,20 +781,23 @@ public sealed class FixedAssetsController : ControllerBase
             return BadRequest(new { Message = "Tenant context is required.", RequiredHeader = "X-Tenant-Key" });
         }
 
-        var validationError = ValidateDepreciationPeriod(request.PeriodStartUtc, request.PeriodEndUtc);
+        var periodStartUtc = EnsureUtc(request.PeriodStartUtc);
+        var periodEndUtc = EnsureUtc(request.PeriodEndUtc);
+
+        var validationError = ValidateDepreciationPeriod(periodStartUtc, periodEndUtc);
         if (validationError is not null) return BadRequest(new { Message = validationError });
 
-        var assets = await GetDepreciationCandidateAssetsAsync(dbContext, request.PeriodEndUtc, cancellationToken);
+        var assets = await GetDepreciationCandidateAssetsAsync(dbContext, periodEndUtc, cancellationToken);
         var existingLines = await dbContext.Set<FixedAssetDepreciationLine>()
             .AsNoTracking()
-            .Where(x => x.DepreciationPeriodStartUtc == request.PeriodStartUtc && x.DepreciationPeriodEndUtc == request.PeriodEndUtc)
+            .Where(x => x.DepreciationPeriodStartUtc == periodStartUtc && x.DepreciationPeriodEndUtc == periodEndUtc)
             .Select(x => x.FixedAssetId)
             .ToListAsync(cancellationToken);
 
         var existingLineSet = existingLines.ToHashSet();
 
         var items = assets
-            .Select(asset => BuildDepreciationPreviewItem(asset, request.PeriodStartUtc, request.PeriodEndUtc, existingLineSet.Contains(asset.Id)))
+            .Select(asset => BuildDepreciationPreviewItem(asset, periodStartUtc, periodEndUtc, existingLineSet.Contains(asset.Id)))
             .Where(x => x is not null)
             .Select(x => x!)
             .ToList();
@@ -800,8 +807,8 @@ public sealed class FixedAssetsController : ControllerBase
             TenantContextAvailable = true,
             TenantId = tenantContext.TenantId,
             TenantKey = tenantContext.TenantKey,
-            request.PeriodStartUtc,
-            request.PeriodEndUtc,
+            periodStartUtc,
+            periodEndUtc,
             Count = items.Count,
             TotalDepreciationAmount = items.Sum(x => x.DepreciationAmount),
             Items = items
@@ -864,33 +871,37 @@ public sealed class FixedAssetsController : ControllerBase
             return BadRequest(new { Message = "Tenant context is required.", RequiredHeader = "X-Tenant-Key" });
         }
 
-        var validationError = ValidateDepreciationPeriod(request.PeriodStartUtc, request.PeriodEndUtc);
+        var periodStartUtc = EnsureUtc(request.PeriodStartUtc);
+        var periodEndUtc = EnsureUtc(request.PeriodEndUtc);
+        var runDateUtc = EnsureUtc(request.RunDateUtc);
+
+        var validationError = ValidateDepreciationPeriod(periodStartUtc, periodEndUtc);
         if (validationError is not null) return BadRequest(new { Message = validationError });
 
-        var postingPeriod = await GetOpenFiscalPeriodForDateAsync(dbContext, request.RunDateUtc, cancellationToken);
+        var postingPeriod = await GetOpenFiscalPeriodForDateAsync(dbContext, runDateUtc, cancellationToken);
         if (postingPeriod is null)
         {
-            return Conflict(new { Message = "No open fiscal period exists for the depreciation run date.", request.RunDateUtc });
+            return Conflict(new { Message = "No open fiscal period exists for the depreciation run date.", runDateUtc });
         }
 
         var existingRun = await dbContext.Set<FixedAssetDepreciationRun>()
             .AsNoTracking()
-            .AnyAsync(x => x.PeriodStartUtc == request.PeriodStartUtc && x.PeriodEndUtc == request.PeriodEndUtc, cancellationToken);
+            .AnyAsync(x => x.PeriodStartUtc == periodStartUtc && x.PeriodEndUtc == periodEndUtc, cancellationToken);
         if (existingRun)
         {
-            return Conflict(new { Message = "A depreciation run already exists for the selected period.", request.PeriodStartUtc, request.PeriodEndUtc });
+            return Conflict(new { Message = "A depreciation run already exists for the selected period.", periodStartUtc, periodEndUtc });
         }
 
-        var assets = await GetDepreciationCandidateAssetsAsync(dbContext, request.PeriodEndUtc, cancellationToken);
+        var assets = await GetDepreciationCandidateAssetsAsync(dbContext, periodEndUtc, cancellationToken);
         var alreadyDepreciatedAssetIds = await dbContext.Set<FixedAssetDepreciationLine>()
             .AsNoTracking()
-            .Where(x => x.DepreciationPeriodStartUtc == request.PeriodStartUtc && x.DepreciationPeriodEndUtc == request.PeriodEndUtc)
+            .Where(x => x.DepreciationPeriodStartUtc == periodStartUtc && x.DepreciationPeriodEndUtc == periodEndUtc)
             .Select(x => x.FixedAssetId)
             .ToListAsync(cancellationToken);
 
         var existingLineSet = alreadyDepreciatedAssetIds.ToHashSet();
         var previewItems = assets
-            .Select(asset => BuildDepreciationPreviewItem(asset, request.PeriodStartUtc, request.PeriodEndUtc, existingLineSet.Contains(asset.Id)))
+            .Select(asset => BuildDepreciationPreviewItem(asset, periodStartUtc, periodEndUtc, existingLineSet.Contains(asset.Id)))
             .Where(x => x is not null && x.DepreciationAmount > 0m)
             .Select(x => x!)
             .ToList();
@@ -909,7 +920,7 @@ public sealed class FixedAssetsController : ControllerBase
         if (ledgerValidation is not null) return ledgerValidation;
 
         var runReference = string.IsNullOrWhiteSpace(request.Reference)
-            ? $"FA-DEP-{request.PeriodEndUtc:yyyyMMdd}"
+            ? $"FA-DEP-{periodEndUtc:yyyyMMdd}"
             : request.Reference.Trim().ToUpperInvariant();
 
         var referenceExists = await dbContext.JournalEntries.AsNoTracking().AnyAsync(x => x.Reference == runReference, cancellationToken);
@@ -921,11 +932,11 @@ public sealed class FixedAssetsController : ControllerBase
         var run = new FixedAssetDepreciationRun(
             Guid.NewGuid(),
             tenantContext.TenantId,
-            request.PeriodStartUtc,
-            request.PeriodEndUtc,
-            request.RunDateUtc,
+            periodStartUtc,
+            periodEndUtc,
+            runDateUtc,
             string.IsNullOrWhiteSpace(request.Description)
-                ? $"Fixed asset depreciation run for {request.PeriodStartUtc:yyyy-MM-dd} to {request.PeriodEndUtc:yyyy-MM-dd}"
+                ? $"Fixed asset depreciation run for {periodStartUtc:yyyy-MM-dd} to {periodEndUtc:yyyy-MM-dd}"
                 : request.Description.Trim());
 
         var depreciationLines = new List<FixedAssetDepreciationLine>();
@@ -951,15 +962,15 @@ public sealed class FixedAssetsController : ControllerBase
                 0m,
                 item.DepreciationAmount));
 
-            asset.RecordDepreciation(item.DepreciationAmount, request.RunDateUtc);
+            asset.RecordDepreciation(item.DepreciationAmount, runDateUtc);
 
             depreciationLines.Add(new FixedAssetDepreciationLine(
                 Guid.NewGuid(),
                 tenantContext.TenantId,
                 run.Id,
                 asset.Id,
-                request.PeriodStartUtc,
-                request.PeriodEndUtc,
+                periodStartUtc,
+                periodEndUtc,
                 item.DepreciationAmount,
                 item.OpeningNetBookValue,
                 item.ClosingNetBookValue));
@@ -969,9 +980,9 @@ public sealed class FixedAssetsController : ControllerBase
                 tenantContext.TenantId,
                 asset.Id,
                 FixedAssetTransactionType.Depreciation,
-                request.RunDateUtc,
+                runDateUtc,
                 item.DepreciationAmount,
-                $"Depreciation posted for {asset.AssetNumber} for period {request.PeriodStartUtc:yyyy-MM-dd} to {request.PeriodEndUtc:yyyy-MM-dd}",
+                $"Depreciation posted for {asset.AssetNumber} for period {periodStartUtc:yyyy-MM-dd} to {periodEndUtc:yyyy-MM-dd}",
                 reference: runReference,
                 notes: request.Description));
         }
@@ -979,7 +990,7 @@ public sealed class FixedAssetsController : ControllerBase
         var journalEntry = new JournalEntry(
             Guid.NewGuid(),
             tenantContext.TenantId,
-            request.RunDateUtc,
+            runDateUtc,
             runReference,
             run.Description,
             JournalEntryStatus.Draft,
@@ -1033,7 +1044,7 @@ public sealed class FixedAssetsController : ControllerBase
             "DepreciationRunPosted",
             run.Id,
             journalEntry.Reference,
-            $"Fixed asset depreciation run posted for period {request.PeriodStartUtc:yyyy-MM-dd} to {request.PeriodEndUtc:yyyy-MM-dd}.",
+            $"Fixed asset depreciation run posted for period {periodStartUtc:yyyy-MM-dd} to {periodEndUtc:yyyy-MM-dd}.",
             User.Identity?.Name,
             tenantContext.TenantId,
             new
@@ -1094,17 +1105,19 @@ public sealed class FixedAssetsController : ControllerBase
         if (request.CreditLedgerAccountId == Guid.Empty) return BadRequest(new { Message = "Credit ledger account is required." });
         if (request.Amount <= 0m) return BadRequest(new { Message = "Improvement amount must be greater than zero." });
 
+        var transactionDateUtc = EnsureUtc(request.TransactionDateUtc);
+
         var asset = await dbContext.Set<FixedAsset>().FirstOrDefaultAsync(x => x.Id == fixedAssetId, cancellationToken);
         if (asset is null) return NotFound(new { Message = "Fixed asset was not found.", FixedAssetId = fixedAssetId });
         if (asset.Status == FixedAssetStatus.Draft) return Conflict(new { Message = "Draft fixed assets must be capitalized before improvement can be recorded.", FixedAssetId = fixedAssetId });
 
-        var postingPeriod = await GetOpenFiscalPeriodForDateAsync(dbContext, request.TransactionDateUtc, cancellationToken);
-        if (postingPeriod is null) return Conflict(new { Message = "No open fiscal period exists for the fixed asset improvement date.", request.TransactionDateUtc });
+        var postingPeriod = await GetOpenFiscalPeriodForDateAsync(dbContext, transactionDateUtc, cancellationToken);
+        if (postingPeriod is null) return Conflict(new { Message = "No open fiscal period exists for the fixed asset improvement date.", transactionDateUtc });
 
         var validation = await ValidateLedgerAccountsAsync(dbContext, new[] { asset.AssetCostLedgerAccountId, request.CreditLedgerAccountId }, cancellationToken);
         if (validation is not null) return validation;
 
-        var reference = string.IsNullOrWhiteSpace(request.Reference) ? $"FA-IMP-{asset.AssetNumber}-{request.TransactionDateUtc:yyyyMMdd}" : request.Reference.Trim().ToUpperInvariant();
+        var reference = string.IsNullOrWhiteSpace(request.Reference) ? $"FA-IMP-{asset.AssetNumber}-{transactionDateUtc:yyyyMMdd}" : request.Reference.Trim().ToUpperInvariant();
         var referenceExists = await dbContext.JournalEntries.AsNoTracking().AnyAsync(x => x.Reference == reference, cancellationToken);
         if (referenceExists) return Conflict(new { Message = "A journal entry with the same improvement reference already exists.", Reference = reference });
 
@@ -1113,7 +1126,7 @@ public sealed class FixedAssetsController : ControllerBase
         var journalEntry = new JournalEntry(
             Guid.NewGuid(),
             tenantContext.TenantId,
-            request.TransactionDateUtc,
+            transactionDateUtc,
             reference,
             string.IsNullOrWhiteSpace(request.Description) ? $"Fixed asset improvement - {asset.AssetNumber}" : request.Description.Trim(),
             JournalEntryStatus.Draft,
@@ -1146,7 +1159,7 @@ public sealed class FixedAssetsController : ControllerBase
             tenantContext.TenantId,
             asset.Id,
             FixedAssetTransactionType.Improvement,
-            request.TransactionDateUtc,
+            transactionDateUtc,
             request.Amount,
             $"Improvement recorded for fixed asset {asset.AssetNumber}",
             journalEntry.Id,
@@ -1167,7 +1180,7 @@ public sealed class FixedAssetsController : ControllerBase
             new
             {
                 asset.AssetNumber,
-                request.TransactionDateUtc,
+                transactionDateUtc,
                 request.Amount,
                 request.UsefulLifeMonthsOverride,
                 JournalEntryId = journalEntry.Id
@@ -1203,6 +1216,10 @@ public sealed class FixedAssetsController : ControllerBase
         var asset = await dbContext.Set<FixedAsset>().FirstOrDefaultAsync(x => x.Id == fixedAssetId, cancellationToken);
         if (asset is null) return NotFound(new { Message = "Fixed asset was not found.", FixedAssetId = fixedAssetId });
 
+        var transactionDateUtc = request.TransactionDateUtc == default
+            ? DateTime.UtcNow
+            : EnsureUtc(request.TransactionDateUtc);
+
         try
         {
             asset.Transfer(request.Location, request.Custodian);
@@ -1211,7 +1228,7 @@ public sealed class FixedAssetsController : ControllerBase
                 tenantContext.TenantId,
                 asset.Id,
                 FixedAssetTransactionType.Transfer,
-                request.TransactionDateUtc == default ? DateTime.UtcNow : request.TransactionDateUtc,
+                transactionDateUtc,
                 0m,
                 $"Transfer recorded for fixed asset {asset.AssetNumber}",
                 reference: asset.AssetNumber,
@@ -1231,7 +1248,7 @@ public sealed class FixedAssetsController : ControllerBase
                 new
                 {
                     asset.AssetNumber,
-                    request.TransactionDateUtc,
+                    transactionDateUtc,
                     request.Location,
                     request.Custodian
                 },
@@ -1264,6 +1281,10 @@ public sealed class FixedAssetsController : ControllerBase
         var asset = await dbContext.Set<FixedAsset>().FirstOrDefaultAsync(x => x.Id == fixedAssetId, cancellationToken);
         if (asset is null) return NotFound(new { Message = "Fixed asset was not found.", FixedAssetId = fixedAssetId });
 
+        var transactionDateUtc = request.TransactionDateUtc == default
+            ? DateTime.UtcNow
+            : EnsureUtc(request.TransactionDateUtc);
+
         var targetClass = await dbContext.Set<FixedAssetClass>().AsNoTracking().FirstOrDefaultAsync(x => x.Id == request.TargetFixedAssetClassId, cancellationToken);
         if (targetClass is null) return NotFound(new { Message = "Target fixed asset class was not found.", request.TargetFixedAssetClassId });
         if (targetClass.Status != FixedAssetClassStatus.Active) return Conflict(new { Message = "Only active fixed asset classes can be used for reclassification.", request.TargetFixedAssetClassId });
@@ -1276,7 +1297,7 @@ public sealed class FixedAssetsController : ControllerBase
                 tenantContext.TenantId,
                 asset.Id,
                 FixedAssetTransactionType.Reclassification,
-                request.TransactionDateUtc == default ? DateTime.UtcNow : request.TransactionDateUtc,
+                transactionDateUtc,
                 0m,
                 $"Reclassification recorded for fixed asset {asset.AssetNumber}",
                 reference: asset.AssetNumber,
@@ -1296,7 +1317,7 @@ public sealed class FixedAssetsController : ControllerBase
                 new
                 {
                     asset.AssetNumber,
-                    request.TransactionDateUtc,
+                    transactionDateUtc,
                     request.TargetFixedAssetClassId,
                     TargetFixedAssetClassCode = targetClass.Code,
                     TargetFixedAssetClassName = targetClass.Name
@@ -1329,17 +1350,19 @@ public sealed class FixedAssetsController : ControllerBase
 
         if (request.Amount <= 0m) return BadRequest(new { Message = "Impairment amount must be greater than zero." });
 
+        var transactionDateUtc = EnsureUtc(request.TransactionDateUtc);
+
         var asset = await dbContext.Set<FixedAsset>().FirstOrDefaultAsync(x => x.Id == fixedAssetId, cancellationToken);
         if (asset is null) return NotFound(new { Message = "Fixed asset was not found.", FixedAssetId = fixedAssetId });
         if (asset.Status == FixedAssetStatus.Draft) return Conflict(new { Message = "Draft fixed assets must be capitalized before impairment can be recorded.", FixedAssetId = fixedAssetId });
 
-        var postingPeriod = await GetOpenFiscalPeriodForDateAsync(dbContext, request.TransactionDateUtc, cancellationToken);
-        if (postingPeriod is null) return Conflict(new { Message = "No open fiscal period exists for the impairment date.", request.TransactionDateUtc });
+        var postingPeriod = await GetOpenFiscalPeriodForDateAsync(dbContext, transactionDateUtc, cancellationToken);
+        if (postingPeriod is null) return Conflict(new { Message = "No open fiscal period exists for the impairment date.", transactionDateUtc });
 
         var validation = await ValidateLedgerAccountsAsync(dbContext, new[] { asset.DepreciationExpenseLedgerAccountId, asset.AccumulatedDepreciationLedgerAccountId }, cancellationToken);
         if (validation is not null) return validation;
 
-        var reference = string.IsNullOrWhiteSpace(request.Reference) ? $"FA-IMP-{asset.AssetNumber}-{request.TransactionDateUtc:yyyyMMdd}" : request.Reference.Trim().ToUpperInvariant();
+        var reference = string.IsNullOrWhiteSpace(request.Reference) ? $"FA-IMP-{asset.AssetNumber}-{transactionDateUtc:yyyyMMdd}" : request.Reference.Trim().ToUpperInvariant();
         var referenceExists = await dbContext.JournalEntries.AsNoTracking().AnyAsync(x => x.Reference == reference, cancellationToken);
         if (referenceExists) return Conflict(new { Message = "A journal entry with the same impairment reference already exists.", Reference = reference });
 
@@ -1350,7 +1373,7 @@ public sealed class FixedAssetsController : ControllerBase
             var journalEntry = new JournalEntry(
                 Guid.NewGuid(),
                 tenantContext.TenantId,
-                request.TransactionDateUtc,
+                transactionDateUtc,
                 reference,
                 string.IsNullOrWhiteSpace(request.Description) ? $"Fixed asset impairment - {asset.AssetNumber}" : request.Description.Trim(),
                 JournalEntryStatus.Draft,
@@ -1382,7 +1405,7 @@ public sealed class FixedAssetsController : ControllerBase
                 tenantContext.TenantId,
                 asset.Id,
                 FixedAssetTransactionType.Impairment,
-                request.TransactionDateUtc,
+                transactionDateUtc,
                 request.Amount,
                 $"Impairment recorded for fixed asset {asset.AssetNumber}",
                 journalEntry.Id,
@@ -1403,7 +1426,7 @@ public sealed class FixedAssetsController : ControllerBase
                 new
                 {
                     asset.AssetNumber,
-                    request.TransactionDateUtc,
+                    transactionDateUtc,
                     request.Amount,
                     JournalEntryId = journalEntry.Id
                 },
@@ -1433,6 +1456,8 @@ public sealed class FixedAssetsController : ControllerBase
             return BadRequest(new { Message = "Tenant context is required.", RequiredHeader = "X-Tenant-Key" });
         }
 
+        var disposalDateUtc = EnsureUtc(request.DisposalDateUtc);
+
         var asset = await dbContext.Set<FixedAsset>().FirstOrDefaultAsync(x => x.Id == fixedAssetId, cancellationToken);
         if (asset is null) return NotFound(new { Message = "Fixed asset was not found.", FixedAssetId = fixedAssetId });
         if (asset.Status == FixedAssetStatus.Draft) return Conflict(new { Message = "Draft fixed assets cannot be disposed.", FixedAssetId = fixedAssetId });
@@ -1448,8 +1473,8 @@ public sealed class FixedAssetsController : ControllerBase
             return Conflict(new { Message = "A disposal record already exists for this fixed asset.", FixedAssetId = fixedAssetId });
         }
 
-        var postingPeriod = await GetOpenFiscalPeriodForDateAsync(dbContext, request.DisposalDateUtc, cancellationToken);
-        if (postingPeriod is null) return Conflict(new { Message = "No open fiscal period exists for the disposal date.", request.DisposalDateUtc });
+        var postingPeriod = await GetOpenFiscalPeriodForDateAsync(dbContext, disposalDateUtc, cancellationToken);
+        if (postingPeriod is null) return Conflict(new { Message = "No open fiscal period exists for the disposal date.", disposalDateUtc });
 
         var ledgerIds = new List<Guid>
         {
@@ -1466,7 +1491,7 @@ public sealed class FixedAssetsController : ControllerBase
         var validation = await ValidateLedgerAccountsAsync(dbContext, ledgerIds, cancellationToken);
         if (validation is not null) return validation;
 
-        var reference = string.IsNullOrWhiteSpace(request.Reference) ? $"FA-DISP-{asset.AssetNumber}-{request.DisposalDateUtc:yyyyMMdd}" : request.Reference.Trim().ToUpperInvariant();
+        var reference = string.IsNullOrWhiteSpace(request.Reference) ? $"FA-DISP-{asset.AssetNumber}-{disposalDateUtc:yyyyMMdd}" : request.Reference.Trim().ToUpperInvariant();
         var referenceExists = await dbContext.JournalEntries.AsNoTracking().AnyAsync(x => x.Reference == reference, cancellationToken);
         if (referenceExists) return Conflict(new { Message = "A journal entry with the same disposal reference already exists.", Reference = reference });
 
@@ -1475,7 +1500,7 @@ public sealed class FixedAssetsController : ControllerBase
 
         try
         {
-            asset.Dispose(request.DisposalDateUtc, request.DisposalProceedsAmount);
+            asset.Dispose(disposalDateUtc, request.DisposalProceedsAmount);
 
             var journalLines = new List<JournalEntryLine>
             {
@@ -1515,7 +1540,7 @@ public sealed class FixedAssetsController : ControllerBase
             var journalEntry = new JournalEntry(
                 Guid.NewGuid(),
                 tenantContext.TenantId,
-                request.DisposalDateUtc,
+                disposalDateUtc,
                 reference,
                 string.IsNullOrWhiteSpace(request.Description) ? $"Fixed asset disposal - {asset.AssetNumber}" : request.Description.Trim(),
                 JournalEntryStatus.Draft,
@@ -1543,7 +1568,7 @@ public sealed class FixedAssetsController : ControllerBase
                 tenantContext.TenantId,
                 asset.Id,
                 FixedAssetTransactionType.Disposal,
-                request.DisposalDateUtc,
+                disposalDateUtc,
                 request.DisposalProceedsAmount,
                 $"Disposal recorded for fixed asset {asset.AssetNumber}",
                 journalEntry.Id,
@@ -1554,7 +1579,7 @@ public sealed class FixedAssetsController : ControllerBase
                 tenantContext.TenantId,
                 asset.Id,
                 request.DisposalType,
-                request.DisposalDateUtc,
+                disposalDateUtc,
                 request.DisposalProceedsAmount,
                 netBookValue,
                 gainOrLoss,
@@ -1575,7 +1600,7 @@ public sealed class FixedAssetsController : ControllerBase
                 new
                 {
                     asset.AssetNumber,
-                    request.DisposalDateUtc,
+                    disposalDateUtc,
                     request.DisposalType,
                     request.DisposalProceedsAmount,
                     NetBookValueAtDisposal = netBookValue,
@@ -1590,7 +1615,7 @@ public sealed class FixedAssetsController : ControllerBase
                 FixedAsset = asset,
                 Disposal = new
                 {
-                    DisposalDateUtc = request.DisposalDateUtc,
+                    DisposalDateUtc = disposalDateUtc,
                     request.DisposalType,
                     request.DisposalProceedsAmount,
                     NetBookValueAtDisposal = netBookValue,
@@ -1605,6 +1630,22 @@ public sealed class FixedAssetsController : ControllerBase
         {
             return Conflict(new { Message = ex.Message, FixedAssetId = fixedAssetId });
         }
+    }
+
+    private static DateTime EnsureUtc(DateTime value)
+    {
+        if (value == default)
+        {
+            return value;
+        }
+
+        return value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            DateTimeKind.Unspecified => DateTime.SpecifyKind(value, DateTimeKind.Utc),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+        };
     }
 
     private static string? ValidateDepreciationPeriod(DateTime periodStartUtc, DateTime periodEndUtc)

@@ -17,7 +17,7 @@ namespace iBalance.Api.Controllers;
 [Route("api/admin/users")]
 public sealed class AdminUsersController : ControllerBase
 {
-        private static readonly string[] SupportedRoles =
+    private static readonly string[] SupportedRoles =
     [
         "PlatformAdmin",
         "TenantAdmin",
@@ -29,7 +29,9 @@ public sealed class AdminUsersController : ControllerBase
         "BudgetOfficer",
         "BudgetOwner",
         "PayrollOfficer",
+        "HrManager",
         "HrOfficer",
+        "HrViewer",
         "ProcurementOfficer",
         "TreasuryOfficer",
         "InventoryOfficer",
@@ -40,10 +42,18 @@ public sealed class AdminUsersController : ControllerBase
         "ExpenseAdvanceApprover",
         "ExpenseAdvanceReviewer",
         "ExpenseAdvanceViewer",
+        "BillingOfficer",
+        "BillingApprover",
+        "BillingViewer",
         "FleetOfficer",
         "FleetApprover",
         "FleetReviewer",
-        "FleetViewer"
+        "FleetViewer",
+        "OilGasManager",
+        "ProductionOfficer",
+        "ProductionApprover",
+        "MeasurementOfficer",
+        "OilGasViewer"
     ];
 
     [HttpGet]
@@ -116,6 +126,7 @@ public sealed class AdminUsersController : ControllerBase
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         [FromServices] PasswordHasher passwordHasher,
+        [FromServices] ICurrentUserService currentUserService,
         [FromServices] IAuditTrailWriter auditTrailWriter,
         CancellationToken cancellationToken)
     {
@@ -153,6 +164,11 @@ public sealed class AdminUsersController : ControllerBase
 
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
         var normalizedRole = NormalizeRole(request.Role);
+
+        if (!CanAssignRole(normalizedRole, currentUserService))
+        {
+            return Forbid();
+        }
 
         var exists = await dbContext.UserAccounts
             .AnyAsync(x => x.Email == normalizedEmail, cancellationToken);
@@ -248,6 +264,11 @@ public sealed class AdminUsersController : ControllerBase
 
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
         var normalizedRole = NormalizeRole(request.Role);
+
+        if (!CanAssignRole(normalizedRole, currentUserService))
+        {
+            return Forbid();
+        }
 
         var user = await dbContext.UserAccounts
             .FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
@@ -569,7 +590,7 @@ public sealed class AdminUsersController : ControllerBase
         return SupportedRoles.First(x => string.Equals(x, role.Trim(), StringComparison.OrdinalIgnoreCase));
     }
 
-private static async Task SyncPrimaryEnterpriseRoleAssignmentAsync(
+    private static async Task SyncPrimaryEnterpriseRoleAssignmentAsync(
     ApplicationDbContext dbContext,
     Guid tenantId,
     UserAccount user,
@@ -581,10 +602,16 @@ private static async Task SyncPrimaryEnterpriseRoleAssignmentAsync(
         "PLATFORMADMIN" => "PLATFORM_ADMIN",
         "TENANTADMIN" => "TENANT_ADMIN",
         "FINANCECONTROLLER" => "FINANCE_CONTROLLER",
+        "ACCOUNTANT" => "ACCOUNTANT",
+        "APPROVER" => "APPROVER",
+        "VIEWER" => "VIEWER",
+        "AUDITOR" => "AUDITOR",
         "BUDGETOFFICER" => "BUDGET_OFFICER",
         "BUDGETOWNER" => "BUDGET_OWNER",
         "PAYROLLOFFICER" => "PAYROLL_OFFICER",
+        "HRMANAGER" => "HR_MANAGER",
         "HROFFICER" => "HR_OFFICER",
+        "HRVIEWER" => "HR_VIEWER",
         "PROCUREMENTOFFICER" => "PROCUREMENT_OFFICER",
         "TREASURYOFFICER" => "TREASURY_OFFICER",
         "INVENTORYOFFICER" => "INVENTORY_OFFICER",
@@ -595,10 +622,18 @@ private static async Task SyncPrimaryEnterpriseRoleAssignmentAsync(
         "EXPENSEADVANCEAPPROVER" => "EXPENSE_ADVANCE_APPROVER",
         "EXPENSEADVANCEREVIEWER" => "EXPENSE_ADVANCE_REVIEWER",
         "EXPENSEADVANCEVIEWER" => "EXPENSE_ADVANCE_VIEWER",
+        "BILLINGOFFICER" => "BILLING_OFFICER",
+        "BILLINGAPPROVER" => "BILLING_APPROVER",
+        "BILLINGVIEWER" => "BILLING_VIEWER",
         "FLEETOFFICER" => "FLEET_OFFICER",
         "FLEETAPPROVER" => "FLEET_APPROVER",
         "FLEETREVIEWER" => "FLEET_REVIEWER",
         "FLEETVIEWER" => "FLEET_VIEWER",
+        "OILGASMANAGER" => "OIL_GAS_MANAGER",
+        "PRODUCTIONOFFICER" => "PRODUCTION_OFFICER",
+        "PRODUCTIONAPPROVER" => "PRODUCTION_APPROVER",
+        "MEASUREMENTOFFICER" => "MEASUREMENT_OFFICER",
+        "OILGASVIEWER" => "OIL_GAS_VIEWER",
         _ => normalizedRole.Trim().Replace(" ", "_").ToUpperInvariant()
     };
 
@@ -633,7 +668,27 @@ private static async Task SyncPrimaryEnterpriseRoleAssignmentAsync(
     await dbContext.SaveChangesAsync(cancellationToken);
 }
 
-        private static bool IsSelfDemotionOrDeactivation(
+    private static bool CanAssignRole(
+        string normalizedRole,
+        ICurrentUserService currentUserService)
+    {
+        if (currentUserService.HasAnyRole("PlatformAdmin"))
+        {
+            return true;
+        }
+
+        if (currentUserService.HasAnyRole("TenantAdmin"))
+        {
+            return !string.Equals(
+                normalizedRole,
+                "PlatformAdmin",
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        return false;
+    }
+
+    private static bool IsSelfDemotionOrDeactivation(
         UserAccount targetUser,
         string requestedRole,
         bool requestedIsActive,

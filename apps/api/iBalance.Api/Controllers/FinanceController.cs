@@ -2137,9 +2137,9 @@ public sealed class FinanceController : ControllerBase
     }
 
 
-    [Authorize(Policy = AuthorizationPolicies.TreasuryView)]
-    [HttpGet("accounts")]
-    public async Task<IActionResult> GetLedgerAccounts(
+        [Authorize(Policy = AuthorizationPolicies.FinanceView)]
+        [HttpGet("accounts")]
+        public async Task<IActionResult> GetLedgerAccounts(
         [FromServices] ApplicationDbContext dbContext,
         [FromServices] ITenantContextAccessor tenantContextAccessor,
         CancellationToken cancellationToken)

@@ -370,7 +370,11 @@ export function canManageUsers(): boolean {
 }
 
 export function canManageFinanceSetup(): boolean {
-  return hasPermission('finance.setup.manage');
+  return (
+    isPlatformAdmin() ||
+    isTenantAdmin() ||
+    hasPermission('finance.setup.manage')
+  );
 }
 
 export function canCreateJournals(): boolean {

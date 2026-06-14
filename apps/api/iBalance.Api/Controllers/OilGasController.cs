@@ -205,6 +205,57 @@ public sealed class OilGasController : ControllerBase
         return Ok(new { Message = "Business unit created.", Item = entity });
     }
 
+[Authorize(Policy = AuthorizationPolicies.OilGasSetupManage)]
+    [HttpPut("business-units/{businessUnitId:guid}")]
+    public async Task<IActionResult> UpdateBusinessUnit(
+        Guid businessUnitId,
+        [FromBody] SaveBusinessUnitRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
+        CancellationToken cancellationToken)
+    {
+        var tenant = tenantContextAccessor.Current;
+        if (!tenant.IsAvailable) return BadRequest(TenantError());
+
+        var entity = await dbContext.OilGasBusinessUnits
+            .FirstOrDefaultAsync(x => x.Id == businessUnitId, cancellationToken);
+
+        if (entity is null)
+            return NotFound(new { Message = "Oil & Gas business unit was not found." });
+
+        var code = RequiredCode(request.Code, "Business unit code");
+        if (code.Error is not null) return BadRequest(new { Message = code.Error });
+
+        var name = RequiredText(request.Name, "Business unit name");
+        if (name.Error is not null) return BadRequest(new { Message = name.Error });
+
+        if (await dbContext.OilGasBusinessUnits.AnyAsync(
+                x => x.Id != businessUnitId && x.Code == code.Value,
+                cancellationToken))
+        {
+            return Conflict(new { Message = $"Business unit code '{code.Value}' already exists." });
+        }
+
+        entity.Code = code.Value!;
+        entity.Name = name.Value!;
+        entity.Description = NormalizeOptional(request.Description);
+        entity.IsActive = request.IsActive;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await WriteAudit(
+            auditTrailWriter,
+            tenant.TenantId,
+            "OilGasBusinessUnit",
+            entity.Id,
+            "Update",
+            $"Oil & Gas business unit {entity.Code} updated.",
+            cancellationToken);
+
+        return Ok(new { Message = "Business unit updated.", Item = entity });
+    }
+
+
     [Authorize(Policy = AuthorizationPolicies.OilGasView)]
     [HttpGet("assets")]
     public async Task<IActionResult> GetAssets([FromServices] ApplicationDbContext dbContext, CancellationToken cancellationToken)
@@ -249,7 +300,7 @@ public sealed class OilGasController : ControllerBase
             Code = code.Value!, Name = name.Value!, AssetType = request.AssetType,
             OperatorName = NormalizeOptional(request.OperatorName), OwnershipPercentage = request.OwnershipPercentage,
             OrganizationCostCenterId = request.OrganizationCostCenterId, LocationDescription = NormalizeOptional(request.LocationDescription),
-            CommissioningDateUtc = request.CommissioningDateUtc, IsActive = request.IsActive, Notes = NormalizeOptional(request.Notes),
+            CommissioningDateUtc = EnsureUtc(request.CommissioningDateUtc), IsActive = request.IsActive, Notes = NormalizeOptional(request.Notes),
             CreatedOnUtc = DateTime.UtcNow
         };
         dbContext.OilGasAssets.Add(entity);
@@ -257,6 +308,77 @@ public sealed class OilGasController : ControllerBase
         await WriteAudit(auditTrailWriter, tenant.TenantId, "OilGasAsset", entity.Id, "Create", $"Oil & Gas asset {entity.Code} created.", cancellationToken);
         return Ok(new { Message = "Oil & Gas asset created.", Item = entity });
     }
+
+[Authorize(Policy = AuthorizationPolicies.OilGasAssetManage)]
+    [HttpPut("assets/{assetId:guid}")]
+    public async Task<IActionResult> UpdateAsset(
+        Guid assetId,
+        [FromBody] SaveAssetRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
+        CancellationToken cancellationToken)
+    {
+        var tenant = tenantContextAccessor.Current;
+        if (!tenant.IsAvailable) return BadRequest(TenantError());
+
+        var entity = await dbContext.OilGasAssets
+            .FirstOrDefaultAsync(x => x.Id == assetId, cancellationToken);
+
+        if (entity is null)
+            return NotFound(new { Message = "Oil & Gas asset was not found." });
+
+        if (!await dbContext.OilGasBusinessUnits.AnyAsync(
+                x => x.Id == request.BusinessUnitId && x.IsActive,
+                cancellationToken))
+        {
+            return BadRequest(new { Message = "Select an active Oil & Gas business unit." });
+        }
+
+        var code = RequiredCode(request.Code, "Asset code");
+        if (code.Error is not null) return BadRequest(new { Message = code.Error });
+
+        var name = RequiredText(request.Name, "Asset name");
+        if (name.Error is not null) return BadRequest(new { Message = name.Error });
+
+        if (!Enum.IsDefined(request.AssetType))
+            return BadRequest(new { Message = "Select a valid asset type." });
+
+        if (request.OwnershipPercentage < 0 || request.OwnershipPercentage > 100)
+            return BadRequest(new { Message = "Ownership percentage must be between 0 and 100." });
+
+        if (await dbContext.OilGasAssets.AnyAsync(
+                x => x.Id != assetId && x.Code == code.Value,
+                cancellationToken))
+        {
+            return Conflict(new { Message = $"Asset code '{code.Value}' already exists." });
+        }
+
+        entity.BusinessUnitId = request.BusinessUnitId;
+        entity.Code = code.Value!;
+        entity.Name = name.Value!;
+        entity.AssetType = request.AssetType;
+        entity.OperatorName = NormalizeOptional(request.OperatorName);
+        entity.OwnershipPercentage = request.OwnershipPercentage;
+        entity.OrganizationCostCenterId = request.OrganizationCostCenterId;
+        entity.LocationDescription = NormalizeOptional(request.LocationDescription);
+        entity.CommissioningDateUtc = EnsureUtc(request.CommissioningDateUtc);
+        entity.IsActive = request.IsActive;
+        entity.Notes = NormalizeOptional(request.Notes);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await WriteAudit(
+            auditTrailWriter,
+            tenant.TenantId,
+            "OilGasAsset",
+            entity.Id,
+            "Update",
+            $"Oil & Gas asset {entity.Code} updated.",
+            cancellationToken);
+
+        return Ok(new { Message = "Oil & Gas asset updated.", Item = entity });
+    }
+
 
     [Authorize(Policy = AuthorizationPolicies.OilGasView)]
     [HttpGet("locations")]
@@ -308,6 +430,83 @@ public sealed class OilGasController : ControllerBase
         return Ok(new { Message = "Operational location created.", Item = entity });
     }
 
+[Authorize(Policy = AuthorizationPolicies.OilGasAssetManage)]
+    [HttpPut("locations/{locationId:guid}")]
+    public async Task<IActionResult> UpdateLocation(
+        Guid locationId,
+        [FromBody] SaveLocationRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
+        CancellationToken cancellationToken)
+    {
+        var tenant = tenantContextAccessor.Current;
+        if (!tenant.IsAvailable) return BadRequest(TenantError());
+
+        var entity = await dbContext.OilGasLocations
+            .FirstOrDefaultAsync(x => x.Id == locationId, cancellationToken);
+
+        if (entity is null)
+            return NotFound(new { Message = "Operational location was not found." });
+
+        if (!await dbContext.OilGasAssets.AnyAsync(
+                x => x.Id == request.AssetId && x.IsActive,
+                cancellationToken))
+        {
+            return BadRequest(new { Message = "Select an active Oil & Gas asset." });
+        }
+
+        if (request.ParentLocationId == locationId)
+            return BadRequest(new { Message = "A location cannot be its own parent." });
+
+        if (request.ParentLocationId.HasValue &&
+            !await dbContext.OilGasLocations.AnyAsync(
+                x => x.Id == request.ParentLocationId.Value &&
+                     x.AssetId == request.AssetId,
+                cancellationToken))
+        {
+            return BadRequest(new { Message = "Parent location must belong to the selected asset." });
+        }
+
+        var code = RequiredCode(request.Code, "Location code");
+        if (code.Error is not null) return BadRequest(new { Message = code.Error });
+
+        var name = RequiredText(request.Name, "Location name");
+        if (name.Error is not null) return BadRequest(new { Message = name.Error });
+
+        if (!Enum.IsDefined(request.LocationType))
+            return BadRequest(new { Message = "Select a valid location type." });
+
+        if (await dbContext.OilGasLocations.AnyAsync(
+                x => x.Id != locationId && x.Code == code.Value,
+                cancellationToken))
+        {
+            return Conflict(new { Message = $"Location code '{code.Value}' already exists." });
+        }
+
+        entity.AssetId = request.AssetId;
+        entity.ParentLocationId = request.ParentLocationId;
+        entity.Code = code.Value!;
+        entity.Name = name.Value!;
+        entity.LocationType = request.LocationType;
+        entity.Coordinates = NormalizeOptional(request.Coordinates);
+        entity.IsActive = request.IsActive;
+        entity.Notes = NormalizeOptional(request.Notes);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await WriteAudit(
+            auditTrailWriter,
+            tenant.TenantId,
+            "OilGasLocation",
+            entity.Id,
+            "Update",
+            $"Oil & Gas location {entity.Code} updated.",
+            cancellationToken);
+
+        return Ok(new { Message = "Operational location updated.", Item = entity });
+    }
+
+
     [Authorize(Policy = AuthorizationPolicies.OilGasView)]
     [HttpGet("products")]
     public async Task<IActionResult> GetProducts([FromServices] ApplicationDbContext dbContext, CancellationToken cancellationToken)
@@ -350,6 +549,66 @@ public sealed class OilGasController : ControllerBase
         await WriteAudit(auditTrailWriter, tenant.TenantId, "OilGasProduct", entity.Id, "Create", $"Oil & Gas product {entity.Code} created.", cancellationToken);
         return Ok(new { Message = "Petroleum product created.", Item = entity });
     }
+
+[Authorize(Policy = AuthorizationPolicies.OilGasProductManage)]
+    [HttpPut("products/{productId:guid}")]
+    public async Task<IActionResult> UpdateProduct(
+        Guid productId,
+        [FromBody] SaveProductRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
+        CancellationToken cancellationToken)
+    {
+        var tenant = tenantContextAccessor.Current;
+        if (!tenant.IsAvailable) return BadRequest(TenantError());
+
+        var entity = await dbContext.OilGasProducts
+            .FirstOrDefaultAsync(x => x.Id == productId, cancellationToken);
+
+        if (entity is null)
+            return NotFound(new { Message = "Petroleum product was not found." });
+
+        var code = RequiredCode(request.Code, "Product code");
+        if (code.Error is not null) return BadRequest(new { Message = code.Error });
+
+        var name = RequiredText(request.Name, "Product name");
+        if (name.Error is not null) return BadRequest(new { Message = name.Error });
+
+        var unit = RequiredText(request.UnitOfMeasure, "Unit of measure");
+        if (unit.Error is not null) return BadRequest(new { Message = unit.Error });
+
+        if (!Enum.IsDefined(request.Category))
+            return BadRequest(new { Message = "Select a valid petroleum product category." });
+
+        if (await dbContext.OilGasProducts.AnyAsync(
+                x => x.Id != productId && x.Code == code.Value,
+                cancellationToken))
+        {
+            return Conflict(new { Message = $"Product code '{code.Value}' already exists." });
+        }
+
+        entity.Code = code.Value!;
+        entity.Name = name.Value!;
+        entity.Category = request.Category;
+        entity.UnitOfMeasure = unit.Value!;
+        entity.StandardDensity = request.StandardDensity;
+        entity.IsActive = request.IsActive;
+        entity.Notes = NormalizeOptional(request.Notes);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await WriteAudit(
+            auditTrailWriter,
+            tenant.TenantId,
+            "OilGasProduct",
+            entity.Id,
+            "Update",
+            $"Oil & Gas product {entity.Code} updated.",
+            cancellationToken);
+
+        return Ok(new { Message = "Petroleum product updated.", Item = entity });
+    }
+
 
     [Authorize(Policy = AuthorizationPolicies.OilGasView)]
     [HttpGet("tanks")]
@@ -402,6 +661,103 @@ public sealed class OilGasController : ControllerBase
         return Ok(new { Message = "Tank created.", Item = entity });
     }
 
+[Authorize(Policy = AuthorizationPolicies.OilGasTankManage)]
+    [HttpPut("tanks/{tankId:guid}")]
+    public async Task<IActionResult> UpdateTank(
+        Guid tankId,
+        [FromBody] SaveTankRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
+        CancellationToken cancellationToken)
+    {
+        var tenant = tenantContextAccessor.Current;
+        if (!tenant.IsAvailable) return BadRequest(TenantError());
+
+        var entity = await dbContext.OilGasTanks
+            .FirstOrDefaultAsync(x => x.Id == tankId, cancellationToken);
+
+        if (entity is null)
+            return NotFound(new { Message = "Oil & Gas tank was not found." });
+
+        if (!await dbContext.OilGasLocations.AnyAsync(
+                x => x.Id == request.LocationId && x.IsActive,
+                cancellationToken))
+        {
+            return BadRequest(new { Message = "Select an active operational location." });
+        }
+
+        if (!await dbContext.OilGasProducts.AnyAsync(
+                x => x.Id == request.ProductId && x.IsActive,
+                cancellationToken))
+        {
+            return BadRequest(new { Message = "Select an active petroleum product." });
+        }
+
+        if (request.NominalCapacity <= 0 ||
+            request.SafeWorkingCapacity <= 0 ||
+            request.SafeWorkingCapacity > request.NominalCapacity)
+        {
+            return BadRequest(new
+            {
+                Message = "Safe working capacity must be positive and cannot exceed nominal capacity."
+            });
+        }
+
+        if (entity.CurrentBookStock > request.SafeWorkingCapacity)
+        {
+            return BadRequest(new
+            {
+                Message = "Safe working capacity cannot be lower than the tank's current book stock.",
+                entity.CurrentBookStock
+            });
+        }
+
+        var code = RequiredCode(request.TankCode, "Tank code");
+        if (code.Error is not null) return BadRequest(new { Message = code.Error });
+
+        var name = RequiredText(request.TankName, "Tank name");
+        if (name.Error is not null) return BadRequest(new { Message = name.Error });
+
+        if (!Enum.IsDefined(request.Status))
+            return BadRequest(new { Message = "Select a valid tank status." });
+
+        if (await dbContext.OilGasTanks.AnyAsync(
+                x => x.Id != tankId && x.TankCode == code.Value,
+                cancellationToken))
+        {
+            return Conflict(new { Message = $"Tank code '{code.Value}' already exists." });
+        }
+
+        entity.LocationId = request.LocationId;
+        entity.ProductId = request.ProductId;
+        entity.TankCode = code.Value!;
+        entity.TankName = name.Value!;
+        entity.NominalCapacity = request.NominalCapacity;
+        entity.SafeWorkingCapacity = request.SafeWorkingCapacity;
+        // Current book stock is intentionally preserved. Stock corrections must
+        // be processed through controlled stock movement/reconciliation workflows.
+        entity.Status = request.Status;
+        entity.Notes = NormalizeOptional(request.Notes);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await WriteAudit(
+            auditTrailWriter,
+            tenant.TenantId,
+            "OilGasTank",
+            entity.Id,
+            "Update",
+            $"Oil & Gas tank {entity.TankCode} updated. Current book stock was preserved.",
+            cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Tank updated. Current book stock was preserved.",
+            Item = entity
+        });
+    }
+
+
     [Authorize(Policy = AuthorizationPolicies.OilGasView)]
     [HttpGet("meters")]
     public async Task<IActionResult> GetMeters([FromServices] ApplicationDbContext dbContext, CancellationToken cancellationToken)
@@ -447,8 +803,8 @@ public sealed class OilGasController : ControllerBase
         {
             Id = Guid.NewGuid(), TenantId = tenant.TenantId, LocationId = request.LocationId, ProductId = request.ProductId,
             MeterCode = code.Value!, MeterName = name.Value!, MeterType = meterType.Value!,
-            SerialNumber = NormalizeOptional(request.SerialNumber), LastCalibrationDateUtc = request.LastCalibrationDateUtc,
-            NextCalibrationDateUtc = request.NextCalibrationDateUtc, Status = request.Status,
+            SerialNumber = NormalizeOptional(request.SerialNumber), LastCalibrationDateUtc = EnsureUtc(request.LastCalibrationDateUtc),
+            NextCalibrationDateUtc = EnsureUtc(request.NextCalibrationDateUtc), Status = request.Status,
             Notes = NormalizeOptional(request.Notes), CreatedOnUtc = DateTime.UtcNow
         };
         dbContext.OilGasMeters.Add(entity);
@@ -456,6 +812,93 @@ public sealed class OilGasController : ControllerBase
         await WriteAudit(auditTrailWriter, tenant.TenantId, "OilGasMeter", entity.Id, "Create", $"Oil & Gas meter {entity.MeterCode} created.", cancellationToken);
         return Ok(new { Message = "Meter created.", Item = entity });
     }
+
+[Authorize(Policy = AuthorizationPolicies.OilGasMeterManage)]
+    [HttpPut("meters/{meterId:guid}")]
+    public async Task<IActionResult> UpdateMeter(
+        Guid meterId,
+        [FromBody] SaveMeterRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
+        CancellationToken cancellationToken)
+    {
+        var tenant = tenantContextAccessor.Current;
+        if (!tenant.IsAvailable) return BadRequest(TenantError());
+
+        var entity = await dbContext.OilGasMeters
+            .FirstOrDefaultAsync(x => x.Id == meterId, cancellationToken);
+
+        if (entity is null)
+            return NotFound(new { Message = "Oil & Gas meter was not found." });
+
+        if (!await dbContext.OilGasLocations.AnyAsync(
+                x => x.Id == request.LocationId && x.IsActive,
+                cancellationToken))
+        {
+            return BadRequest(new { Message = "Select an active operational location." });
+        }
+
+        if (!await dbContext.OilGasProducts.AnyAsync(
+                x => x.Id == request.ProductId && x.IsActive,
+                cancellationToken))
+        {
+            return BadRequest(new { Message = "Select an active petroleum product." });
+        }
+
+        if (request.LastCalibrationDateUtc.HasValue &&
+            request.NextCalibrationDateUtc.HasValue &&
+            request.NextCalibrationDateUtc.Value <= request.LastCalibrationDateUtc.Value)
+        {
+            return BadRequest(new
+            {
+                Message = "Next calibration date must be later than the last calibration date."
+            });
+        }
+
+        var code = RequiredCode(request.MeterCode, "Meter code");
+        if (code.Error is not null) return BadRequest(new { Message = code.Error });
+
+        var name = RequiredText(request.MeterName, "Meter name");
+        if (name.Error is not null) return BadRequest(new { Message = name.Error });
+
+        var meterType = RequiredText(request.MeterType, "Meter type");
+        if (meterType.Error is not null) return BadRequest(new { Message = meterType.Error });
+
+        if (!Enum.IsDefined(request.Status))
+            return BadRequest(new { Message = "Select a valid meter status." });
+
+        if (await dbContext.OilGasMeters.AnyAsync(
+                x => x.Id != meterId && x.MeterCode == code.Value,
+                cancellationToken))
+        {
+            return Conflict(new { Message = $"Meter code '{code.Value}' already exists." });
+        }
+
+        entity.LocationId = request.LocationId;
+        entity.ProductId = request.ProductId;
+        entity.MeterCode = code.Value!;
+        entity.MeterName = name.Value!;
+        entity.MeterType = meterType.Value!;
+        entity.SerialNumber = NormalizeOptional(request.SerialNumber);
+        entity.LastCalibrationDateUtc = EnsureUtc(request.LastCalibrationDateUtc);
+        entity.NextCalibrationDateUtc = EnsureUtc(request.NextCalibrationDateUtc);
+        entity.Status = request.Status;
+        entity.Notes = NormalizeOptional(request.Notes);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await WriteAudit(
+            auditTrailWriter,
+            tenant.TenantId,
+            "OilGasMeter",
+            entity.Id,
+            "Update",
+            $"Oil & Gas meter {entity.MeterCode} updated.",
+            cancellationToken);
+
+        return Ok(new { Message = "Meter updated.", Item = entity });
+    }
+
 
     [Authorize(Policy = AuthorizationPolicies.OilGasView)]
     [HttpGet("permits")]
@@ -502,7 +945,7 @@ public sealed class OilGasController : ControllerBase
         {
             Id = Guid.NewGuid(), TenantId = tenant.TenantId, AssetId = request.AssetId, LocationId = request.LocationId,
             PermitNumber = number.Value!, PermitType = type.Value!, IssuingAuthority = authority.Value!,
-            EffectiveDateUtc = request.EffectiveDateUtc, ExpiryDateUtc = request.ExpiryDateUtc, Status = request.Status,
+            EffectiveDateUtc = EnsureUtc(request.EffectiveDateUtc), ExpiryDateUtc = EnsureUtc(request.ExpiryDateUtc), Status = request.Status,
             ResponsibleOfficer = NormalizeOptional(request.ResponsibleOfficer), Notes = NormalizeOptional(request.Notes),
             CreatedOnUtc = DateTime.UtcNow
         };
@@ -511,6 +954,88 @@ public sealed class OilGasController : ControllerBase
         await WriteAudit(auditTrailWriter, tenant.TenantId, "OilGasPermit", entity.Id, "Create", $"Oil & Gas permit {entity.PermitNumber} created.", cancellationToken);
         return Ok(new { Message = "Licence or permit created.", Item = entity });
     }
+
+[Authorize(Policy = AuthorizationPolicies.OilGasPermitManage)]
+    [HttpPut("permits/{permitId:guid}")]
+    public async Task<IActionResult> UpdatePermit(
+        Guid permitId,
+        [FromBody] SavePermitRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] ITenantContextAccessor tenantContextAccessor,
+        [FromServices] IAuditTrailWriter auditTrailWriter,
+        CancellationToken cancellationToken)
+    {
+        var tenant = tenantContextAccessor.Current;
+        if (!tenant.IsAvailable) return BadRequest(TenantError());
+
+        var entity = await dbContext.OilGasPermits
+            .FirstOrDefaultAsync(x => x.Id == permitId, cancellationToken);
+
+        if (entity is null)
+            return NotFound(new { Message = "Oil & Gas licence or permit was not found." });
+
+        if (request.ExpiryDateUtc <= request.EffectiveDateUtc)
+            return BadRequest(new { Message = "Permit expiry date must be later than its effective date." });
+
+        if (request.AssetId.HasValue &&
+            !await dbContext.OilGasAssets.AnyAsync(
+                x => x.Id == request.AssetId.Value,
+                cancellationToken))
+        {
+            return BadRequest(new { Message = "Selected Oil & Gas asset was not found." });
+        }
+
+        if (request.LocationId.HasValue &&
+            !await dbContext.OilGasLocations.AnyAsync(
+                x => x.Id == request.LocationId.Value,
+                cancellationToken))
+        {
+            return BadRequest(new { Message = "Selected operational location was not found." });
+        }
+
+        var number = RequiredText(request.PermitNumber, "Permit number");
+        if (number.Error is not null) return BadRequest(new { Message = number.Error });
+
+        var type = RequiredText(request.PermitType, "Permit type");
+        if (type.Error is not null) return BadRequest(new { Message = type.Error });
+
+        var authority = RequiredText(request.IssuingAuthority, "Issuing authority");
+        if (authority.Error is not null) return BadRequest(new { Message = authority.Error });
+
+        if (!Enum.IsDefined(request.Status))
+            return BadRequest(new { Message = "Select a valid permit status." });
+
+        if (await dbContext.OilGasPermits.AnyAsync(
+                x => x.Id != permitId && x.PermitNumber == number.Value,
+                cancellationToken))
+        {
+            return Conflict(new { Message = $"Permit number '{number.Value}' already exists." });
+        }
+
+        entity.AssetId = request.AssetId;
+        entity.LocationId = request.LocationId;
+        entity.PermitNumber = number.Value!;
+        entity.PermitType = type.Value!;
+        entity.IssuingAuthority = authority.Value!;
+        entity.EffectiveDateUtc = EnsureUtc(request.EffectiveDateUtc);
+        entity.ExpiryDateUtc = EnsureUtc(request.ExpiryDateUtc);
+        entity.Status = request.Status;
+        entity.ResponsibleOfficer = NormalizeOptional(request.ResponsibleOfficer);
+        entity.Notes = NormalizeOptional(request.Notes);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await WriteAudit(
+            auditTrailWriter,
+            tenant.TenantId,
+            "OilGasPermit",
+            entity.Id,
+            "Update",
+            $"Oil & Gas permit {entity.PermitNumber} updated.",
+            cancellationToken);
+
+        return Ok(new { Message = "Licence or permit updated.", Item = entity });
+    }
+
 
     [Authorize(Policy = AuthorizationPolicies.OilGasView)]
     [HttpGet("production")]
@@ -547,7 +1072,8 @@ public sealed class OilGasController : ControllerBase
         var validation = await ValidateProductionRequest(request, dbContext, cancellationToken);
         if (validation is not null) return BadRequest(new { Message = validation });
 
-        var nextNumber = $"OGP-{request.ProductionDateUtc:yyyyMMdd}-{(await dbContext.OilGasProductionEntries.CountAsync(x => x.ProductionDateUtc.Date == request.ProductionDateUtc.Date, cancellationToken) + 1):D4}";
+        var productionDateUtc = EnsureUtc(request.ProductionDateUtc);
+        var nextNumber = $"OGP-{productionDateUtc:yyyyMMdd}-{(await dbContext.OilGasProductionEntries.CountAsync(x => x.ProductionDateUtc.Date == productionDateUtc.Date, cancellationToken) + 1):D4}";
         var entity = new OilGasProductionEntry
         {
             Id = Guid.NewGuid(), TenantId = tenant.TenantId, EntryNumber = nextNumber,
@@ -759,7 +1285,7 @@ public sealed class OilGasController : ControllerBase
 
     private static void ApplyProduction(OilGasProductionEntry entity, SaveProductionRequest request)
     {
-        entity.ProductionDateUtc = request.ProductionDateUtc.Date;
+        entity.ProductionDateUtc = EnsureUtc(request.ProductionDateUtc).Date;
         entity.AssetId = request.AssetId;
         entity.LocationId = request.LocationId;
         entity.ProductId = request.ProductId;
@@ -791,6 +1317,26 @@ public sealed class OilGasController : ControllerBase
     }
 
     private static string? NormalizeOptional(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static DateTime EnsureUtc(DateTime value)
+    {
+        if (value == default)
+        {
+            return value;
+        }
+
+        return value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+        };
+    }
+
+    private static DateTime? EnsureUtc(DateTime? value)
+    {
+        return value.HasValue ? EnsureUtc(value.Value) : null;
+    }
     private static object TenantError() => new { Message = "Tenant context is required.", RequiredHeader = "X-Tenant-Key" };
 
     private async Task WriteAudit(IAuditTrailWriter writer, Guid tenantId, string entityType, Guid entityId, string action, string description, CancellationToken cancellationToken)

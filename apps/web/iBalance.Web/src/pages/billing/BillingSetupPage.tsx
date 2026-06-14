@@ -34,6 +34,13 @@ function accountLabel(account: BillingPostingAccountDto): string {
   return `${account.code} - ${account.name}`;
 }
 
+function formsAreEqual(
+  left: SaveBillingPolicyRequest,
+  right: SaveBillingPolicyRequest,
+): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
 type AccountSelectProps = {
   label: string;
   value?: string | null;
@@ -77,8 +84,11 @@ export function BillingSetupPage() {
   const canManage = canManageBillingSetup();
 
   const [form, setForm] = useState<SaveBillingPolicyRequest>(defaultForm);
+  const [savedForm, setSavedForm] =
+    useState<SaveBillingPolicyRequest>(defaultForm);
   const [message, setMessage] = useState('');
   const [errorText, setErrorText] = useState('');
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
 
   const policyQ = useQuery({
     queryKey: ['billing-policy'],
@@ -98,10 +108,15 @@ export function BillingSetupPage() {
     [postingAccountsQ.data?.items]
   );
 
+  const isDirty = useMemo(
+    () => !formsAreEqual(form, savedForm),
+    [form, savedForm],
+  );
+
   useEffect(() => {
     if (policyQ.data?.item) {
       const item = policyQ.data.item;
-      setForm({
+      const loadedForm: SaveBillingPolicyRequest = {
         invoicePrefix: item.invoicePrefix,
         nextInvoiceNumber: item.nextInvoiceNumber,
         currencyCode: item.currencyCode,
@@ -116,20 +131,62 @@ export function BillingSetupPage() {
         defaultTaxRate: Number(item.defaultTaxRate || 0),
         defaultDueDays: Number(item.defaultDueDays || 30),
         notes: item.notes || '',
-      });
+      };
+
+      setForm(loadedForm);
+      setSavedForm(loadedForm);
     }
   }, [policyQ.data?.item]);
 
+  useEffect(() => {
+    if (!message) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setMessage('');
+    }, 10_000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [message]);
+
   const saveMut = useMutation({
     mutationFn: saveBillingPolicy,
-    onSuccess: (response) => {
-      setMessage(response.message || 'Billing setup saved.');
+    onMutate: () => {
+      setMessage('');
       setErrorText('');
-      queryClient.invalidateQueries({ queryKey: ['billing-policy'] });
-      queryClient.invalidateQueries({ queryKey: ['billing-posting-accounts'] });
     },
-    onError: (error) => setErrorText(getBillingReadableError(error, 'Unable to save Billing setup.')),
+    onSuccess: async (response) => {
+      setSavedForm(form);
+      setLastSavedAt(new Date());
+      setMessage(
+        response.message ||
+          'Billing setup saved successfully. The values shown below are now active.',
+      );
+      setErrorText('');
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['billing-policy'] }),
+        queryClient.invalidateQueries({
+          queryKey: ['billing-posting-accounts'],
+        }),
+      ]);
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    onError: (error) => {
+      setMessage('');
+      setErrorText(
+        getBillingReadableError(error, 'Unable to save Billing setup.'),
+      );
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
   });
+
+  function resetChanges() {
+    setForm(savedForm);
+    setMessage('Unsaved changes were discarded.');
+    setErrorText('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
   if (!canView) {
     return <div className="panel error-panel">You do not have access to Billing setup.</div>;
@@ -150,8 +207,26 @@ export function BillingSetupPage() {
         <div className="muted">
           Configure numbering, maker/checker behavior, default due days, tax defaults, and GL posting account mapping.
         </div>
-        {message ? <div className="success-panel">{message}</div> : null}
-        {errorText ? <div className="error-panel">{errorText}</div> : null}
+        <div aria-live="polite">
+          {message ? <div className="success-panel">{message}</div> : null}
+          {errorText ? <div className="error-panel">{errorText}</div> : null}
+        </div>
+
+        {isDirty && canManage ? (
+          <div className="panel" style={{ marginTop: 12 }}>
+            <strong>Unsaved changes</strong>
+            <div className="muted">
+              You have changed this setup. Click Save Billing Setup to make the
+              new values active.
+            </div>
+          </div>
+        ) : null}
+
+        {!isDirty && lastSavedAt ? (
+          <div className="muted" style={{ marginTop: 10 }}>
+            Last saved successfully at {lastSavedAt.toLocaleTimeString()}.
+          </div>
+        ) : null}
       </section>
 
       <section className="panel">
@@ -317,9 +392,29 @@ export function BillingSetupPage() {
         </div>
 
         {canManage ? (
-          <button className="button primary" onClick={() => saveMut.mutate(form)} disabled={saveMut.isPending}>
-            {saveMut.isPending ? 'Saving...' : 'Save Billing Setup'}
-          </button>
+          <div className="inline-actions">
+            <button
+              className="button primary"
+              type="button"
+              onClick={() => saveMut.mutate(form)}
+              disabled={saveMut.isPending || !isDirty}
+            >
+              {saveMut.isPending
+                ? 'Saving...'
+                : isDirty
+                  ? 'Save Billing Setup'
+                  : 'Saved'}
+            </button>
+
+            <button
+              className="button secondary"
+              type="button"
+              onClick={resetChanges}
+              disabled={saveMut.isPending || !isDirty}
+            >
+              Discard Changes
+            </button>
+          </div>
         ) : null}
       </section>
     </div>

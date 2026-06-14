@@ -108,6 +108,7 @@ export type AppPermission =
   | 'eam.retirement.submit'
   | 'eam.retirement.approve'
   | 'eam.retirement.reject'
+  | 'eam.retirement.post'
   | 'eam.refund.record'
   | 'eam.recovery.manage'
   | 'eam.policy.manage'
@@ -117,6 +118,7 @@ export type AppPermission =
   | 'workflow.reopen'
   | 'reports.view'
   | 'reports.export'
+  | 'workingcapital.view'
   | 'billing.view'
   | 'billing.setup.manage'
   | 'billing.invoice.create'
@@ -155,6 +157,16 @@ export type AppPermission =
   | 'oilgas.movement.post'
   | 'oilgas.lifting.manage'
   | 'oilgas.reconciliation.manage'
+  | 'oilgas.lifting.approve'
+  | 'oilgas.lifting.complete'
+  | 'oilgas.afe.manage'
+  | 'oilgas.afe.approve'
+  | 'oilgas.partner.manage'
+  | 'oilgas.production-close.manage'
+  | 'oilgas.production-close.approve'
+  | 'oilgas.hse.manage'
+  | 'oilgas.equipment.manage'
+  | 'oilgas.document.manage'
   | 'fleet.view' 
   | 'fleet.vehicle.manage' 
   | 'fleet.driver.manage'
@@ -350,6 +362,16 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
     'oilgas.movement.post',
     'oilgas.lifting.manage',
     'oilgas.reconciliation.manage',
+    'oilgas.lifting.approve',
+    'oilgas.lifting.complete',
+    'oilgas.afe.manage',
+    'oilgas.afe.approve',
+    'oilgas.partner.manage',
+    'oilgas.production-close.manage',
+    'oilgas.production-close.approve',
+    'oilgas.hse.manage',
+    'oilgas.equipment.manage',
+    'oilgas.document.manage',
   ],
   TenantAdmin: [
     'approval.inbox.view',
@@ -506,6 +528,16 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
     'oilgas.movement.post',
     'oilgas.lifting.manage',
     'oilgas.reconciliation.manage',
+    'oilgas.lifting.approve',
+    'oilgas.lifting.complete',
+    'oilgas.afe.manage',
+    'oilgas.afe.approve',
+    'oilgas.partner.manage',
+    'oilgas.production-close.manage',
+    'oilgas.production-close.approve',
+    'oilgas.hse.manage',
+    'oilgas.equipment.manage',
+    'oilgas.document.manage',
   ],
   FinanceController: [
     'approval.inbox.view',
@@ -973,6 +1005,16 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
     'oilgas.movement.post',
     'oilgas.lifting.manage',
     'oilgas.reconciliation.manage',
+    'oilgas.lifting.approve',
+    'oilgas.lifting.complete',
+    'oilgas.afe.manage',
+    'oilgas.afe.approve',
+    'oilgas.partner.manage',
+    'oilgas.production-close.manage',
+    'oilgas.production-close.approve',
+    'oilgas.hse.manage',
+    'oilgas.equipment.manage',
+    'oilgas.document.manage',
     'workflow.approve',
     'workflow.reject',
     'reports.export',
@@ -983,6 +1025,8 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
     'oilgas.production.update',
     'oilgas.production.correct',
     'oilgas.production.submit',
+    'oilgas.afe.manage',
+    'oilgas.production-close.manage',
     'oilgas.reports.view',
   ],
   ProductionApprover: [
@@ -1007,14 +1051,6 @@ const rolePermissions: Record<UserRole, AppPermission[]> = {
     'oilgas.view',
     'oilgas.reports.view',
     'oilgas.export',
-    'oilgas.movement.create',
-    'oilgas.movement.update',
-    'oilgas.movement.submit',
-    'oilgas.movement.approve',
-    'oilgas.movement.reject',
-    'oilgas.movement.post',
-    'oilgas.lifting.manage',
-    'oilgas.reconciliation.manage',
   ],
 
   FleetOfficer: [
@@ -1081,7 +1117,9 @@ export function getAssignableRolesForRole(role: UserRole | null | undefined): Us
       'BudgetOfficer',
       'BudgetOwner',
       'PayrollOfficer',
+      'HrManager',
       'HrOfficer',
+      'HrViewer',
       'ProcurementOfficer',
       'TreasuryOfficer',
       'InventoryOfficer',
@@ -1118,7 +1156,9 @@ export function getAssignableRolesForRole(role: UserRole | null | undefined): Us
       'BudgetOfficer',
       'BudgetOwner',
       'PayrollOfficer',
+      'HrManager',
       'HrOfficer',
+      'HrViewer',
       'ProcurementOfficer',
       'TreasuryOfficer',
       'InventoryOfficer',
@@ -1146,3 +1186,4 @@ export function getAssignableRolesForRole(role: UserRole | null | undefined): Us
 
   return [];
 }
+
